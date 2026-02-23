@@ -88,13 +88,14 @@ def mark_attendance():
         if update_query:
             subjects_collection.update_one({'_id': subject_id}, update_query)
 
-        # 3. Handle Substitution Logic (unchanged logic, just safety wrapper)
+        # 3. Handle Substitution Logic
         if status == 'substituted' and sub_oid:
             sub_id = sub_oid
             sub_subject = subjects_collection.find_one({'_id': sub_id})
             if sub_subject:
                  attendance_log_collection.insert_one({
                     "subject_id": sub_id,
+                    "subject_name": sub_subject.get('name'), # Added for visibility
                     "owner_email": user_email,
                     "date": date_str,
                     "status": "present",
@@ -251,7 +252,8 @@ def get_classes_for_date():
         # Get slots for this specific subject, sorted by time
         subj_slots = sorted([s for s in slots_to_return if s['id'] == sid], key=lambda x: x.get('time', ''))
         # Get logs for this specific subject on this date, sorted by mark-time (timestamp)
-        subj_logs = sorted([l for l in logs if str(l.get('subject_id')) == sid], key=lambda x: x.get('timestamp', datetime.min))
+        # CRITICAL: Exclude 'substitution_class' from regular slot matching to prevent clashing
+        subj_logs = sorted([l for l in logs if str(l.get('subject_id')) == sid and l.get('type') != 'substitution_class'], key=lambda x: x.get('timestamp', datetime.min))
         
         current_log_idx = 0
         for i, slot in enumerate(subj_slots):
@@ -285,6 +287,27 @@ def get_classes_for_date():
                 slot['notes'] = log.get('notes', '')
                 if log.get('substituted_by'):
                     slot['substituted_by'] = str(log.get('substituted_by'))
+
+    # 3. Add any unmatched logs as extra slots (e.g. substitutions, extra classes)
+    unmatched_logs = [l for l in logs if str(l.get('_id')) not in processed_log_ids]
+    for log in unmatched_logs:
+        sid = str(log.get('subject_id'))
+        # Use Subject Name from log if exists, else fallback to name in current subjects
+        name = log.get('subject_name')
+        if not name:
+             subject = subjects_collection.find_one({"_id": ObjectId(sid)})
+             name = subject.get('name') if subject else "Extra Class"
+             
+        slots_to_return.append({
+            "id": sid,
+            "log_id": str(log.get('_id')),
+            "name": name,
+            "time": "Extra / Sub",
+            "type": log.get('type', 'Lecture'),
+            "marked_status": log.get('status', 'pending'),
+            "notes": log.get('notes', ''),
+            "is_extra": True
+        })
 
     import json
     return success_response(json.loads(json_util.dumps(slots_to_return)))

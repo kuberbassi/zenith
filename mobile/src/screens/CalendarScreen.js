@@ -153,7 +153,16 @@ const CalendarScreen = ({ navigation }) => {
         }
         try {
             // 1. Optimistic Update (List)
-            setDayClasses(prev => prev.map(c => (c._id === subjectId || c.id === subjectId) ? { ...c, marked_status: status } : c));
+            setDayClasses(prev => prev.map(c => {
+                // If we match by log_id, it's a specific unique record
+                if (logId && c.log_id === logId) return { ...c, marked_status: status };
+                // If no logId, we match the first pending slot for this subject
+                // (or all pending slots if using simple subjectId matching)
+                if (!logId && !c.log_id && (c._id === subjectId || c.id === subjectId)) {
+                    return { ...c, marked_status: status };
+                }
+                return c;
+            }));
 
             // 2. Optimistic Update (Calendar Dots)
             const dateKey = selectedDate;
@@ -163,8 +172,12 @@ const CalendarScreen = ({ navigation }) => {
                 const monthData = { ...(prev[monthKey] || {}) };
                 const dayLogs = [...(monthData[dateKey] || [])];
 
-                // Remove existing log for this subject if any
-                const filteredLogs = dayLogs.filter(l => l.subject_id !== subjectId && l.id !== subjectId);
+                // Remove existing log for this subject or specific log_id
+                const filteredLogs = dayLogs.filter(l => {
+                    if (logId && (l._id === logId || l.id === logId)) return false;
+                    if (!logId && (l.subject_id === subjectId || l.id === subjectId)) return false;
+                    return true;
+                });
 
                 // Add new log if not clearing
                 if (status !== 'pending') {
