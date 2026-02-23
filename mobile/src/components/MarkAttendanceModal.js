@@ -57,7 +57,6 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
 
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
-    const transAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         if (visible) {
@@ -115,24 +114,28 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
         setSelectedStatus(cls.marked_status || 'present');
         setNote(cls.note || '');
         setSubstitutedBy(cls.substituted_by || '');
-        Animated.spring(transAnim, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }).start();
     };
 
     const closeAdvanced = () => {
-        Animated.timing(transAnim, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => {
-            setAdvancedClass(null);
-            setNote('');
-            setSelectedStatus(null);
-            setSubstitutedBy('');
-        });
+        setAdvancedClass(null);
+        setNote('');
+        setSelectedStatus(null);
+        setSubstitutedBy('');
     };
 
     const handleConfirmAdvanced = () => {
         if (advancedClass) {
-            const id = getSafeId(advancedClass.isMerged ? advancedClass.originalClasses[0]._id || advancedClass.originalClasses[0].id : advancedClass._id || advancedClass.id);
-            const logId = advancedClass.isMerged ? advancedClass.originalClasses[0].log_id : advancedClass.log_id;
-            const type = advancedClass.type;
-            onMark(id, selectedStatus, note, logId, false, type, substitutedBy);
+            if (advancedClass.isMerged) {
+                // Fire all updates in parallel without blocking the UI
+                advancedClass.originalClasses.forEach((cls, i) => {
+                    const isLast = i === advancedClass.originalClasses.length - 1;
+                    const id = getSafeId(cls._id || cls.id);
+                    onMark(id, selectedStatus, note, cls.log_id, !isLast, cls.type, substitutedBy);
+                });
+            } else {
+                const id = getSafeId(advancedClass._id || advancedClass.id);
+                onMark(id, selectedStatus, note, advancedClass.log_id, false, advancedClass.type, substitutedBy);
+            }
             closeAdvanced();
         }
     };
@@ -140,8 +143,8 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
     const handleClearMark = () => {
         if (advancedClass) {
             if (advancedClass.isMerged) {
-                advancedClass.originalClasses.forEach((cls, idx) => {
-                    const isLast = idx === advancedClass.originalClasses.length - 1;
+                advancedClass.originalClasses.forEach((cls, i) => {
+                    const isLast = i === advancedClass.originalClasses.length - 1;
                     const cleanSubId = getSafeId(cls.subject_id || cls.subjectId || cls.id || cls._id);
                     onMark(cleanSubId, 'pending', '', cls.log_id, !isLast, cls.type);
                 });

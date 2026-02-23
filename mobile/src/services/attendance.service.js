@@ -20,7 +20,7 @@ const clearCalendarCaches = () => {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
-    
+
     // Clear current and adjacent months for all semesters
     for (let sem = 1; sem <= 8; sem++) {
         for (let m = month - 1; m <= month + 1; m++) {
@@ -113,8 +113,8 @@ export const attendanceService = {
         clearCalendarCaches();
     },
 
-    editAttendance: async (logId, status, notes, date) => {
-        await api.post(`/api/edit_attendance/${logId}`, { status, notes, date });
+    editAttendance: async (logId, status, notes, date, substitutedById = null, type = 'Lecture') => {
+        await api.post(`/api/edit_attendance/${logId}`, { status, notes, date, substituted_by_id: substitutedById, type });
         clearCache('dash_1');
         clearCache('dash_2');
         clearCache('reports_1');
@@ -413,11 +413,11 @@ export const attendanceService = {
         const key = 'uni_notices';
         const timestampKey = 'uni_notices_timestamp';
         const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
-        
+
         if (!force) {
             const cached = await getCached(key);
             const cachedTimestamp = await getCached(timestampKey);
-            
+
             // Check if cache is valid (within TTL)
             if (cached && cachedTimestamp) {
                 const age = Date.now() - parseInt(cachedTimestamp, 10);
@@ -427,7 +427,7 @@ export const attendanceService = {
                 }
             }
         }
-        
+
         // Fetch fresh data - this may be slow due to IPU scraper
         console.log('🌐 Fetching fresh notices from server...');
         const response = await api.get('/api/notices');

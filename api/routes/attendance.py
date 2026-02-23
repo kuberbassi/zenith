@@ -33,6 +33,7 @@ def mark_attendance():
     try:
         data = request.json or {}
         user_email = session['user']['email'].lower()  # ✅ Normalized
+        print(f"DEBUG: /mark called with data: {data}")
         
         # Validation
         subject_id_str = data.get('subject_id')
@@ -77,9 +78,11 @@ def mark_attendance():
         
         # 2. Update stats
         update_query = {}
-        if status in ['present', 'absent', 'late', 'approved_medical']:
+        # Statuses that count towards Total
+        if status in ['present', 'absent', 'late', 'approved_medical', 'medical', 'duty']:
             update_query.setdefault('$inc', {})['total'] = 1
-            if status in ['present', 'late', 'approved_medical']:
+            # Statuses that count towards Attended
+            if status in ['present', 'late', 'approved_medical', 'medical', 'duty']:
                 update_query.setdefault('$inc', {})['attended'] = 1
         
         if update_query:
@@ -292,6 +295,7 @@ def edit_attendance(log_id):
     if 'user' not in session: return error_response("Unauthorized", "UNAUTHORIZED", 401)
     user_email = session['user']['email'].lower()  # ✅ Normalized
     data = request.json
+    print(f"DEBUG: /edit_attendance/{log_id} called with data: {data}")
     
     try:
         log = attendance_log_collection.find_one({"_id": ObjectId(log_id), "owner_email": user_email})
@@ -306,6 +310,16 @@ def edit_attendance(log_id):
         if 'status' in data: update_fields['status'] = new_status
         if 'notes' in data: update_fields['notes'] = new_notes
         if 'date' in data: update_fields['date'] = data['date']
+        if 'type' in data: update_fields['type'] = data['type']
+        
+        # Handle Substituted By update
+        sub_id_val = data.get('substituted_by_id')
+        if sub_id_val:
+            try:
+                update_fields['substituted_by'] = ObjectId(sub_id_val)
+            except: pass
+        elif 'substituted_by_id' in data: # Explicitly clearing it
+            update_fields['substituted_by'] = None
         
         attendance_log_collection.update_one(
             {"_id": ObjectId(log_id)},
@@ -318,15 +332,15 @@ def edit_attendance(log_id):
             inc_updates = {}
             
             # Revert old effect
-            if old_status in ['present', 'absent', 'late', 'approved_medical']:
+            if old_status in ['present', 'absent', 'late', 'approved_medical', 'medical', 'duty']:
                 inc_updates['total'] = inc_updates.get('total', 0) - 1
-                if old_status in ['present', 'late', 'approved_medical']:
+                if old_status in ['present', 'late', 'approved_medical', 'medical', 'duty']:
                     inc_updates['attended'] = inc_updates.get('attended', 0) - 1
             
             # Apply new effect
-            if new_status in ['present', 'absent', 'late', 'approved_medical']:
+            if new_status in ['present', 'absent', 'late', 'approved_medical', 'medical', 'duty']:
                 inc_updates['total'] = inc_updates.get('total', 0) + 1
-                if new_status in ['present', 'late', 'approved_medical']:
+                if new_status in ['present', 'late', 'approved_medical', 'medical', 'duty']:
                     inc_updates['attended'] = inc_updates.get('attended', 0) + 1
             
             if inc_updates:

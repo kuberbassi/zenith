@@ -153,7 +153,7 @@ const CalendarScreen = ({ navigation }) => {
         }
         try {
             // 1. Optimistic Update (List)
-            setDayClasses(prev => prev.map(c => c._id === subjectId ? { ...c, marked_status: status } : c));
+            setDayClasses(prev => prev.map(c => (c._id === subjectId || c.id === subjectId) ? { ...c, marked_status: status } : c));
 
             // 2. Optimistic Update (Calendar Dots)
             const dateKey = selectedDate;
@@ -164,7 +164,7 @@ const CalendarScreen = ({ navigation }) => {
                 const dayLogs = [...(monthData[dateKey] || [])];
 
                 // Remove existing log for this subject if any
-                const filteredLogs = dayLogs.filter(l => l.subject_id !== subjectId);
+                const filteredLogs = dayLogs.filter(l => l.subject_id !== subjectId && l.id !== subjectId);
 
                 // Add new log if not clearing
                 if (status !== 'pending') {
@@ -186,7 +186,7 @@ const CalendarScreen = ({ navigation }) => {
                 await attendanceService.deleteAttendance(logId);
             } else if (logId) {
                 // EDIT existing log (prevents duplicates when re-saving)
-                await attendanceService.editAttendance(logId, status, note, selectedDate);
+                await attendanceService.editAttendance(logId, status, note, selectedDate, substitutedById, type);
             } else {
                 // Create NEW log
                 await attendanceService.markAttendance(
@@ -205,8 +205,8 @@ const CalendarScreen = ({ navigation }) => {
                 const d = new Date(selectedDate);
                 fetchMonthData(d.getFullYear(), d.getMonth() + 1);
 
-                // 5. Verify Persistence (Refresh List)
-                await fetchClassesForDate(selectedDate);
+                // 5. Verify Persistence (Refresh List in background)
+                fetchClassesForDate(selectedDate);
             }
 
         } catch (error) {
