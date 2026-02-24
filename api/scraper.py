@@ -149,86 +149,86 @@ def get_notice_stats():
     return success_response(stats)
 
 def scrape_ipu_notices():
+    """Optimized hybrid Regex + BS4 scraper for the 4MB IPU notices page."""
     url = "http://www.ipu.ac.in/notices.php"
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
     
     try:
-        response = requests.get(url, headers=headers, timeout=5)
+        # Increase timeout slightly as the page is huge
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
-        soup = BeautifulSoup(response.content, 'html.parser')
+        # Use regex to find table rows — extremely fast even on 4MB
+        row_pattern = re.compile(r'<tr[^>]*>(.*?)</tr>', re.IGNORECASE | re.DOTALL)
+        rows = list(row_pattern.finditer(response.text))
+        
         notices = []
-        
-        links = []
-        
-        notice_container = soup.find('div', id='content') or soup.find('div', class_='content')
-        if notice_container:
-            links = notice_container.find_all('a', href=True)
-            
-        if not links:
-            for table in soup.find_all('table'):
-                row_count = len(table.find_all('tr'))
-                if row_count > 10:
-                    links = table.find_all('a', href=True)
-                    if links: break
-        
-        if not links:
-            links = soup.find_all('a', href=True)
-        
-        notice_count = 0
-        for link in links:
-            if notice_count >= 50:
-                break
-                
-            title = link.get_text(strip=True)
-            href = link.get('href', '')
-            
-            if not href or not title or len(title) < 5:
-                continue
-            
-            if not any(keyword in href.lower() for keyword in ['pdf', 'notice', 'upload', 'download', '.php']):
-                continue
-                
-            if not href.startswith('http'):
-                href = f"http://www.ipu.ac.in/{href.lstrip('/')}"
-            
-            date_str = datetime.now().strftime("%Y-%m-%d")
-            
+        # Process first 150 rows (typically contains last 2-3 months of notices)
+        for row_match in rows[:150]:
             try:
-                row = link.find_parent('tr')
-                if row:
-                    cols = row.find_all('td')
-                    for col in cols:
-                        text = col.get_text(strip=True)
-                        match = re.search(r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})', text)
-                        if match:
-                            date_str = match.group(0)
-                            break
+                row_html = row_match.group(1)
+                row_soup = BeautifulSoup(row_html, 'html.parser')
                 
-                if date_str == datetime.now().strftime("%Y-%m-%d"):
-                    match = re.search(r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})', title)
-                    if match:
-                        date_str = match.group(0)
+                link = row_soup.find('a', href=True)
+                if not link:
+                    continue
+                    
+                title = link.get_text(strip=True)
+                href = link.get('href', '').strip()
                 
-                if date_str == datetime.now().strftime("%Y-%m-%d"):
-                    prev_text = link.find_previous(string=True)
-                    if prev_text:
-                        match = re.search(r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})', prev_text)
-                        if match:
-                            date_str = match.group(0)
-            except:
-                pass
-
-            notices.append({
-                "title": title[:250],
-                "link": href,
-                "date": date_str,
-                "category": categorize_notice(title)
-            })
-            notice_count += 1
-            
+                # Validation
+                if not title or len(title) < 5:
+                    continue
+                
+                href_lower = href.lower()
+                # Ensure it looks like a document/notice
+                if not any(kw in href_lower for kw in ['.pdf', 'notice', 'upload', 'circular', 'download', 'order', 'datesheet']):
+                    continue
+                
+                # Fix relative URLs
+                if not href.startswith('http'):
+                    href = f"http://www.ipu.ac.in/{href.lstrip('/')}"
+                
+                # Extract date from other cells in the same row
+                date_str = None
+                cols = row_soup.find_all('td')
+                for col in cols:
+                    col_text = col.get_text(strip=True)
+                    # Look for DD-MM-YYYY or similar patterns
+                    date_match = re.search(r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})', col_text)
+                    if date_match:
+                        date_str = date_match.group(0)
+                        break
+                
+                if not date_str:
+                    # Fallback 1: search in title
+                    date_match = re.search(r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})', title)
+                    if date_match:
+                        date_str = date_match.group(0)
+                    else:
+                        # Fallback 2: search in filename (e.g. nt240226)
+                        # IPU puts dates like YYMMDD or DDMMYY in filename
+                        date_match = re.search(r'(\d{2})(\d{2})(\d{2})', href)
+                        if date_match:
+                            d, m, y = date_match.groups()
+                            # Basic heuristic: if d > 31, it's probably yymmdd
+                            if int(d) > 31: 
+                                date_str = f"{y}-{m}-20{d}"
+                            else:
+                                date_str = f"{d}-{m}-20{y}"
+                
+                notices.append({
+                    "title": title[:250],
+                    "link": href,
+                    "date": date_str or datetime.now().strftime("%d-%m-%Y"),
+                    "category": categorize_notice(title)
+                })
+            except Exception as row_err:
+                print(f"Skipping row due to error: {row_err}")
+                continue
+                
         return notices if notices else []
 
     except Exception as e:
