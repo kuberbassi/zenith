@@ -67,15 +67,24 @@ def get_notices():
                     _refreshing = True
                     threading.Thread(target=_background_refresh, daemon=True).start()
         else:
-            # No cached data or force refresh — block and fetch
-            print("Fetching fresh notices via scraper...")
-            try:
-                notices = scrape_ipu_notices()
-                if notices:
-                    _notice_cache["data"] = notices
-                    _notice_cache["last_updated"] = now
-            except Exception as e:
-                print(f"Scraper update failed: {e}")
+            # Cold start or force — fetch with hard timeout to avoid Vercel 504
+            print("Fetching fresh notices via scraper (cold start)...")
+            result = [None]
+            def _fetch():
+                try:
+                    result[0] = scrape_ipu_notices()
+                except Exception as e:
+                    print(f"Scraper fetch failed: {e}")
+            
+            t = threading.Thread(target=_fetch, daemon=True)
+            t.start()
+            t.join(timeout=6)  # Hard 6s ceiling — Vercel has 30s limit
+            
+            if result[0]:
+                _notice_cache["data"] = result[0]
+                _notice_cache["last_updated"] = now
+            else:
+                print("Scraper timed out or returned empty — serving empty response")
     
     notices = _notice_cache["data"]
     
@@ -101,7 +110,7 @@ def scrape_ipu_notices():
     }
     
     try:
-        response = requests.get(url, headers=headers, timeout=8)
+        response = requests.get(url, headers=headers, timeout=5)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.content, 'html.parser')
