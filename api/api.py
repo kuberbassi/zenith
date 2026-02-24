@@ -526,15 +526,23 @@ def get_dashboard_data():
     if 'user' not in session: return jsonify({"error": "Unauthorized"}), 401
     try:
         user_email = session['user']['email']
-        # Fetch preferences from the correct collection
-        user_prefs_doc = preferences_collection.find_one({'owner_email': user_email})
+        current_semester = int(request.args.get('semester', 1))
+
+        # Parallel-ish: fetch preferences + subjects with projection (only needed fields)
+        subject_projection = {
+            '_id': 1, 'name': 1, 'code': 1, 'professor': 1, 'classroom': 1,
+            'attended': 1, 'total': 1, 'semester': 1, 'owner_email': 1,
+            'type': 1, 'color': 1, 'credits': 1
+        }
+        user_prefs_doc = preferences_collection.find_one(
+            {'owner_email': user_email},
+            {'preferences.attendance_threshold': 1}  # Only fetch what we need
+        )
         prefs = user_prefs_doc.get('preferences', {}) if user_prefs_doc else {}
         required_percent = int(prefs.get('attendance_threshold', 75))
 
-        current_semester = int(request.args.get('semester', 1)) 
-        # Filter by semester when provided
         query = {"owner_email": user_email, "semester": current_semester}
-        subjects = list(subjects_collection.find(query))
+        subjects = list(subjects_collection.find(query, subject_projection))
         
         total_attended = sum(s.get('attended', 0) for s in subjects)
         total_classes = sum(s.get('total', 0) for s in subjects)
@@ -550,16 +558,14 @@ def get_dashboard_data():
             **calculate_bunk_guard(s.get('attended', 0), s.get('total', 0), required_percent)
         } for s in subjects]
         
-        # Transform subjects list to include percentage and status_message for frontend usage
-        # This matches the structure expected by Dashboard.tsx (Subject & { attendance_percentage: number; status_message: string })
+        # Transform subjects — use jsonify instead of slow json_util.dumps
         transformed_subjects = []
         for s in subjects:
             stats = calculate_bunk_guard(s.get('attended', 0), s.get('total', 0), required_percent)
             s_dict = {
-                **s,
+                **{k: v for k, v in s.items() if k != '_id'},
                 "attendance_percentage": stats["percentage"],
                 "status_message": stats["status_message"],
-                # Ensure _id is string for frontend consistency if needed
                 "_id": str(s['_id'])
             }
             transformed_subjects.append(s_dict)
@@ -572,7 +578,10 @@ def get_dashboard_data():
             "current_semester": current_semester,
             "total_subjects": len(subjects)
         }
-        return Response(json_util.dumps(response_data), mimetype='application/json')
+        # Use jsonify (fast) instead of json_util.dumps (slow BSON serializer)
+        resp = jsonify(response_data)
+        resp.headers['Cache-Control'] = 'private, max-age=30'
+        return resp
     except Exception as e:
         print(f"---! ERROR IN /api/dashboard_data: {e} !---")
         traceback.print_exc()

@@ -16,15 +16,17 @@ def init_db():
         return None
         
     try:
-        # Increase timeout slightly or keep as is
+        # Serverless-optimized: minimal pool, tight timeouts for fast cold starts
         client = MongoClient(
             mongo_uri,
-            maxPoolSize=200,    # Increased for 5M+ accounts concurrency
-            minPoolSize=10,
-            serverSelectionTimeoutMS=5000,
-            connectTimeoutMS=5000,
-            socketTimeoutMS=30000,
-            retryWrites=True
+            maxPoolSize=10,      # Serverless doesn't need 200 — each invocation is short-lived
+            minPoolSize=1,       # Just 1 warm connection
+            serverSelectionTimeoutMS=3000,  # Fail fast if DB unreachable (was 5s)
+            connectTimeoutMS=3000,          # 3s connect (was 5s)
+            socketTimeoutMS=10000,          # 10s socket (was 30s — way too long for serverless)
+            retryWrites=True,
+            maxIdleTimeMS=45000,            # Close idle connections after 45s
+            appName='acadhub-vercel'        # Helps with Atlas monitoring
         )
         # Force a connection check to see if it fails immediately (DNS etc)
         # asking for a database is lazy in pymongo, but we want to know if it failed for the 'db' proxy logic

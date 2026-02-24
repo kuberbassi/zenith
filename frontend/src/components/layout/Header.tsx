@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Bell, Search, X,
     LayoutDashboard, PieChart, CalendarDays, CalendarClock,
-    BookOpen, StickyNote, GraduationCap, Trophy, Beaker, Settings
+    GraduationCap, Trophy, Beaker, Settings, Target
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -17,11 +17,10 @@ const routeTitles: Record<string, { title: string; icon: React.ElementType }> = 
     '/analytics': { title: 'Analytics', icon: PieChart },
     '/timetable': { title: 'Schedule', icon: CalendarClock },
     '/calendar': { title: 'Calendar', icon: CalendarDays },
-    '/planner': { title: 'Planner', icon: BookOpen },
-    '/board': { title: 'Board', icon: StickyNote },
     '/courses': { title: 'Courses', icon: GraduationCap },
     '/results': { title: 'Results', icon: Trophy },
     '/practicals': { title: 'Assignments', icon: Beaker },
+    '/skills': { title: 'Skills', icon: Target },
     '/settings': { title: 'Settings', icon: Settings },
     '/notifications': { title: 'Notifications', icon: Bell },
 };
@@ -32,11 +31,10 @@ const quickNavItems = [
     { name: 'Analytics', href: '/analytics', icon: PieChart },
     { name: 'Schedule', href: '/timetable', icon: CalendarClock },
     { name: 'Calendar', href: '/calendar', icon: CalendarDays },
-    { name: 'Planner', href: '/planner', icon: BookOpen },
-    { name: 'Board', href: '/board', icon: StickyNote },
     { name: 'Courses', href: '/courses', icon: GraduationCap },
     { name: 'Results', href: '/results', icon: Trophy },
     { name: 'Assignments', href: '/practicals', icon: Beaker },
+    { name: 'Skills', href: '/skills', icon: Target },
     { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
