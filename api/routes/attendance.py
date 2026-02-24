@@ -350,8 +350,8 @@ def edit_attendance(log_id):
         )
         
         # Update Stats if status changed
+        subject_id = log.get('subject_id')
         if old_status != new_status:
-            subject_id = log.get('subject_id')
             inc_updates = {}
             
             # Revert old effect
@@ -367,10 +367,48 @@ def edit_attendance(log_id):
                     inc_updates['attended'] = inc_updates.get('attended', 0) + 1
             
             if inc_updates:
-                # Remove 0 updates to avoid no-op or errors
                 final_inc = {k: v for k, v in inc_updates.items() if v != 0}
                 if final_inc:
                     subjects_collection.update_one({'_id': subject_id}, {'$inc': final_inc})
+
+            # --- Substitution companion log management ---
+            date_str = data.get('date', log.get('date'))
+            subject_name = log.get('subject_name') or ''
+
+            # If OLD status was substituted, remove the old companion log
+            if old_status == 'substituted' and log.get('substituted_by'):
+                old_sub_id = log.get('substituted_by')
+                companion = attendance_log_collection.find_one({
+                    'subject_id': old_sub_id, 'owner_email': user_email,
+                    'date': date_str, 'type': 'substitution_class',
+                    'notes': {'$regex': f'^Substituted {subject_name}'}
+                })
+                if companion:
+                    subjects_collection.update_one({'_id': old_sub_id}, {'$inc': {'total': -1, 'attended': -1}})
+                    attendance_log_collection.delete_one({'_id': companion['_id']})
+                    print(f"DEBUG edit: Removed old companion sub log {companion['_id']}")
+
+            # If NEW status is substituted, create a new companion log
+            if new_status == 'substituted' and sub_id_val:
+                try:
+                    sub_oid = ObjectId(sub_id_val)
+                    sub_subject = subjects_collection.find_one({'_id': sub_oid})
+                    if sub_subject:
+                        attendance_log_collection.insert_one({
+                            'subject_id': sub_oid,
+                            'subject_name': sub_subject.get('name'),
+                            'owner_email': user_email,
+                            'date': date_str,
+                            'status': 'present',
+                            'type': 'substitution_class',
+                            'timestamp': datetime.utcnow(),
+                            'semester': sub_subject.get('semester'),
+                            'notes': f"Substituted {subject_name}"
+                        })
+                        subjects_collection.update_one({'_id': sub_oid}, {'$inc': {'total': 1, 'attended': 1}})
+                        print(f"DEBUG edit: Created companion sub log for {sub_subject.get('name')}")
+                except Exception as sub_e:
+                    logger.error(f"Failed to create companion sub log on edit: {sub_e}")
 
         create_system_log(user_email, "Attendance Updated", f"Updated record for {log.get('subject_name')}")
         return success_response({"message": "Updated successfully"})
@@ -399,9 +437,9 @@ def delete_attendance(log_id):
         subject_id = log.get('subject_id')
         
         update_query = {}
-        if status in ['present', 'absent', 'late', 'approved_medical']:
+        if status in ['present', 'absent', 'late', 'approved_medical', 'medical', 'duty']:
             update_query.setdefault('$inc', {})['total'] = -1
-            if status in ['present', 'late', 'approved_medical']:
+            if status in ['present', 'late', 'approved_medical', 'medical', 'duty']:
                 update_query.setdefault('$inc', {})['attended'] = -1
         
         if update_query and subject_id:
@@ -410,6 +448,21 @@ def delete_attendance(log_id):
             except Exception as e:
                  logger.error(f"Failed to update stats on delete: {e}")
         
+        # Cascade-delete companion substitution_class log if this was a 'substituted' entry
+        if status == 'substituted' and log.get('substituted_by'):
+            sub_id = log.get('substituted_by')
+            subject_name = log.get('subject_name', '')
+            date_str = log.get('date', '')
+            companion = attendance_log_collection.find_one({
+                'subject_id': sub_id, 'owner_email': user_email,
+                'date': date_str, 'type': 'substitution_class',
+                'notes': {'$regex': f'^Substituted {subject_name}'}
+            })
+            if companion:
+                subjects_collection.update_one({'_id': sub_id}, {'$inc': {'total': -1, 'attended': -1}})
+                attendance_log_collection.delete_one({'_id': companion['_id']})
+                print(f"DEBUG delete: Cascade-removed companion sub log {companion['_id']}")
+
         attendance_log_collection.delete_one({"_id": log_oid})
         create_system_log(user_email, "Attendance Deleted", f"Deleted record for {log.get('subject_name', 'Unknown Class')}")
         

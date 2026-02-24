@@ -125,8 +125,16 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
 
     const handleConfirmAdvanced = () => {
         if (advancedClass) {
+            const payload = {
+                id: advancedClass._id || advancedClass.id,
+                status: selectedStatus,
+                logId: advancedClass.log_id,
+                sub: substitutedBy
+            };
+            console.log("💾 handleConfirmAdvanced triggering onMark:", payload);
+
             if (advancedClass.isMerged) {
-                // Fire all updates in parallel without blocking the UI
+                console.log(`🔗 Merged Class: Processing ${advancedClass.originalClasses.length} slots`);
                 advancedClass.originalClasses.forEach((cls, i) => {
                     const isLast = i === advancedClass.originalClasses.length - 1;
                     const id = getSafeId(cls._id || cls.id);
@@ -137,6 +145,8 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
                 onMark(id, selectedStatus, note, advancedClass.log_id, false, advancedClass.type, substitutedBy);
             }
             closeAdvanced();
+        } else {
+            console.warn("⚠️ handleConfirmAdvanced: advancedClass is null");
         }
     };
 
@@ -164,7 +174,9 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
         classesList.forEach((slot) => {
             const slotId = getSafeId(slot.id || slot._id);
             const subjectId = getSafeId(slot.subject_id || slot.subjectId || slot.id || slot._id);
-            const isSameSubject = currentGroup && ((subjectId && getSafeId(currentGroup.subject_id || currentGroup.subjectId || currentGroup.id) === subjectId) || (slot.name === currentGroup.name));
+            const isSameSubject = currentGroup &&
+                ((subjectId && getSafeId(currentGroup.subject_id || currentGroup.subjectId || currentGroup.id) === subjectId) || (slot.name === currentGroup.name)) &&
+                !slot.is_extra && !currentGroup.is_extra; // CRITICAL: Don't group extra/sub logs
 
             if (currentGroup && isSameSubject && slot.type === currentGroup.type) {
                 currentGroup.originalClasses.push(slot);
@@ -240,7 +252,11 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
                         <View style={{ marginBottom: 20 }}>
                             <Text style={styles.label}>Substituted By</Text>
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
-                                {subjects.filter(s => getSafeId(s._id || s.id) !== getSafeId(advancedClass.subject_id)).map((sub) => {
+                                {subjects.filter(s => {
+                                    const subId = getSafeId(s._id || s.id);
+                                    const currentSubId = getSafeId(advancedClass.subject_id || advancedClass.id);
+                                    return subId !== currentSubId;
+                                }).map((sub) => {
                                     const subId = getSafeId(sub._id || sub.id);
                                     const isSelected = substitutedBy === subId;
                                     return (
@@ -258,13 +274,23 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
                 </ScrollView>
 
                 <View style={styles.stickyFooter}>
-                    <PressableScale style={{ flex: 1 }} onPress={handleClearMark}>
+                    <TouchableOpacity
+                        style={{ flex: 1 }}
+                        onPress={handleClearMark}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                         <View style={styles.clearBtn}>
                             <Trash2 size={18} color={c.danger} />
                             <Text style={styles.clearBtnText}>Clear</Text>
                         </View>
-                    </PressableScale>
-                    <PressableScale style={{ flex: 1 }} onPress={handleConfirmAdvanced}>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={{ flex: 1 }}
+                        onPress={handleConfirmAdvanced}
+                        activeOpacity={0.7}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
                         <LinearGradient
                             colors={c.gradients?.primary || [c.primary, c.primary]}
                             style={styles.saveBtn}
@@ -273,7 +299,7 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
                             <Save size={18} color="#FFF" />
                             <Text style={styles.saveBtnText}>Save</Text>
                         </LinearGradient>
-                    </PressableScale>
+                    </TouchableOpacity>
                 </View>
             </View>
         );
