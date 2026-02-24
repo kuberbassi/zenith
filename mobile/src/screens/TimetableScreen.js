@@ -585,7 +585,7 @@ const TimetableScreen = ({ navigation }) => {
                         <Text style={styles.modalTitle}>{editingSlot ? 'Edit Class' : 'Add Class'} ({selectedDay})</Text>
 
                         <View style={{ flexShrink: 1 }}>
-                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 4 }} style={{ flexGrow: 0 }}>
+                            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 4 }} style={{ flexGrow: 0 }}>
                                 <Text style={styles.label}>Subject</Text>
                                 <View style={styles.subjectGrid}>
                                     {(subjects || []).map(sub => {
@@ -661,7 +661,7 @@ const TimetableScreen = ({ navigation }) => {
                         <LinearGradient colors={isDark ? theme.gradients.cardDark : theme.gradients.cardLight} style={{ padding: 24, borderRadius: 32, borderWidth: 1, borderColor: c.glassBorder }}>
                             <Text style={styles.pickerTitle}>Select Time</Text>
                             <View style={styles.pickerRow}>
-                                <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
+                                <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
                                     {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
                                         <PressableScale key={`h_${h}`} style={[styles.pickerItem, tempTime.hour === h && styles.pickerSelected]} onPress={() => setTempTime(prev => ({ ...prev, hour: h }))}>
                                             <Text style={[styles.pickerText, tempTime.hour === h && styles.pickerSelectedText]}>{h.toString().padStart(2, '0')}</Text>
@@ -669,7 +669,7 @@ const TimetableScreen = ({ navigation }) => {
                                     ))}
                                 </ScrollView>
                                 <Text style={styles.colon}>:</Text>
-                                <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false}>
+                                <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
                                     {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
                                         <PressableScale key={`m_${m}`} style={[styles.pickerItem, tempTime.minute === m && styles.pickerSelected]} onPress={() => setTempTime(prev => ({ ...prev, minute: m }))}>
                                             <Text style={[styles.pickerText, tempTime.minute === m && styles.pickerSelectedText]}>{m.toString().padStart(2, '0')}</Text>
@@ -714,7 +714,7 @@ const TimetableScreen = ({ navigation }) => {
                         </View>
 
                         <View style={{ flexShrink: 1 }}>
-                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 4 }} style={{ flexGrow: 0 }}>
+                            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 4 }} style={{ flexGrow: 0 }}>
                                 {tempPeriods.map((p, idx) => (
                                     <LinearGradient
                                         key={idx}

@@ -71,9 +71,13 @@ const GlassTabBarBackground = () => {
 const MainTabs = () => {
   const { isDark, accentColor } = useTheme();
   const primary = accentColor || theme.palette.purple;
-  
+  const insets = require('react-native-safe-area-context').useSafeAreaInsets();
+
   // Create a semi-transparent version for backgrounds
   const accentBgColor = `${primary}33`; // 20% opacity
+
+  // Dynamic bottom offset: ensures tab bar clears 3-button nav bars
+  const tabBottom = Platform.OS === 'ios' ? 24 : Math.max(insets.bottom, 16);
 
   return (
     <Tab.Navigator
@@ -88,7 +92,7 @@ const MainTabs = () => {
           marginHorizontal: 24,
           alignSelf: 'center',
           width: Dimensions.get('window').width - 48,
-          bottom: Platform.OS === 'ios' ? 24 : 16,
+          bottom: tabBottom,
           borderRadius: 32,
           paddingBottom: 0,
           paddingTop: 10,

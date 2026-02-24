@@ -1,12 +1,12 @@
-import React, { useRef } from 'react';
-import { Animated, Pressable, StyleSheet } from 'react-native';
+import React, { useRef, useCallback } from 'react';
+import { Animated, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 
 import * as Haptics from 'expo-haptics';
 
-const PressableScale = ({ children, onPress, style, scaleTo = 0.95, friction = 8, tension = 45, activeOpacity = 0.9, ...props }) => {
+const PressableScale = ({ children, onPress, style, scaleTo = 0.95, friction = 8, tension = 45, activeOpacity = 0.9, disabled, ...props }) => {
     const scaleAnim = useRef(new Animated.Value(1)).current;
 
-    const handlePressIn = () => {
+    const handlePressIn = useCallback(() => {
         // Dynamic Haptics
         if (props.hapticStyle === 'medium') {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -26,26 +26,30 @@ const PressableScale = ({ children, onPress, style, scaleTo = 0.95, friction = 8
             tension,
             useNativeDriver: true,
         }).start();
-    };
+    }, [props.hapticStyle, scaleTo, friction, tension]);
 
-    const handlePressOut = () => {
+    const handlePressOut = useCallback(() => {
         Animated.spring(scaleAnim, {
             toValue: 1,
             friction,
             tension,
             useNativeDriver: true,
         }).start();
-    };
+    }, [friction, tension]);
 
     // Flatten style to safely access properties for inheritance
     const flatStyle = StyleSheet.flatten(style) || {};
 
     return (
-        <Pressable
+        <TouchableOpacity
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
             onPress={onPress}
+            activeOpacity={activeOpacity}
+            disabled={disabled}
             style={style}
+            hitSlop={props.hitSlop}
+            delayPressIn={0}
             {...props}
         >
             <Animated.View style={[
@@ -55,15 +59,14 @@ const PressableScale = ({ children, onPress, style, scaleTo = 0.95, friction = 8
                 flatStyle.alignItems ? { alignItems: flatStyle.alignItems } : null,
                 flatStyle.justifyContent ? { justifyContent: flatStyle.justifyContent } : null,
                 flatStyle.flex ? { flex: 1 } : null,
-                // Ensure the animated view fills the Pressable parent if it has fixed dimensions
+                // Ensure the animated view fills parent if it has fixed dimensions
                 flatStyle.width ? { width: '100%' } : null,
                 flatStyle.height ? { height: '100%' } : null
             ]}>
                 {children}
             </Animated.View>
-        </Pressable>
+        </TouchableOpacity>
     );
 };
 
 export default PressableScale;
-

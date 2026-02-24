@@ -217,7 +217,7 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
                     </PressableScale>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }} style={{ flex: 1 }}>
+                <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }} style={{ flex: 1 }}>
                     <View style={styles.statusGrid}>
                         {[
                             { id: 'present', icon: Check, color: c.success },
@@ -332,7 +332,7 @@ const MarkAttendanceModal = ({ visible, onClose, date, classes, onMark, onRefres
                                         </PressableScale>
                                     </View>
 
-                                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }} style={{ flex: 1 }}>
+                                    <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }} style={{ flex: 1 }}>
                                         {groupedClasses.length > 0 ? (
                                             groupedClasses.map((cls, index) => {
                                                 const isMarked = cls.marked_status && cls.marked_status !== 'pending';

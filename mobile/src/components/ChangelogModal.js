@@ -168,6 +168,7 @@ const ChangelogModal = () => {
                         style={styles.content}
                         contentContainerStyle={styles.contentContainer}
                         showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled
                     >
                         <Text style={[styles.releaseName, { color: c.onSurface }]}>
                             {changelog.name}

@@ -50,7 +50,11 @@ const DashboardScreen = ({ navigation }) => {
 
     const fetchDashboardData = async (force = false) => {
         try {
-            const data = await attendanceService.getDashboardData(selectedSemester, force);
+            // Fetch dashboard data + silently warm notice cache in parallel
+            const [data] = await Promise.all([
+                attendanceService.getDashboardData(selectedSemester, force),
+                attendanceService.getNotices(false).catch(() => null), // silent prefetch
+            ]);
             setDashboardData(data);
 
             if (data?.subjects) {
@@ -362,7 +366,7 @@ const DashboardScreen = ({ navigation }) => {
                     )}
                 </View>
 
-                <View style={{ height: 100 }} />
+                <View style={{ height: 80 + insets.bottom }} />
             </AnimatedScrollView>
 
             {/* UNIVERSAL ANIMATED HEADER - MOVED TO FRONT LAYER */}

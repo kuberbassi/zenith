@@ -137,7 +137,7 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
                     </View>
 
                     <View style={{ flexShrink: 1, maxHeight: height * 0.7 }}>
-                        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]} showsVerticalScrollIndicator={false} style={{ flexGrow: 0 }}>
+                        <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 40 }]} showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{ flexGrow: 0 }}>
 
                             {/* Section: Basic Info */}
                             <Text style={styles.sectionLabel}>Basic Info</Text>

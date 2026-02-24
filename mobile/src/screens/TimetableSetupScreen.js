@@ -704,7 +704,7 @@ const TimetableSetupScreen = ({ navigation }) => {
                                     </View>
                                 </View>
 
-                                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+                                <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" style={{ maxHeight: 400 }}>
                                     <View style={{ paddingBottom: 20, paddingTop: 4, paddingHorizontal: 24 }}>
                                         <Text style={styles.label}>Time Slot</Text>
                                         <View style={{ height: 60, marginBottom: 20 }}>
@@ -793,7 +793,7 @@ const TimetableSetupScreen = ({ navigation }) => {
                                         {/* Always Show Subjects */}
                                         <View style={{ flex: 1, marginTop: 10 }}>
                                             <Text style={styles.label}>Assign Subject</Text>
-                                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                                            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 }}>
                                                 <View style={styles.subGrid}>
                                                     {Array.isArray(subjects) ? subjects.map((sub, mapIdx) => {
                                                         const subId = safeId(sub._id || sub.id);

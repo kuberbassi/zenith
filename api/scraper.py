@@ -1,4 +1,5 @@
 import re
+import threading
 from flask import Blueprint, jsonify, request
 import requests
 from bs4 import BeautifulSoup
@@ -26,30 +27,55 @@ def categorize_notice(title):
             return cat
     return "General"
 
-# Simple in-memory cache
-CACHE_TIMEOUT = 3600  # 1 hour
+# In-memory cache with background refresh
+CACHE_TIMEOUT = 600  # 10 minutes (was 3600)
 _notice_cache = {
     "data": [],
     "last_updated": None
 }
+_refresh_lock = threading.Lock()
+_refreshing = False
+
+def _background_refresh():
+    """Refresh notices in a background thread so the main request isn't blocked."""
+    global _refreshing
+    try:
+        notices = scrape_ipu_notices()
+        if notices:
+            _notice_cache["data"] = notices
+            _notice_cache["last_updated"] = datetime.now()
+    except Exception as e:
+        print(f"Background scraper refresh failed: {e}")
+    finally:
+        with _refresh_lock:
+            _refreshing = False
 
 @scraper_bp.route('/notices', methods=['GET'])
 def get_notices():
-    global _notice_cache
+    global _refreshing
     category_filter = request.args.get('category')
     force_refresh = request.args.get('force') == 'true'
     
     now = datetime.now()
-    if force_refresh or not _notice_cache["last_updated"] or (now - _notice_cache["last_updated"]).total_seconds() > CACHE_TIMEOUT:
-        print("Fetching fresh notices via scraper...")
-        try:
-            notices = scrape_ipu_notices()
-            if notices: # Only update cache if successful
-                _notice_cache["data"] = notices
-                _notice_cache["last_updated"] = now
-        except Exception as e:
-             print(f"Scraper update failed: {e}")
-             # Serve stale data if available
+    cache_expired = not _notice_cache["last_updated"] or (now - _notice_cache["last_updated"]).total_seconds() > CACHE_TIMEOUT
+
+    if force_refresh or cache_expired:
+        if _notice_cache["data"] and not force_refresh:
+            # Serve stale data immediately, refresh in background
+            with _refresh_lock:
+                if not _refreshing:
+                    _refreshing = True
+                    threading.Thread(target=_background_refresh, daemon=True).start()
+        else:
+            # No cached data or force refresh — block and fetch
+            print("Fetching fresh notices via scraper...")
+            try:
+                notices = scrape_ipu_notices()
+                if notices:
+                    _notice_cache["data"] = notices
+                    _notice_cache["last_updated"] = now
+            except Exception as e:
+                print(f"Scraper update failed: {e}")
     
     notices = _notice_cache["data"]
     
@@ -60,7 +86,8 @@ def get_notices():
 
 @scraper_bp.route('/stats', methods=['GET'])
 def get_notice_stats():
-    notices = scrape_ipu_notices()
+    # Use cached data if available, don't re-scrape
+    notices = _notice_cache["data"] if _notice_cache["data"] else scrape_ipu_notices()
     stats = {}
     for n in notices:
         cat = n.get('category', 'General')
@@ -74,7 +101,7 @@ def scrape_ipu_notices():
     }
     
     try:
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=8)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.content, 'html.parser')

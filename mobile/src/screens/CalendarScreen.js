@@ -437,7 +437,7 @@ const CalendarScreen = ({ navigation }) => {
 };
 
 const getStyles = (c, isDark, insets) => StyleSheet.create({
-    scrollContent: { padding: 16, paddingTop: Layout.header.maxHeight + (insets?.top || 20) - 30, paddingBottom: 40 },
+    scrollContent: { padding: 16, paddingTop: Layout.header.maxHeight + (insets?.top || 20) - 30, paddingBottom: 80 + (insets?.bottom || 0) },
     manageBtn: { backgroundColor: c.glassBgEnd, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: c.glassBorder },
     manageText: { color: c.primary, fontWeight: '700', fontSize: 12 },
     calendarCard: {

@@ -4,11 +4,6 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Logic for Smart Notifications
-// We don't want to spam user.
-// Rule: Notify only if attendance < threshold AND classes_to_attend > 0.
-// Rule: Max 1 notification per subject per day.
-
 const NOTIF_STORAGE_KEY = 'NOTIFIED_SUBJECTS_LOG';
 
 Notifications.setNotificationHandler({
@@ -39,11 +34,8 @@ export const NotificationService = {
                 const { status } = await Notifications.requestPermissionsAsync();
                 finalStatus = status;
             }
-            // Expo SDK 53+ in Expo Go has limited push notification support for remote tokens.
-            // We use a try-catch and check environment to avoid crashing in Expo Go.
             try {
                 if (Constants.appOwnership === 'expo') {
-                    // console.log('Skipping remote push token registration (Expo Go environment)');
                     return null;
                 }
                 const token = (await Notifications.getExpoPushTokenAsync({
@@ -67,51 +59,54 @@ export const NotificationService = {
                 body,
                 sound: true,
             },
-            trigger: null, // Immediate
+            trigger: null,
         });
     },
 
-    // The "Smart" Check
+    // Single consolidated notification — no spam
     async checkAndNotify(subjects, threshold = 75) {
         if (!subjects || subjects.length === 0) return;
 
         try {
             const todayStr = new Date().toISOString().split('T')[0];
             const logStr = await AsyncStorage.getItem(NOTIF_STORAGE_KEY);
-            let log = logStr ? JSON.parse(logStr) : {}; // { date: "YYYY-MM-DD", subjects: ["id1", "id2"] }
+            let log = logStr ? JSON.parse(logStr) : {};
 
-            // Reset log if new day
-            if (log.date !== todayStr) {
-                log = { date: todayStr, subjects: [] };
-            }
+            // Already sent today's summary — skip
+            if (log.date === todayStr && log.sent) return;
 
-            // Check user preferences for threshold? Assume 75 for safety default or parse status_message
-            // The dashboard data has 'status_message' and 'percentage' pre-calculated by backend.
-            // We can use that.
+            // Collect all subjects below threshold
+            const lowSubjects = subjects.filter(s => {
+                const pct = s.attendance_percentage;
+                const msg = (s.status_message || '').toLowerCase();
+                return pct < threshold && msg.includes('attend');
+            });
 
-            for (const subject of subjects) {
-                const pct = subject.attendance_percentage; // 75.5
-                const statusMsg = subject.status_message || ""; // "Attend next 2 classes"
+            if (lowSubjects.length === 0) return;
 
-                // Criteria: Low Attendance (<threshold%) AND actionable message "Attend"
-                const isDanger = statusMsg.toLowerCase().includes('attend') && pct < threshold;
+            // Build one compact summary
+            // e.g. "Math 62% · Physics 71% · DSA 68%"
+            const summary = lowSubjects
+                .map(s => {
+                    const name = (s.name || 'Subject').length > 12
+                        ? (s.name || 'Subject').substring(0, 12).trim() + '…'
+                        : (s.name || 'Subject');
+                    return `${name} ${Math.round(s.attendance_percentage)}%`;
+                })
+                .join(' · ');
 
-                if (isDanger) {
-                    if (!log.subjects.includes(subject._id)) {
-                        await this.scheduleLocalNotification(
-                            "Attendance Hint 💡",
-                            `${subject.name}: ${pct}% (${statusMsg})`
-                        );
-                        log.subjects.push(subject._id);
-                    }
-                }
-            }
+            const title = `📉 ${lowSubjects.length} subject${lowSubjects.length > 1 ? 's' : ''} below ${threshold}%`;
 
-            // Save log
-            await AsyncStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(log));
+            await this.scheduleLocalNotification(title, summary);
+
+            // Mark as sent for today
+            await AsyncStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify({
+                date: todayStr,
+                sent: true,
+            }));
 
         } catch (e) {
-            console.error("Smart Notification Check Error", e);
+            console.error("Notification Check Error", e);
         }
     }
 };
