@@ -5,6 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from api.utils.response import success_response, error_response
+from api.database import db
 
 scraper_bp = Blueprint('scraper', __name__)
 
@@ -27,8 +28,11 @@ def categorize_notice(title):
             return cat
     return "General"
 
-# In-memory cache with background refresh
-CACHE_TIMEOUT = 600  # 10 minutes (was 3600)
+# ── Persistent cache via MongoDB ──────────────────────────────────
+# In-memory cache is just a fast layer; MongoDB is the durable store.
+# On cold start, we load from MongoDB instantly (~200ms) instead of
+# scraping ipu.ac.in (~5-10s or timeout).
+CACHE_TIMEOUT = 600  # 10 minutes
 _notice_cache = {
     "data": [],
     "last_updated": None
@@ -36,14 +40,47 @@ _notice_cache = {
 _refresh_lock = threading.Lock()
 _refreshing = False
 
+CACHE_COLLECTION = 'notice_cache'
+CACHE_DOC_ID = 'ipu_notices'
+
+def _load_from_mongo():
+    """Load cached notices from MongoDB (survives Vercel cold starts)."""
+    try:
+        doc = db.get_collection(CACHE_COLLECTION).find_one({"_id": CACHE_DOC_ID})
+        if doc and doc.get("notices"):
+            _notice_cache["data"] = doc["notices"]
+            _notice_cache["last_updated"] = doc.get("updated_at", datetime.now())
+            print(f"✅ Loaded {len(doc['notices'])} notices from MongoDB cache")
+            return True
+    except Exception as e:
+        print(f"⚠️ MongoDB cache load failed: {e}")
+    return False
+
+def _save_to_mongo(notices):
+    """Persist notices to MongoDB so next cold start is instant."""
+    try:
+        db.get_collection(CACHE_COLLECTION).update_one(
+            {"_id": CACHE_DOC_ID},
+            {"$set": {
+                "notices": notices,
+                "updated_at": datetime.now(),
+                "count": len(notices)
+            }},
+            upsert=True
+        )
+    except Exception as e:
+        print(f"⚠️ MongoDB cache save failed: {e}")
+
 def _background_refresh():
-    """Refresh notices in a background thread so the main request isn't blocked."""
+    """Refresh notices in background, persist to MongoDB."""
     global _refreshing
     try:
         notices = scrape_ipu_notices()
         if notices:
             _notice_cache["data"] = notices
             _notice_cache["last_updated"] = datetime.now()
+            _save_to_mongo(notices)
+            print(f"✅ Background refresh done — {len(notices)} notices saved")
     except Exception as e:
         print(f"Background scraper refresh failed: {e}")
     finally:
@@ -57,34 +94,38 @@ def get_notices():
     force_refresh = request.args.get('force') == 'true'
     
     now = datetime.now()
+
+    # Cold start: memory is empty → load from MongoDB first
+    if not _notice_cache["data"]:
+        _load_from_mongo()
+
     cache_expired = not _notice_cache["last_updated"] or (now - _notice_cache["last_updated"]).total_seconds() > CACHE_TIMEOUT
 
     if force_refresh or cache_expired:
-        if _notice_cache["data"] and not force_refresh:
-            # Serve stale data immediately, refresh in background
-            with _refresh_lock:
-                if not _refreshing:
-                    _refreshing = True
-                    threading.Thread(target=_background_refresh, daemon=True).start()
-        else:
-            # Cold start or force — fetch with hard timeout to avoid Vercel 504
-            print("Fetching fresh notices via scraper (cold start)...")
+        # Always kick off background refresh — never block the response
+        with _refresh_lock:
+            if not _refreshing:
+                _refreshing = True
+                threading.Thread(target=_background_refresh, daemon=True).start()
+
+        # If still no data after trying MongoDB, do a quick inline fetch
+        if not _notice_cache["data"]:
+            print("Cold start with empty MongoDB — inline fetch with 5s ceiling")
             result = [None]
             def _fetch():
                 try:
                     result[0] = scrape_ipu_notices()
                 except Exception as e:
-                    print(f"Scraper fetch failed: {e}")
+                    print(f"Inline scraper fetch failed: {e}")
             
             t = threading.Thread(target=_fetch, daemon=True)
             t.start()
-            t.join(timeout=6)  # Hard 6s ceiling — Vercel has 30s limit
+            t.join(timeout=5)
             
             if result[0]:
                 _notice_cache["data"] = result[0]
                 _notice_cache["last_updated"] = now
-            else:
-                print("Scraper timed out or returned empty — serving empty response")
+                _save_to_mongo(result[0])
     
     notices = _notice_cache["data"]
     
@@ -95,8 +136,12 @@ def get_notices():
 
 @scraper_bp.route('/stats', methods=['GET'])
 def get_notice_stats():
-    # Use cached data if available, don't re-scrape
-    notices = _notice_cache["data"] if _notice_cache["data"] else scrape_ipu_notices()
+    # Use cached data — load from mongo if memory is empty
+    if not _notice_cache["data"]:
+        _load_from_mongo()
+    notices = _notice_cache["data"]
+    if not notices:
+        notices = scrape_ipu_notices() or []
     stats = {}
     for n in notices:
         cat = n.get('category', 'General')
@@ -116,16 +161,12 @@ def scrape_ipu_notices():
         soup = BeautifulSoup(response.content, 'html.parser')
         notices = []
         
-        # Try to find the main notice table first for better accuracy
-        # The IPU site often uses multiple nested tables
         links = []
         
-        # Priority 1: Specifically targeted areas
         notice_container = soup.find('div', id='content') or soup.find('div', class_='content')
         if notice_container:
             links = notice_container.find_all('a', href=True)
             
-        # Priority 2: Tables that look like they contain notices (often have many rows)
         if not links:
             for table in soup.find_all('table'):
                 row_count = len(table.find_all('tr'))
@@ -133,13 +174,12 @@ def scrape_ipu_notices():
                     links = table.find_all('a', href=True)
                     if links: break
         
-        # Fallback 3: All links (original strategy)
         if not links:
             links = soup.find_all('a', href=True)
         
         notice_count = 0
         for link in links:
-            if notice_count >= 50: # Increased for better categorization coverage
+            if notice_count >= 50:
                 break
                 
             title = link.get_text(strip=True)
@@ -156,28 +196,22 @@ def scrape_ipu_notices():
             
             date_str = datetime.now().strftime("%Y-%m-%d")
             
-            # Improved date extraction
             try:
-                # 1. Look in the same table row
                 row = link.find_parent('tr')
                 if row:
                     cols = row.find_all('td')
                     for col in cols:
                         text = col.get_text(strip=True)
-                        # Look for date patterns: DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY
-                        # Or even just numbers with separators
                         match = re.search(r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})', text)
                         if match:
                             date_str = match.group(0)
                             break
                 
-                # 2. Look in the text itself if not found
                 if date_str == datetime.now().strftime("%Y-%m-%d"):
                     match = re.search(r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})', title)
                     if match:
                         date_str = match.group(0)
                 
-                # 3. Look at preceding/following elements lightly
                 if date_str == datetime.now().strftime("%Y-%m-%d"):
                     prev_text = link.find_previous(string=True)
                     if prev_text:
