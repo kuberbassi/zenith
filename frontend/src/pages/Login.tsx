@@ -1,34 +1,12 @@
-import React from 'react';
-import { useGoogleLogin } from '@react-oauth/google';
+import React, { useState } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
 import { motion } from 'framer-motion';
-import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import { useAuth } from '@/contexts/AuthContext';
 
 const Login: React.FC = () => {
     const { loginWithGoogle } = useAuth();
-
-    const handleLogin = useGoogleLogin({
-        onSuccess: async (codeResponse) => {
-
-            try {
-                await loginWithGoogle(codeResponse.code);
-
-                // User will be redirected by AuthContext
-            } catch (error) {
-                console.error('❌ Backend login failed:', error);
-                alert('Login failed. Check console for details.');
-            }
-        },
-        onError: (error) => {
-            console.error('❌ Google Login Failed:', error);
-            alert(`Google Login Error: ${JSON.stringify(error)}`);
-        },
-        flow: 'auth-code',
-        // @ts-ignore
-        prompt: 'consent', // Force consent prompt to ensure we get a refresh_token
-        scope: 'email profile openid'
-    });
+    const [error, setError] = useState<string | null>(null);
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center bg-surface-container p-4 relative overflow-hidden">
@@ -60,15 +38,33 @@ const Login: React.FC = () => {
                         Sign in to AcadHub to continue
                     </p>
 
-                    <Button
-                        onClick={() => handleLogin()}
-                        variant="filled"
-                        size="lg"
-                        className="w-full !rounded-full !h-12 !text-base shadow-none hover:shadow-elevation-1"
-                        icon={<span className="material-icons text-xl">login</span>}
-                    >
-                        Sign in with Google
-                    </Button>
+                    <div className="flex flex-col items-center gap-3">
+                        <GoogleLogin
+                            onSuccess={async (credentialResponse) => {
+                                setError(null);
+                                try {
+                                    if (!credentialResponse.credential) throw new Error('No credential received');
+                                    await loginWithGoogle(credentialResponse.credential);
+                                } catch (err) {
+                                    console.error('❌ Backend login failed:', err);
+                                    setError('Login failed. Please try again.');
+                                }
+                            }}
+                            onError={() => {
+                                console.error('❌ Google Login Failed');
+                                setError('Google sign-in failed. Please try again.');
+                            }}
+                            theme="filled_black"
+                            size="large"
+                            width={320}
+                            text="signin_with"
+                            shape="pill"
+                        />
+                        {error && (
+                            <p className="text-error text-sm">{error}</p>
+                        )}
+
+                    </div>
 
                     <p className="mt-8 text-xs text-on-surface-variant dark:text-dark-surface-variant opacity-70">
                         By continuing, you agree to our{' '}

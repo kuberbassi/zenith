@@ -104,9 +104,10 @@ export default defineConfig({
     },
     port: 5173,
     proxy: {
+      // All /api routes go to the Node backend
       '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: false,
+        target: 'http://localhost:5001',
+        changeOrigin: true,
         secure: false,
         ws: true,
       },
@@ -120,7 +121,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          charts: ['recharts'],
+          charts: ['chart.js', 'react-chartjs-2'],
           animations: ['framer-motion'],
         },
       },

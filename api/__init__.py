@@ -227,7 +227,6 @@ def create_app():
     app.add_url_rule('/api/delete_attendance/<log_id>', view_func=delete_attendance, methods=['DELETE'])
     app.add_url_rule('/api/logs/<log_id>', view_func=delete_attendance, methods=['DELETE'])
 
-    # Data Management Routes
     from api.routes.data_management import data_mgmt_bp, export_data, import_data, delete_all_data, restore_backup, list_backups
     app.register_blueprint(data_mgmt_bp, url_prefix='/api/v1/data')
     app.add_url_rule('/api/export_data', view_func=export_data, methods=['GET'])
@@ -235,6 +234,12 @@ def create_app():
     app.add_url_rule('/api/delete_all_data', view_func=delete_all_data, methods=['DELETE'])
     app.add_url_rule('/api/backups', view_func=list_backups, methods=['GET'])
     app.add_url_rule('/api/restore_backup/<backup_id>', view_func=restore_backup, methods=['POST'])
+
+    # IPU Exam Portal Routes
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    from api.routes.ipu import ipu_bp
+    app.register_blueprint(ipu_bp, url_prefix='/api/ipu')
 
     
     # Initialize Rate Limiter

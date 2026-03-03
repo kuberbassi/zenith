@@ -53,13 +53,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // CRITICAL: Refetch user data when returning to the tab (Cross-Device Sync)
     // If user updates PFP on mobile, focusing the web tab will now update the header instantly.
     const lastFetchRef = React.useRef<number>(0);
-    const FETCH_COOLDOWN = 60000; // 60 seconds
+    const FETCH_COOLDOWN = 5 * 60 * 1000; // 5 minutes — reduces 429s on Google profile picture
+    const isLoggedIn = !!user; // use primitive so effect doesn't re-attach on every user object change
 
     useEffect(() => {
         const handleFocus = async () => {
             const now = Date.now();
             // Only fetch if tab is visible, we are logged in, and cooldown has passed
-            if (document.visibilityState === 'visible' && user && (now - lastFetchRef.current > FETCH_COOLDOWN)) {
+            if (document.visibilityState === 'visible' && isLoggedIn && (now - lastFetchRef.current > FETCH_COOLDOWN)) {
                 try {
                     lastFetchRef.current = now;
                     const freshUser = await authService.getCurrentUser();
@@ -80,7 +81,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             window.removeEventListener('focus', handleFocus);
             document.removeEventListener('visibilitychange', handleFocus);
         };
-    }, [user]); // Add user to dependency to ensure check happens when logged in
+    }, [isLoggedIn]); // primitive bool — only re-attaches on actual login/logout
 
     const login = () => {
         // Legacy login (redirect) - largely unused now

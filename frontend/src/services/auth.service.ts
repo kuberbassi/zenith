@@ -9,12 +9,10 @@ export const authService = {
         window.location.href = `${baseUrl}/api/auth/login`;
     },
 
-    loginWithGoogle: async (authCode: string): Promise<User | null> => {
+    loginWithGoogle: async (credential: string): Promise<User | null> => {
         try {
-            // Send the auth code to backend to verify and get tokens
-            const response = await api.post('/api/auth/google', {
-                code: authCode
-            });
+            // Send the Google ID token to our Node backend for verification
+            const response = await api.post('/api/auth/google', { credential });
 
             const { token, user } = response.data;
 
@@ -33,7 +31,7 @@ export const authService = {
     // Get current user
     getCurrentUser: async (): Promise<User | null> => {
         try {
-            const response = await api.get('/api/current_user');
+            const response = await api.get('/api/auth/me');
             return response.data.data;
         } catch (error) {
             return null;

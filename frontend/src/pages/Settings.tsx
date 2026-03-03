@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     User, Palette, Settings as SettingsIcon, Download, Upload,
     Sun, Moon, AlertTriangle, LogOut, Trash2,
-    Activity, Clock, FileText, Edit2
+    Activity, Clock, FileText, Edit2, Camera,
+    GraduationCap, BookOpen, Target,
+    Mail, Hash, Building2, CalendarDays, Shield
 } from 'lucide-react';
 import type { SystemLog } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSemester } from '@/contexts/SemesterContext';
-import GlassCard from '@/components/ui/GlassCard'; // Added
+import GlassCard from '@/components/ui/GlassCard';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
@@ -18,12 +20,10 @@ import { attendanceService } from '@/services/attendance.service';
 import { authService } from '@/services/auth.service';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
-
 interface UserPreferences {
     attendance_threshold: number;
-    warning_threshold: number;  // Standardized field name
+    warning_threshold: number;
     counting_mode: 'classes' | 'percentage';
-
     accent_color: string;
 }
 
@@ -42,31 +42,25 @@ const ACCENT_COLORS = [
     { name: 'Rose', value: '#F43F5E' },
 ];
 
-// --- Sub-Components ---
+/* ── System Logs Sub-Component ─────────────────────────────────────────── */
 
 const SystemLogsSection: React.FC = () => {
     const [groupedLogs, setGroupedLogs] = useState<Record<string, SystemLog[]>>({});
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadLogs();
-    }, []);
+    useEffect(() => { loadLogs(); }, []);
 
     const loadLogs = async () => {
         try {
             const data = await attendanceService.getSystemLogs();
-
-            // Group by date
             const grouped = data.reduce((acc: Record<string, SystemLog[]>, log) => {
                 const date = typeof log.timestamp === 'string'
                     ? new Date(log.timestamp).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
                     : new Date((log.timestamp as any).$date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
                 if (!acc[date]) acc[date] = [];
                 acc[date].push(log);
                 return acc;
             }, {});
-
             setGroupedLogs(grouped);
         } catch (err) {
             console.error(err);
@@ -86,10 +80,10 @@ const SystemLogsSection: React.FC = () => {
     };
 
     if (loading) return (
-        <GlassCard className="h-64 flex items-center justify-center">
+        <GlassCard className="h-48 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs text-on-surface-variant animate-pulse">Fetching activities...</p>
+                <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-xs text-on-surface-variant animate-pulse">Loading activity...</p>
             </div>
         </GlassCard>
     );
@@ -97,38 +91,37 @@ const SystemLogsSection: React.FC = () => {
     const dates = Object.keys(groupedLogs);
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-4">
             {dates.length === 0 ? (
-                <GlassCard className="p-12 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 rounded-full bg-surface-container-highest flex items-center justify-center mb-4 opacity-50">
-                        <Activity size={32} className="text-on-surface-variant" />
+                <GlassCard className="p-10 flex flex-col items-center justify-center text-center">
+                    <div className="w-14 h-14 rounded-full bg-surface-container-highest flex items-center justify-center mb-3 opacity-40">
+                        <Activity size={28} className="text-on-surface-variant" />
                     </div>
-                    <h3 className="text-lg font-medium text-on-surface">No Activity Yet</h3>
-                    <p className="text-sm text-on-surface-variant max-w-xs">Your system actions, profile updates, and vital changes will appear here.</p>
+                    <h3 className="text-base font-semibold text-on-surface">No Activity Yet</h3>
+                    <p className="text-xs text-on-surface-variant max-w-xs mt-1">Your actions, updates, and changes will appear here as a timeline.</p>
                 </GlassCard>
             ) : (
                 dates.map(date => (
-                    <div key={date} className="space-y-3">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant/60 sticky top-0 py-2 bg-surface/80 backdrop-blur-sm z-10 px-2 rounded-lg">
+                    <div key={date} className="space-y-2">
+                        <h3 className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 sticky top-0 py-1.5 bg-surface/80 backdrop-blur-sm z-10 px-2 rounded-lg">
                             {date}
                         </h3>
                         <GlassCard className="divide-y divide-outline-variant/10">
                             {groupedLogs[date].map((log, index) => (
-                                <div key={`${log._id}-${index}`} className="flex gap-4 items-start p-4 hover:bg-surface-container-low/30 transition-colors group">
-                                    <div className="w-10 h-10 rounded-xl bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/10 group-hover:scale-110 transition-transform">
+                                <div key={`${log._id}-${index}`} className="flex gap-3 items-start p-3.5 hover:bg-surface-container-low/30 transition-colors group">
+                                    <div className="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center shrink-0 border border-outline-variant/10 group-hover:scale-105 transition-transform">
                                         {getLogIcon(log.action)}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-2">
-                                            <h4 className="font-bold text-sm text-on-surface truncate">{log.action}</h4>
-                                            <span className="text-[10px] tabular-nums text-on-surface-variant/50">
+                                            <h4 className="font-semibold text-xs text-on-surface truncate">{log.action}</h4>
+                                            <span className="text-[10px] tabular-nums text-on-surface-variant/40 shrink-0">
                                                 {typeof log.timestamp === 'string'
                                                     ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                    : new Date((log.timestamp as any).$date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                }
+                                                    : new Date((log.timestamp as any).$date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-on-surface-variant line-clamp-2 mt-0.5 leading-relaxed">{log.description}</p>
+                                        <p className="text-xs text-on-surface-variant line-clamp-2 mt-0.5 leading-relaxed">{log.description}</p>
                                     </div>
                                 </div>
                             ))}
@@ -140,92 +133,57 @@ const SystemLogsSection: React.FC = () => {
     );
 };
 
-// --- Main Settings Component ---
+/* ── Main Settings Component ───────────────────────────────────────────── */
+
+type TabKey = 'profile' | 'appearance' | 'activity' | 'data';
 
 const Settings: React.FC = () => {
     const { user, logout, setUser } = useAuth();
-    const { theme, toggleTheme, setAccentColor, accentColor } = useTheme(); // Added setAccentColor
-    const { setCurrentSemester } = useSemester(); // Sync semester globally
+    const { theme, toggleTheme, setAccentColor, accentColor } = useTheme();
+    const { currentSemester, setCurrentSemester } = useSemester();
     const { showToast } = useToast();
 
-    // ... (rest of state)
-
-    const [activeTab, setActiveTab] = useState<'profile' | 'academics'>('profile');
+    const [activeTab, setActiveTab] = useState<TabKey>('profile');
     const [imgError, setImgError] = useState(false);
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [dashboardStats, setDashboardStats] = useState<{ attendance: number; totalSubjects: number } | null>(null);
 
     const [preferences, setPreferences] = useState<UserPreferences>({
         attendance_threshold: 75,
         warning_threshold: 76,
         counting_mode: 'percentage',
-
         accent_color: accentColor || '#EC4899'
     });
 
     const [name, setName] = useState(user?.name || '');
-    const [isEditingProfile, setIsEditingProfile] = useState(false);
-
     const [profileForm, setProfileForm] = useState({
-        course: '',
-        college: '',
-        semester: 1,
-        batch: '',
-        picture: ''
+        course: '', college: '', semester: 1, batch: '', picture: '', enrollment_number: ''
     });
 
     useEffect(() => {
         if (user) {
             setProfileForm({
-                course: user.course || '',
-                college: user.college || '',
-                semester: user.semester || 1,
-                batch: user.batch || '',
-                picture: user.picture || ''
+                course: user.course || user.branch || '', college: user.college || '',
+                semester: user.semester || user.current_semester || 1, batch: user.batch || '',
+                picture: user.picture || '', enrollment_number: user.enrollment_number || ''
             });
             setName(user.name);
         }
     }, [user]);
 
-    // Protect against unsaved profile changes
+    useEffect(() => { loadPreferences(); loadDashboardStats(); }, []);
+
     useUnsavedChanges(isEditingProfile);
 
-    const handleProfileSave = async () => {
+    async function loadDashboardStats() {
         try {
-            await attendanceService.updateProfile({
-                name,
-                ...profileForm
+            const data = await attendanceService.getDashboardData(currentSemester);
+            setDashboardStats({
+                attendance: data.overall_attendance || 0,
+                totalSubjects: data.total_subjects || 0,
             });
-
-            // Update stored user in localStorage so it persists
-            if (user) {
-                const updatedUser = {
-                    ...user,
-                    name,
-                    course: profileForm.course,
-                    college: profileForm.college,
-                    semester: profileForm.semester,
-                    batch: profileForm.batch,
-                    picture: profileForm.picture || user.picture
-                };
-                authService.storeUser(updatedUser);
-
-                // CRITICAL: Update context immediately so UI reflects changes
-                setUser(updatedUser);
-                
-                // Sync the global semester selector with profile semester
-                setCurrentSemester(profileForm.semester);
-            }
-
-            // Mark as saved BEFORE forcing any navigation/updates to avoid guard
-            setIsEditingProfile(false);
-            showToast('success', 'Profile updated');
-        } catch (error) {
-            showToast('error', 'Failed to update profile');
-        }
-    };
-
-    useEffect(() => {
-        loadPreferences();
-    }, []);
+        } catch { /* ignore */ }
+    }
 
     const loadPreferences = async () => {
         try {
@@ -236,530 +194,411 @@ const Settings: React.FC = () => {
                     attendance_threshold: prefs.attendance_threshold ?? prev.attendance_threshold,
                     warning_threshold: prefs.warning_threshold ?? prefs.min_attendance ?? prev.warning_threshold,
                     counting_mode: prefs.counting_mode ?? prev.counting_mode,
-                    accent_color: prefs.accent_color ?? accentColor // Use context as fallback
+                    accent_color: prefs.accent_color ?? accentColor
                 }));
-                // Sync global theme
-                if (prefs.accent_color) {
-                    setAccentColor(prefs.accent_color);
-                }
+                if (prefs.accent_color) setAccentColor(prefs.accent_color);
             }
-        } catch (error) {
-            // Preferences might not exist yet
-        }
+        } catch { /* ignore */ }
     };
 
-    // Debounce ref for saving preferences
+    /* ── Profile save ──────────────────────────────────────────────────── */
+
+    const handleProfileSave = async () => {
+        try {
+            await attendanceService.updateProfile({ name, ...profileForm, enrollment_number: profileForm.enrollment_number });
+            if (user) {
+                const updatedUser = {
+                    ...user, name, course: profileForm.course, college: profileForm.college,
+                    semester: profileForm.semester, batch: profileForm.batch,
+                    picture: profileForm.picture || user.picture, enrollment_number: profileForm.enrollment_number
+                };
+                authService.storeUser(updatedUser);
+                setUser(updatedUser);
+                setCurrentSemester(profileForm.semester);
+            }
+            setIsEditingProfile(false);
+            showToast('success', 'Profile updated');
+        } catch { showToast('error', 'Failed to update profile'); }
+    };
+
+    /* ── Preferences ───────────────────────────────────────────────────── */
+
     const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Update preferences locally (no API call)
-    const updateLocalPreferences = (newPrefs: Partial<UserPreferences>) => {
-        setPreferences(prev => ({ ...prev, ...newPrefs }));
-
-        // Instant visual update for accent color
-        if (newPrefs.accent_color) {
-            setAccentColor(newPrefs.accent_color);
-        }
-    };
-
-    // Save to API with debounce (only shows toast once)
     const savePreferencesToAPI = useCallback(async (prefs: UserPreferences) => {
-        try {
-            await attendanceService.updatePreferences(prefs);
-            showToast('success', 'Preferences saved');
-        } catch (error) {
-            showToast('error', 'Failed to save preferences');
-        }
+        try { await attendanceService.updatePreferences(prefs); showToast('success', 'Preferences saved'); }
+        catch { showToast('error', 'Failed to save preferences'); }
     }, [showToast]);
 
-    // Debounced save - waits 800ms after last change before saving
     const debouncedSave = useCallback((newPrefs: Partial<UserPreferences>) => {
-        // Update locally immediately
         const updated = { ...preferences, ...newPrefs };
-        updateLocalPreferences(newPrefs);
+        setPreferences(updated);
+        if (newPrefs.accent_color) setAccentColor(newPrefs.accent_color);
+        if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = setTimeout(() => savePreferencesToAPI(updated), 1000);
+    }, [preferences, savePreferencesToAPI, setAccentColor]);
 
-        // Clear existing timeout
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-
-        // Set new timeout to save after 1000ms
-        saveTimeoutRef.current = setTimeout(() => {
-            savePreferencesToAPI(updated);
-        }, 1000);
-    }, [preferences, savePreferencesToAPI]);
-
-    // For instant saves (like accent color buttons)
     const savePreferences = async (newPrefs: Partial<UserPreferences>) => {
         const updated = { ...preferences, ...newPrefs };
         setPreferences(updated);
-
-        // Instant Accent Update
-        if (newPrefs.accent_color) {
-            setAccentColor(newPrefs.accent_color);
-        }
-
-        try {
-            await attendanceService.updatePreferences(updated);
-            showToast('success', 'Preferences saved');
-        } catch (error) {
-            showToast('error', 'Failed to save preferences');
-        }
+        if (newPrefs.accent_color) setAccentColor(newPrefs.accent_color);
+        try { await attendanceService.updatePreferences(updated); showToast('success', 'Preferences saved'); }
+        catch { showToast('error', 'Failed to save preferences'); }
     };
+
+    /* ── Data Management ───────────────────────────────────────────────── */
 
     const handleExportData = async () => {
         try {
             const blob = await attendanceService.exportData();
-            // Blob already contains JSON from backend, use it directly
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `acadhub-data-${new Date().toISOString().split('T')[0]}.json`;
             a.click();
-            URL.revokeObjectURL(url); // Clean up
+            URL.revokeObjectURL(url);
             showToast('success', 'Data exported successfully');
-        } catch (error) {
-            showToast('error', 'Failed to export data');
-        }
+        } catch { showToast('error', 'Failed to export data'); }
     };
 
     const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
-        // Show warning about data replacement
-        const confirmed = confirm(
-            "⚠️ IMPORT WARNING\n\n" +
-            "Importing data will REPLACE all your current subjects, attendance logs, and settings.\n\n" +
-            "💡 If you want to keep your existing data, export a backup first.\n\n" +
-            "🗑️ For a clean import, consider using 'Delete All Data' before importing.\n\n" +
-            "Do you want to continue?"
-        );
-
-        if (!confirmed) {
-            // Reset the file input
-            e.target.value = '';
-            return;
-        }
-
+        const confirmed = confirm("⚠️ IMPORT WARNING\n\nImporting data will REPLACE all your current subjects, attendance logs, and settings.\n\n💡 Export a backup first if needed.\n\nContinue?");
+        if (!confirmed) { e.target.value = ''; return; }
         try {
             const text = await file.text();
             const data = JSON.parse(text);
             await attendanceService.importData(data);
             showToast('success', 'Data imported successfully');
             window.location.reload();
-        } catch (error) {
-            showToast('error', 'Failed to import data');
-        }
+        } catch { showToast('error', 'Failed to import data'); }
     };
 
     const handleDeleteAllData = async () => {
-        // Get current user email for verification
         const userEmail = user?.email?.toLowerCase() || '';
-        
-        // First confirmation
-        if (!confirm(`⚠️ WARNING: This will DELETE ALL your attendance data.\n\n📥 You will be required to download a backup first.\n🔒 Deleting data for: ${userEmail}\n\nAre you sure?`)) return;
-
-        // Second confirmation
+        if (!confirm(`⚠️ WARNING: This will DELETE ALL your attendance data.\n\n📥 A backup will be downloaded first.\n🔒 Deleting data for: ${userEmail}\n\nContinue?`)) return;
         if (!confirm('⚠️ FINAL WARNING: All subjects, attendance logs, timetable, semester results, and settings will be deleted. Continue?')) return;
-
-        // Third confirmation - require typing 'DELETE'
         const userInput = prompt('To confirm deletion, type DELETE in all caps:');
-        if (userInput !== 'DELETE') {
-            showToast('error', 'Deletion cancelled - confirmation text did not match');
-            return;
-        }
-
+        if (userInput !== 'DELETE') { showToast('error', 'Deletion cancelled'); return; }
         try {
-            // 📥 MANDATORY: Force download backup FIRST
             showToast('info', 'Downloading backup before deletion...');
-            
             const blob = await attendanceService.exportData();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `acadhub-backup-BEFORE-DELETE-${userEmail.replace('@', '_at_')}-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            showToast('success', 'Backup downloaded! Now proceeding with deletion...');
-            
-            // Small delay to ensure download initiated
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            showToast('success', 'Backup downloaded! Proceeding with deletion...');
             await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            // NOW proceed with delete
             const res: any = await attendanceService.deleteAllData(userEmail);
             if (res && res.success !== false) {
-                const backupId = res.backup_id || 'N/A';
-                showToast('success', `Data deleted. Server Backup ID: ${backupId} (expires in 30 days)`);
+                showToast('success', `Data deleted. Server Backup ID: ${res.backup_id || 'N/A'}`);
                 setTimeout(() => window.location.reload(), 2000);
-            } else {
-                showToast('error', res?.error || 'Failed to delete data');
-            }
+            } else { showToast('error', res?.error || 'Failed to delete data'); }
         } catch (error: any) {
-            const errorMsg = error.response?.data?.error || error.message || 'Failed to delete data';
-            showToast('error', errorMsg);
+            showToast('error', error.response?.data?.error || error.message || 'Failed to delete data');
         }
     };
 
+    /* ── Derived ───────────────────────────────────────────────────────── */
+
+    const avatarUrl = profileForm.picture || user?.picture;
+    const initials = (user?.name || user?.email || 'U').charAt(0).toUpperCase();
+    const attendancePct = dashboardStats?.attendance ?? 0;
+    const attendanceColor = attendancePct >= (preferences.attendance_threshold || 75) ? 'text-emerald-500' : attendancePct >= (preferences.warning_threshold || 76) ? 'text-amber-500' : 'text-rose-500';
+
+    const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
+        { key: 'profile', label: 'Profile', icon: <User size={15} /> },
+        { key: 'appearance', label: 'Appearance', icon: <Palette size={15} /> },
+        { key: 'activity', label: 'Activity', icon: <Activity size={15} /> },
+        { key: 'data', label: 'Data', icon: <Shield size={15} /> },
+    ];
+
+    /* ── Render ─────────────────────────────────────────────────────────── */
+
     return (
-        <div className="max-w-4xl mx-auto pb-24">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 md:mb-8"
-            >
-                <h1 className="text-2xl md:text-3xl font-display font-bold text-on-surface mb-1 md:mb-2">Settings</h1>
-                <p className="text-sm md:text-base text-on-surface-variant">Customize your AcadHub experience</p>
-            </motion.div>
+        <div className="max-w-4xl mx-auto pb-24 space-y-5">
 
-            {/* Tabs for Mobile/Desktop */}
-            <div className="flex gap-2 mb-4 md:mb-6 border-b border-outline-variant/30 pb-1 overflow-x-auto no-scrollbar">
-                <button
-                    onClick={() => setActiveTab('profile')}
-                    className={`px-3 md:px-4 py-2 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'profile' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
-                >
-                    Profile & Preferences
-                </button>
-                <button
-                    onClick={() => setActiveTab('academics')}
-                    className={`px-3 md:px-4 py-2 text-xs md:text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'academics' ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface'}`}
-                >
-                    Activity Log
-                </button>
-            </div>
+            {/* ── Hero Profile Card ─────────────────────────────────────── */}
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+                <GlassCard className="p-0 overflow-hidden">
+                    {/* Gradient Banner */}
+                    <div className="h-28 md:h-36 bg-gradient-to-br from-primary/20 via-primary/10 to-indigo-500/10 relative">
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/5 to-transparent" />
+                    </div>
 
-            <div className="space-y-4 md:space-y-6">
-                {activeTab === 'profile' ? (
-                    <>
-                        {/* Profile Section */}
-                        <section>
-                            <h2 className="text-lg md:text-xl font-bold text-on-surface mb-3 md:mb-4 flex items-center gap-2">
-                                <User className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                                Profile
-                            </h2>
-                            <GlassCard className="p-4 md:p-6">
-                                <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
-                                    {/* Profile Picture */}
-                                    <div className="w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden shrink-0">
-                                        {(imgError || (!profileForm.picture && !user?.picture)) ? (
-                                            <div className="w-full h-full bg-primary-container text-primary text-2xl md:text-3xl flex items-center justify-center font-bold">
-                                                {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-                                            </div>
-                                        ) : (
-                                            <img
-                                                src={profileForm.picture || user?.picture || ''}
-                                                alt={user?.name || 'Profile'}
-                                                className="w-full h-full object-cover border-2 border-primary/20"
-                                                onError={() => setImgError(true)}
-                                            />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 w-full space-y-3 md:space-y-4">
-                                        {/* PFP File Upload */}
-                                        <div>
-                                            <div className="flex items-center gap-4">
-                                                {isEditingProfile ? (
-                                                    <div className="relative">
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            className="hidden"
-                                                            id="pfp-upload"
-                                                            onChange={async (e) => {
-                                                                const file = e.target.files?.[0];
-                                                                if (file) {
-                                                                    const formData = new FormData();
-                                                                    formData.append('file', file);
-                                                                    try {
-                                                                        const res = await attendanceService.uploadPfp(formData);
-                                                                        setProfileForm({ ...profileForm, picture: res.url });
-                                                                        showToast('success', 'Image uploaded');
-                                                                    } catch (err) {
-                                                                        showToast('error', 'Upload failed');
-                                                                    }
-                                                                }
-                                                            }}
-                                                        />
-                                                        <label
-                                                            htmlFor="pfp-upload"
-                                                            className="flex items-center gap-2 cursor-pointer px-3 md:px-4 py-1.5 md:py-2 bg-primary/10 text-primary text-xs md:text-sm font-medium rounded-lg hover:bg-primary/20 transition-colors"
-                                                        >
-                                                            <Upload size={14} className="md:w-4 md:h-4" />
-                                                            Upload Photo
-                                                        </label>
-                                                    </div>
-                                                ) : null}
-                                            </div>
+                    <div className="px-5 md:px-8 pb-6 -mt-12 md:-mt-14 relative">
+                        <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-end">
+                            {/* Avatar */}
+                            <div className="relative group">
+                                <div className="w-24 h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden border-4 border-surface shadow-xl bg-surface-container">
+                                    {(imgError || !avatarUrl) ? (
+                                        <div className="w-full h-full bg-gradient-to-br from-primary to-primary/70 text-on-primary text-3xl md:text-4xl flex items-center justify-center font-bold">
+                                            {initials}
                                         </div>
-
-                                        <Input
-                                            label="Display Name"
-                                            value={name}
-                                            onChange={(e) => setName(e.target.value)}
-                                            disabled={!isEditingProfile}
-                                        />
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                                            <Input
-                                                label="Course/Branch"
-                                                placeholder="e.g. B.Tech CSE"
-                                                value={isEditingProfile ? profileForm.course : (user?.course || '')}
-                                                disabled={!isEditingProfile}
-                                                onChange={(e) => setProfileForm({ ...profileForm, course: e.target.value })}
-                                            />
-                                            <Input
-                                                label="College"
-                                                placeholder="e.g. USICT"
-                                                value={isEditingProfile ? profileForm.college : (user?.college || '')}
-                                                disabled={!isEditingProfile}
-                                                onChange={(e) => setProfileForm({ ...profileForm, college: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                            <Select
-                                                label="Semester"
-                                                value={isEditingProfile ? profileForm.semester : (user?.semester || 1)}
-                                                options={[1, 2, 3, 4, 5, 6, 7, 8].map(s => ({ value: s, label: `Sem ${s}` }))}
-                                                disabled={!isEditingProfile}
-                                                onChange={(e) => setProfileForm({ ...profileForm, semester: parseInt(e.target.value) })}
-                                            />
-                                            <Input
-                                                label="Batch"
-                                                placeholder="e.g. 2023-27"
-                                                value={isEditingProfile ? profileForm.batch : (user?.batch || '')}
-                                                disabled={!isEditingProfile}
-                                                onChange={(e) => setProfileForm({ ...profileForm, batch: e.target.value })}
-                                            />
-                                        </div>
-                                        <Input
-                                            label="Email"
-                                            value={user?.email || ''}
-                                            disabled
-                                        />
-                                    </div >
-                                </div >
-                                <div className="mt-4 md:mt-6 flex justify-end gap-2">
-                                    {isEditingProfile ? (
-                                        <>
-                                            <Button variant="text" size="sm" onClick={() => setIsEditingProfile(false)}>Cancel</Button>
-                                            <Button size="sm" onClick={handleProfileSave}>
-                                                Save Changes
-                                            </Button>
-                                        </>
                                     ) : (
-                                        <Button variant="outlined" size="sm" onClick={() => setIsEditingProfile(true)}>Edit Profile</Button>
+                                        <img src={avatarUrl} alt={user?.name || 'Profile'} className="w-full h-full object-cover" onError={() => setImgError(true)} />
                                     )}
                                 </div>
-                            </GlassCard >
-                        </section >
-
-                        {/* Appearance */}
-                        < section >
-                            <h2 className="text-lg md:text-xl font-bold text-on-surface mb-3 md:mb-4 flex items-center gap-2">
-                                <Palette className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                                Appearance
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                                <GlassCard className="p-4 md:p-6 cursor-pointer hover:bg-surface-container-low transition-colors" onClick={toggleTheme}>
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3 md:gap-4">
-                                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-secondary-container text-secondary flex items-center justify-center">
-                                                {theme === 'dark' ? <Moon className="w-4 h-4 md:w-5 md:h-5" /> : <Sun className="w-4 h-4 md:w-5 md:h-5" />}
-                                            </div>
-                                            <div>
-                                                <h3 className="font-medium text-sm md:text-base text-on-surface">Theme</h3>
-                                                <p className="text-xs md:text-sm text-on-surface-variant">{theme === 'dark' ? 'Dark' : 'Light'} Mode</p>
-                                            </div>
-                                        </div>
-                                        <div className={`w-10 h-5 md:w-12 md:h-6 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-primary' : 'bg-outline-variant'}`}>
-                                            <div className={`absolute top-0.5 left-0.5 md:top-1 md:left-1 w-4 h-4 rounded-full transition-transform ${theme === 'dark' ? 'translate-x-5 md:translate-x-6 bg-on-primary' : 'bg-white'}`} />
-                                        </div>
-                                    </div>
-                                </GlassCard>
-
-                                <GlassCard className="p-4 md:p-6">
-                                    <div className="flex items-center justify-between mb-3 md:mb-4">
-                                        <h3 className="font-medium text-sm md:text-base text-on-surface">Accent Color</h3>
-                                        {/* Custom Color Picker */}
-                                        <div className="relative group flex items-center gap-2 bg-surface-container-high/50 pl-1 pr-2 md:pr-3 py-1 rounded-full border border-outline-variant/20 hover:border-primary/30 transition-colors">
-                                            <div className="relative w-6 h-6 md:w-8 md:h-8 shrink-0">
-                                                <div className="w-6 h-6 md:w-8 md:h-8 rounded-full shadow-sm ring-2 ring-white/20 overflow-hidden bg-surface-container">
-                                                    <div
-                                                        className="w-full h-full transition-colors"
-                                                        style={{ backgroundColor: preferences.accent_color }}
-                                                    />
-                                                </div>
-                                                <input
-                                                    type="color"
-                                                    value={preferences.accent_color}
-                                                    onChange={(e) => {
-                                                        const color = e.target.value;
-                                                        setAccentColor(color);
-                                                        setPreferences({ ...preferences, accent_color: color });
-                                                        debouncedSave({ accent_color: color });
-                                                    }}
-                                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                                />
-                                                <div className="absolute -bottom-1 -right-1 bg-surface-container-highest rounded-full p-0.5 shadow-sm border border-outline-variant/20 pointer-events-none z-0">
-                                                    <Edit2 size={8} className="text-on-surface-variant" />
-                                                </div>
-                                            </div>
-                                            <span className="text-[10px] md:text-xs font-medium text-on-surface-variant">Custom</span>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-6 gap-2 md:gap-3">
-                                        {ACCENT_COLORS.map((color) => (
-                                            <button
-                                                key={color.value}
-                                                onClick={() => {
-                                                    setAccentColor(color.value);
-                                                    savePreferences({ accent_color: color.value });
-                                                }}
-                                                className={`w-8 h-8 md:w-10 md:h-10 rounded-full transition-all hover:scale-110 ${preferences.accent_color === color.value
-                                                    ? 'ring-3 md:ring-4 ring-white/30 scale-110 shadow-lg'
-                                                    : 'hover:ring-2 hover:ring-white/20'
-                                                    }`}
-                                                style={{ backgroundColor: color.value }}
-                                                title={color.name}
-                                            />
-                                        ))}
-                                    </div>
-                                </GlassCard>
+                                {isEditingProfile && (
+                                    <label htmlFor="pfp-upload-hero" className="absolute inset-0 rounded-2xl bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                                        <Camera className="w-6 h-6 text-white" />
+                                        <input type="file" accept="image/*" className="hidden" id="pfp-upload-hero" onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                const formData = new FormData(); formData.append('file', file);
+                                                try { const res = await attendanceService.uploadPfp(formData); setProfileForm({ ...profileForm, picture: res.url }); showToast('success', 'Photo uploaded'); }
+                                                catch { showToast('error', 'Upload failed'); }
+                                            }
+                                        }} />
+                                    </label>
+                                )}
                             </div>
-                        </section >
 
-                        {/* Attendance Preferences */}
-                        < section >
-                            <h2 className="text-lg md:text-xl font-bold text-on-surface mb-3 md:mb-4 flex items-center gap-2">
-                                <SettingsIcon className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                                Attendance Preferences
-                            </h2>
-                            <GlassCard className="p-4 md:p-6">
-                                <div className="space-y-4 md:space-y-6">
-                                    {/* Threshold Settings */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                                        <div className="p-3 md:p-4 rounded-xl bg-surface-container/50 border border-outline-variant/20">
-                                            <label className="block text-xs md:text-sm font-medium text-on-surface mb-2 md:mb-3">
-                                                Minimum Attendance
-                                            </label>
-                                            <div className="flex items-center gap-3">
-                                                <input
-                                                    type="number"
-                                                    min="50"
-                                                    max="100"
-                                                    value={preferences.attendance_threshold}
-                                                    onChange={(e) => debouncedSave({ attendance_threshold: Math.min(100, Math.max(50, parseInt(e.target.value) || 75)) })}
-                                                    onBlur={() => savePreferencesToAPI(preferences)}
-                                                    className="w-16 md:w-20 px-2 md:px-3 py-1.5 md:py-2 text-center text-base md:text-lg font-bold rounded-lg bg-surface-container-highest text-on-surface border-2 border-outline-variant focus:border-primary outline-none"
-                                                />
-                                                <span className="text-on-surface-variant">%</span>
-                                            </div>
-                                            <p className="text-[10px] md:text-xs text-on-surface-variant mt-2">
-                                                Below this, subjects are "at risk"
-                                            </p>
-                                        </div>
+                            {/* Name & Info */}
+                            <div className="flex-1 min-w-0 pt-1 md:pb-1">
+                                <h1 className="text-xl md:text-2xl font-black text-on-surface tracking-tight leading-tight">{user?.name || 'Student'}</h1>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
+                                    <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                                        <Mail className="w-3 h-3" /> {user?.email}
+                                    </span>
+                                    {user?.enrollment_number && (
+                                        <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                                            <Hash className="w-3 h-3" /> {user.enrollment_number}
+                                        </span>
+                                    )}
+                                    {user?.college && (
+                                        <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                                            <Building2 className="w-3 h-3" /> {user.college}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
 
-                                        <div className="p-3 md:p-4 rounded-xl bg-surface-container/50 border border-outline-variant/20">
-                                            <label className="block text-xs md:text-sm font-medium text-on-surface mb-2 md:mb-3">
-                                                Warning Threshold
-                                            </label>
-                                            <div className="flex items-center gap-3">
-                                                <input
-                                                    type="number"
-                                                    min={preferences.attendance_threshold}
-                                                    max="100"
-                                                    value={preferences.warning_threshold}
-                                                    onChange={(e) => debouncedSave({ warning_threshold: Math.min(100, Math.max(preferences.attendance_threshold, parseInt(e.target.value) || 76)) })}
-                                                    onBlur={() => savePreferencesToAPI(preferences)}
-                                                    className="w-16 md:w-20 px-2 md:px-3 py-1.5 md:py-2 text-center text-base md:text-lg font-bold rounded-lg bg-surface-container-highest text-orange-500 border-2 border-orange-500/30 focus:border-orange-500 outline-none"
-                                                />
-                                                <span className="text-on-surface-variant">%</span>
-                                            </div>
-                                            <p className="text-[10px] md:text-xs text-on-surface-variant mt-2">
-                                                Warning when below this
-                                            </p>
+                            {/* Edit Button */}
+                            <div className="shrink-0 md:pb-1">
+                                {isEditingProfile ? (
+                                    <div className="flex gap-2">
+                                        <Button variant="text" size="sm" onClick={() => setIsEditingProfile(false)}>Cancel</Button>
+                                        <Button size="sm" onClick={handleProfileSave}>Save</Button>
+                                    </div>
+                                ) : (
+                                    <Button variant="outlined" size="sm" icon={<Edit2 size={14} />} onClick={() => setIsEditingProfile(true)}>Edit</Button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Quick Stats Row */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+                            <StatChip icon={<Target className="w-3.5 h-3.5" />} label="Attendance" value={`${attendancePct.toFixed(1)}%`} valueClass={attendanceColor} />
+                            <StatChip icon={<GraduationCap className="w-3.5 h-3.5" />} label="Semester" value={`Sem ${user?.semester || currentSemester}`} />
+                            <StatChip icon={<BookOpen className="w-3.5 h-3.5" />} label="Subjects" value={String(dashboardStats?.totalSubjects ?? '—')} />
+                            <StatChip icon={<CalendarDays className="w-3.5 h-3.5" />} label="Batch" value={user?.batch || '—'} />
+                        </div>
+                    </div>
+                </GlassCard>
+            </motion.div>
+
+            {/* ── Tab Navigation ────────────────────────────────────────── */}
+            <div className="flex gap-1.5 p-1 bg-surface-container/50 rounded-2xl border border-outline-variant/30 overflow-x-auto no-scrollbar">
+                {tabs.map(tab => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex-1 justify-center
+                            ${activeTab === tab.key
+                                ? 'bg-primary text-on-primary shadow-md'
+                                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high/50'}`}>
+                        {tab.icon} {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* ── Tab Content ───────────────────────────────────────────── */}
+            <AnimatePresence mode="wait">
+                <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
+
+                    {/* ── Profile Tab ──────────────────────────────────── */}
+                    {activeTab === 'profile' && (
+                        <div className="space-y-5">
+                            {/* Personal Info Card */}
+                            <GlassCard className="p-5 md:p-6">
+                                <SectionHeader icon={<User className="w-4 h-4 text-primary" />} title="Personal Information" subtitle="Your academic profile details" />
+                                <div className="space-y-4 mt-5">
+                                    <Input label="Display Name" value={name} onChange={e => setName(e.target.value)} disabled={!isEditingProfile} />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <Input label="Course / Branch" placeholder="e.g. B.Tech CSE" value={isEditingProfile ? profileForm.course : (user?.course || '')}
+                                            disabled={!isEditingProfile} onChange={e => setProfileForm({ ...profileForm, course: e.target.value })} />
+                                        <Input label="College / University" placeholder="e.g. USICT, GGSIPU" value={isEditingProfile ? profileForm.college : (user?.college || '')}
+                                            disabled={!isEditingProfile} onChange={e => setProfileForm({ ...profileForm, college: e.target.value })} />
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <Select label="Semester" value={isEditingProfile ? profileForm.semester : (user?.semester || 1)}
+                                            options={[1,2,3,4,5,6,7,8].map(s => ({ value: s, label: `Sem ${s}` }))}
+                                            disabled={!isEditingProfile} onChange={e => setProfileForm({ ...profileForm, semester: parseInt(e.target.value) })} />
+                                        <Input label="Batch" placeholder="e.g. 2023-27" value={isEditingProfile ? profileForm.batch : (user?.batch || '')}
+                                            disabled={!isEditingProfile} onChange={e => setProfileForm({ ...profileForm, batch: e.target.value })} />
+                                        <Input label="Enrollment No." placeholder="e.g. 00113302725" value={isEditingProfile ? profileForm.enrollment_number : (user?.enrollment_number || '')}
+                                            disabled={!isEditingProfile} onChange={e => setProfileForm({ ...profileForm, enrollment_number: e.target.value })} />
+                                    </div>
+                                    <Input label="Email" value={user?.email || ''} disabled />
+                                </div>
+                            </GlassCard>
+
+                            {/* Attendance Preferences */}
+                            <GlassCard className="p-5 md:p-6">
+                                <SectionHeader icon={<SettingsIcon className="w-4 h-4 text-primary" />} title="Attendance Preferences" subtitle="Set your attendance targets" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+                                    <div className="p-4 rounded-xl bg-surface-container/50 border border-outline-variant/20">
+                                        <label className="block text-xs font-semibold text-on-surface-variant mb-2.5 uppercase tracking-wider">
+                                            Minimum Attendance
+                                        </label>
+                                        <div className="flex items-center gap-3">
+                                            <input type="number" min="50" max="100" value={preferences.attendance_threshold}
+                                                onChange={e => debouncedSave({ attendance_threshold: Math.min(100, Math.max(50, parseInt(e.target.value) || 75)) })}
+                                                onBlur={() => savePreferencesToAPI(preferences)}
+                                                className="w-20 px-3 py-2 text-center text-lg font-bold rounded-xl bg-surface-container-highest text-on-surface border-2 border-outline-variant focus:border-primary outline-none transition-colors" />
+                                            <span className="text-on-surface-variant font-medium">%</span>
                                         </div>
+                                        <p className="text-[10px] text-on-surface-variant/60 mt-2">Below this → "at risk"</p>
+                                    </div>
+                                    <div className="p-4 rounded-xl bg-surface-container/50 border border-outline-variant/20">
+                                        <label className="block text-xs font-semibold text-on-surface-variant mb-2.5 uppercase tracking-wider">
+                                            Warning Threshold
+                                        </label>
+                                        <div className="flex items-center gap-3">
+                                            <input type="number" min={preferences.attendance_threshold} max="100" value={preferences.warning_threshold}
+                                                onChange={e => debouncedSave({ warning_threshold: Math.min(100, Math.max(preferences.attendance_threshold, parseInt(e.target.value) || 76)) })}
+                                                onBlur={() => savePreferencesToAPI(preferences)}
+                                                className="w-20 px-3 py-2 text-center text-lg font-bold rounded-xl bg-surface-container-highest text-amber-500 border-2 border-amber-500/30 focus:border-amber-500 outline-none transition-colors" />
+                                            <span className="text-on-surface-variant font-medium">%</span>
+                                        </div>
+                                        <p className="text-[10px] text-on-surface-variant/60 mt-2">Warning when below this</p>
                                     </div>
                                 </div>
                             </GlassCard>
-                        </section >
-                    </>
-                ) : (
-                    <>
-                        {/* System Logs */}
-                        <section>
-                            <h2 className="text-lg md:text-xl font-bold text-on-surface mb-3 md:mb-4 flex items-center gap-2">
-                                <FileText className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                                Activity Log
-                            </h2>
-                            <SystemLogsSection />
-                        </section>
-                    </>
-                )}
-
-                {/* Data Management & Danger Zone (Always Visible at bottom) */}
-                <section>
-                    <h2 className="text-lg md:text-xl font-bold text-on-surface mb-3 md:mb-4 flex items-center gap-2">
-                        <Download className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-                        Data Management
-                    </h2>
-                    <GlassCard className="p-4 md:p-6">
-                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                            <div>
-                                <h3 className="font-medium text-sm md:text-base text-on-surface mb-1">Export & Import</h3>
-                                <p className="text-xs md:text-sm text-on-surface-variant">Backup or restore your attendance data</p>
-                            </div>
-                            <div className="flex gap-2 w-full md:w-auto">
-                                <label className="flex-1 md:flex-none">
-                                    <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
-                                    <span className="flex items-center justify-center font-medium transition-all duration-200 border-2 border-primary/20 text-primary hover:bg-primary/5 hover:border-primary/40 px-4 h-10 md:h-11 text-sm rounded-xl gap-2 cursor-pointer w-full md:w-auto">
-                                        <Upload size={16} className="md:w-[18px]" />
-                                        Import
-                                    </span>
-                                </label>
-                                <Button className="flex-1 md:flex-none" icon={<Download size={16} className="md:w-[18px]" />} onClick={handleExportData}>
-                                    Export JSON
-                                </Button>
-                            </div>
                         </div>
-                    </GlassCard>
-                </section>
+                    )}
 
-                <section>
-                    <h2 className="text-lg md:text-xl font-bold text-error mb-3 md:mb-4 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
-                        Danger Zone
-                    </h2>
-                    <div className="space-y-3">
-                        <GlassCard className="p-4 border-error/30 bg-error-container/5">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="font-medium text-sm md:text-base text-on-surface">Sign Out</h3>
-                                    <p className="text-xs md:text-sm text-on-surface-variant">End your current session</p>
+                    {/* ── Appearance Tab ───────────────────────────────── */}
+                    {activeTab === 'appearance' && (
+                        <div className="space-y-5">
+                            {/* Theme Toggle */}
+                            <GlassCard className="p-5 cursor-pointer hover:bg-surface-container-low/50 transition-colors" onClick={toggleTheme}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-secondary-container/50 text-secondary flex items-center justify-center">
+                                            {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-sm text-on-surface">Theme</h3>
+                                            <p className="text-xs text-on-surface-variant mt-0.5">{theme === 'dark' ? 'Dark' : 'Light'} mode is active</p>
+                                        </div>
+                                    </div>
+                                    <div className={`w-12 h-6 rounded-full relative transition-colors ${theme === 'dark' ? 'bg-primary' : 'bg-outline-variant'}`}>
+                                        <div className={`absolute top-1 left-1 w-4 h-4 rounded-full transition-transform ${theme === 'dark' ? 'translate-x-6 bg-on-primary' : 'bg-white'}`} />
+                                    </div>
                                 </div>
-                                <Button variant="outlined" size="sm" icon={<LogOut size={16} />} onClick={logout}>
-                                    Logout
-                                </Button>
-                            </div>
-                        </GlassCard>
+                            </GlassCard>
 
-                        <GlassCard className="p-4 border-error/50 bg-error-container/10">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="font-medium text-sm md:text-base text-error">Delete All Data</h3>
-                                    <p className="text-xs md:text-sm text-on-surface-variant">Permanently delete all attendance records</p>
+                            {/* Accent Color */}
+                            <GlassCard className="p-5 md:p-6">
+                                <div className="flex items-center justify-between mb-5">
+                                    <SectionHeader icon={<Palette className="w-4 h-4 text-primary" />} title="Accent Color" subtitle="Personalize the app's look" />
+                                    <div className="relative group flex items-center gap-2 bg-surface-container-high/50 pl-1 pr-3 py-1 rounded-full border border-outline-variant/20 hover:border-primary/30 transition-colors">
+                                        <div className="relative w-7 h-7 shrink-0">
+                                            <div className="w-7 h-7 rounded-full shadow-sm ring-2 ring-white/20 overflow-hidden"><div className="w-full h-full" style={{ backgroundColor: preferences.accent_color }} /></div>
+                                            <input type="color" value={preferences.accent_color}
+                                                onChange={e => { setAccentColor(e.target.value); setPreferences({ ...preferences, accent_color: e.target.value }); debouncedSave({ accent_color: e.target.value }); }}
+                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                                            <div className="absolute -bottom-0.5 -right-0.5 bg-surface-container-highest rounded-full p-0.5 shadow-sm border border-outline-variant/20 pointer-events-none z-0"><Edit2 size={7} className="text-on-surface-variant" /></div>
+                                        </div>
+                                        <span className="text-[10px] font-medium text-on-surface-variant">Custom</span>
+                                    </div>
                                 </div>
-                                <Button variant="outlined" size="sm" icon={<Trash2 size={16} />} onClick={handleDeleteAllData} className="!border-error !text-error hover:!bg-error/10">
-                                    Delete All
-                                </Button>
-                            </div>
-                        </GlassCard>
-                    </div>
-                </section>
-            </div >
-        </div >
+                                <div className="grid grid-cols-6 gap-3">
+                                    {ACCENT_COLORS.map(color => (
+                                        <button key={color.value}
+                                            onClick={() => { setAccentColor(color.value); savePreferences({ accent_color: color.value }); }}
+                                            className={`w-10 h-10 rounded-full transition-all hover:scale-110 ${preferences.accent_color === color.value ? 'ring-4 ring-white/30 scale-110 shadow-lg' : 'hover:ring-2 hover:ring-white/20'}`}
+                                            style={{ backgroundColor: color.value }} title={color.name} />
+                                    ))}
+                                </div>
+                            </GlassCard>
+                        </div>
+                    )}
+
+                    {/* ── Activity Tab ─────────────────────────────────── */}
+                    {activeTab === 'activity' && (
+                        <div>
+                            <SystemLogsSection />
+                        </div>
+                    )}
+
+                    {/* ── Data Tab ─────────────────────────────────────── */}
+                    {activeTab === 'data' && (
+                        <div className="space-y-4">
+                            {/* Export / Import */}
+                            <GlassCard className="p-5 md:p-6">
+                                <SectionHeader icon={<Download className="w-4 h-4 text-primary" />} title="Export & Import" subtitle="Backup or restore your data" />
+                                <div className="flex flex-col sm:flex-row gap-3 mt-5">
+                                    <Button className="flex-1 justify-center" icon={<Download size={16} />} onClick={handleExportData}>Export JSON</Button>
+                                    <label className="flex-1">
+                                        <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
+                                        <span className="flex items-center justify-center font-medium transition-all duration-200 border-2 border-primary/20 text-primary hover:bg-primary/5 hover:border-primary/40 px-4 h-10 text-sm rounded-full gap-2 cursor-pointer w-full">
+                                            <Upload size={16} /> Import JSON
+                                        </span>
+                                    </label>
+                                </div>
+                            </GlassCard>
+
+                            {/* Danger Zone */}
+                            <GlassCard className="p-5 border-rose-500/20">
+                                <SectionHeader icon={<AlertTriangle className="w-4 h-4 text-rose-500" />} title="Danger Zone" subtitle="Irreversible actions" titleClass="text-rose-500" />
+                                <div className="space-y-3 mt-5">
+                                    <div className="flex items-center justify-between p-4 rounded-xl bg-surface-container/50 border border-outline-variant/20">
+                                        <div>
+                                            <h4 className="font-semibold text-sm text-on-surface">Sign Out</h4>
+                                            <p className="text-xs text-on-surface-variant mt-0.5">End your current session</p>
+                                        </div>
+                                        <Button variant="outlined" size="sm" icon={<LogOut size={14} />} onClick={logout}>Logout</Button>
+                                    </div>
+                                    <div className="flex items-center justify-between p-4 rounded-xl bg-rose-500/5 border border-rose-500/20">
+                                        <div>
+                                            <h4 className="font-semibold text-sm text-rose-500">Delete All Data</h4>
+                                            <p className="text-xs text-on-surface-variant mt-0.5">Permanently remove all records</p>
+                                        </div>
+                                        <Button variant="outlined" size="sm" icon={<Trash2 size={14} />} onClick={handleDeleteAllData} className="!border-rose-500 !text-rose-500 hover:!bg-rose-500/10">Delete</Button>
+                                    </div>
+                                </div>
+                            </GlassCard>
+                        </div>
+                    )}
+                </motion.div>
+            </AnimatePresence>
+        </div>
     );
 };
+
+/* ── Sub-components ───────────────────────────────────────────────────── */
+
+const StatChip: React.FC<{ icon: React.ReactNode; label: string; value: string; valueClass?: string }> = ({ icon, label, value, valueClass }) => (
+    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-surface-container-high/40 border border-outline-variant/20">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">{icon}</div>
+        <div className="min-w-0">
+            <p className="text-[10px] font-medium text-on-surface-variant uppercase tracking-wider">{label}</p>
+            <p className={`text-sm font-bold mt-0.5 ${valueClass || 'text-on-surface'} truncate`}>{value}</p>
+        </div>
+    </div>
+);
+
+const SectionHeader: React.FC<{ icon: React.ReactNode; title: string; subtitle?: string; titleClass?: string }> = ({ icon, title, subtitle, titleClass }) => (
+    <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">{icon}</div>
+        <div>
+            <h3 className={`font-bold text-sm ${titleClass || 'text-on-surface'}`}>{title}</h3>
+            {subtitle && <p className="text-[11px] text-on-surface-variant mt-0.5">{subtitle}</p>}
+        </div>
+    </div>
+);
 
 export default Settings;

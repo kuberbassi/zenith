@@ -175,11 +175,12 @@ const TimeTable: React.FC = () => {
         };
         try {
             setIsSaving(true);
-            if (isEditing && payload._id) {
-                await attendanceService.updateTimetableSlot(payload._id, payload as TimetableSlot);
+            const slotId = (payload as any).id || payload._id;
+            if (isEditing && slotId) {
+                await attendanceService.updateTimetableSlot(slotId, payload as TimetableSlot, currentSemester);
                 showToast('success', 'Updated');
             } else {
-                await attendanceService.addTimetableSlot(payload as TimetableSlot);
+                await attendanceService.addTimetableSlot(payload as TimetableSlot, currentSemester);
                 showToast('success', 'Added');
             }
             setAppModalOpen(false);

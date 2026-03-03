@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './api';
 
 export interface DashboardData {
     overall_attendance: number;
@@ -19,9 +19,7 @@ export interface DashboardData {
 
 export const attendanceService = {
     getDashboardData: async (semester: number): Promise<DashboardData> => {
-        const response = await axios.get(`/api/dashboard/data?semester=${semester}`, {
-            withCredentials: true
-        });
+        const response = await api.get(`/api/dashboard/data?semester=${semester}`);
         return response.data;
     }
 };

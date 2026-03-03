@@ -131,35 +131,42 @@ def add_slot():
 @timetable_bp.route('/slot/<slot_id>', methods=['PUT'])
 def update_slot(slot_id):
     if 'user' not in session: return error_response("Unauthorized", "UNAUTHORIZED", 401)
-    user_email = session['user']['email'].lower()  # ✅ Normalized
+    user_email = session['user']['email'].lower()
     semester = request.args.get('semester', type=int, default=1)
-    updates = request.json
+    updates = request.json or {}
     
-    doc = timetable_collection.find_one({'owner_email': user_email, 'semester': semester})
-    if not doc or 'schedule' not in doc:
-        return error_response("Timetable not found", "NOT_FOUND", 404)
+    try:
+        doc = timetable_collection.find_one({'owner_email': user_email, 'semester': semester})
+        if not doc or 'schedule' not in doc:
+            return error_response("Timetable not found", "NOT_FOUND", 404)
+
+        # Normalise to plain Python dicts — avoids BSON ObjectId re-serialisation errors
+        import json
+        schedule = json.loads(json_util.dumps(doc['schedule']))
         
-    schedule = doc['schedule']
-    found = False
-    
-    for day, slots in schedule.items():
-        for i, slot in enumerate(slots):
-            current_id = str(slot.get('id') or slot.get('_id') or '')
-            if current_id == slot_id:
-                # Update fields
-                schedule[day][i].update(updates)
-                found = True
+        found = False
+        for day, slots in schedule.items():
+            for i, slot in enumerate(slots):
+                current_id = str(slot.get('id') or slot.get('_id') or '')
+                if current_id == slot_id:
+                    schedule[day][i] = {**slot, **updates}
+                    found = True
+                    break
+            if found:
                 break
-        if found: break
-            
-    if found:
+
+        if not found:
+            return error_response("Slot not found", "NOT_FOUND", 404)
+
         timetable_collection.update_one(
             {'_id': doc['_id']},
             {'$set': {'schedule': schedule, 'updated_at': datetime.utcnow()}}
         )
-        return success_response({"message": "Slot updated"})
-    else:
-        return error_response("Slot not found", "NOT_FOUND", 404)
+        return success_response({"message": "Slot updated", "slot": schedule[day][i]})
+
+    except Exception as e:
+        logger.error("update_slot error: %s\n%s", e, traceback.format_exc())
+        return error_response(f"Server error: {str(e)}", "SERVER_ERROR", 500)
 
 @timetable_bp.route('/slot/<slot_id>', methods=['DELETE'])
 def delete_slot(slot_id):

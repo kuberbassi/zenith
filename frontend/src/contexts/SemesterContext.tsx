@@ -10,37 +10,31 @@ const SemesterContext = createContext<SemesterContextType | undefined>(undefined
 
 export const SemesterProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [currentSemester, setCurrentSemesterState] = useState<number>(() => {
-        // First try to get from user profile (synced with backend)
-        const user = authService.getStoredUser();
-        if (user?.semester) {
-            return user.semester;
-        }
-        // Fallback to localStorage
+        // Priority: user's manual selection in localStorage > user profile > default 1
         const saved = localStorage.getItem('acadhub_semester');
-        return saved ? parseInt(saved, 10) : 1;
+        if (saved) {
+            const parsed = parseInt(saved, 10);
+            if (!isNaN(parsed) && parsed >= 1 && parsed <= 8) return parsed;
+        }
+        // Fallback to user profile
+        const user = authService.getStoredUser();
+        if (user?.semester) return user.semester;
+        if (user?.current_semester) return user.current_semester;
+        return 1;
     });
 
-    // Sync semester when user data changes (e.g., after login or profile update)
+    // On initial load, if localStorage has no semester, seed it from user profile (one-time)
     useEffect(() => {
-        const syncFromUser = () => {
+        const saved = localStorage.getItem('acadhub_semester');
+        if (!saved) {
             const user = authService.getStoredUser();
-            if (user?.semester && user.semester !== currentSemester) {
-                setCurrentSemesterState(user.semester);
-                localStorage.setItem('acadhub_semester', user.semester.toString());
+            const sem = user?.semester || user?.current_semester;
+            if (sem) {
+                localStorage.setItem('acadhub_semester', sem.toString());
+                setCurrentSemesterState(sem);
             }
-        };
-        
-        // Listen for storage changes (cross-tab sync)
-        window.addEventListener('storage', syncFromUser);
-        
-        // Also check on focus (in case user updated profile)
-        window.addEventListener('focus', syncFromUser);
-        
-        return () => {
-            window.removeEventListener('storage', syncFromUser);
-            window.removeEventListener('focus', syncFromUser);
-        };
-    }, [currentSemester]);
+        }
+    }, []);
 
     const setCurrentSemester = (semester: number) => {
         setCurrentSemesterState(semester);

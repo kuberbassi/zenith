@@ -82,8 +82,8 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
     const fetchAttendanceLogs = async (date: Date) => {
         try {
             const dateStr = getDateStr(date);
-            // Use api instance for consistency/auth
-            const response = await api.get(`/api/attendance_logs?date=${dateStr}&semester=${currentSemester}`);
+            // Fetch ALL logs for this date (no semester filter — we want every record for the day)
+            const response = await api.get(`/api/attendance/logs?date=${dateStr}&limit=100`);
 
             // Backend returns success_response({"logs": [...], ...}) 
             // So response.data.data is the payload we want
@@ -119,6 +119,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
             }
 
             loadClassesForDate(selectedDate, true); // Silent reload
+            fetchAttendanceLogs(selectedDate); // Refresh logs section
             if (onSuccess) onSuccess();
         } catch (error: any) {
             showToast('error', error.response?.data?.error || 'Failed to mark');
@@ -136,6 +137,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
             await attendanceService.deleteAttendance(subject.log_id);
             showToast('success', 'Attendance cleared');
             loadClassesForDate(selectedDate, true);
+            fetchAttendanceLogs(selectedDate); // Refresh logs section
             if (onSuccess) onSuccess();
         } catch (error: any) {
             showToast('error', error.response?.data?.error || 'Failed to delete');
@@ -187,6 +189,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
             setExpandedSubjectId(null);
             resetDetailForm();
             loadClassesForDate(selectedDate, true);
+            fetchAttendanceLogs(selectedDate); // Refresh logs section
             if (onSuccess) onSuccess();
         } catch (error: any) {
             showToast('error', error.response?.data?.error || 'Failed to mark');
@@ -354,7 +357,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                                 className="flex items-center justify-between p-3 rounded-lg bg-surface-variant/30 border border-stroke"
                                             >
                                                 <div className="flex-1">
-                                                    <div className="font-semibold text-sm">{logSubject?.name || 'Unknown Subject'}</div>
+                                                    <div className="font-semibold text-sm">{log.subject_name || log.subject_info?.name || logSubject?.name || 'Unknown Subject'}</div>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
                                                             {String(log.status).toUpperCase()}
@@ -366,7 +369,8 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                                 </div>
                                                 <button
                                                     onClick={() => {
-                                                        if (confirm(`Delete this ${log.status} entry for ${logSubject?.name || 'this subject'}?`)) {
+                                                        const subName = log.subject_name || log.subject_info?.name || logSubject?.name || 'this subject';
+                                                        if (confirm(`Delete this ${log.status} entry for ${subName}?`)) {
                                                             deleteLog(logId);
                                                         }
                                                     }}

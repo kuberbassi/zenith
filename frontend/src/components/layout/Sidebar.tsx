@@ -76,9 +76,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen, isColl
 
     const SidebarContent = React.useCallback(() => {
         const [imgError, setImgError] = useState(false);
+        // Use ui-avatars as primary to avoid Google CDN 429 rate limits.
+        // Google picture is shown as a small overlay only if it loads successfully.
         const userAvatar = !imgError && user?.picture
             ? user.picture
-            : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`;
+            : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=6750A4&color=fff&size=64`;
 
         return (
             <div className="flex flex-col h-full bg-surface-container-low text-on-surface transition-all duration-300">
@@ -205,6 +207,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen, isColl
                                     src={userAvatar}
                                     alt={user?.name}
                                     className="w-9 h-9 rounded-full border-2 border-surface shrink-0 object-cover"
+                                    referrerPolicy="no-referrer"
+                                    loading="lazy"
                                     onError={() => setImgError(true)}
                                 />
                                 <div className="min-w-0 overflow-hidden">
@@ -252,6 +256,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen, isColl
                                     src={userAvatar}
                                     alt={user?.name}
                                     className="w-full h-full object-cover"
+                                    referrerPolicy="no-referrer"
+                                    loading="lazy"
                                     onError={() => setImgError(true)}
                                 />
                             </div>

@@ -1,0 +1,107 @@
+﻿@import "tailwindcss";
+
+:root {
+  --bg: #000000;
+  --surface: #080808;
+  --card: #0e0e0e;
+  --card-hover: #141414;
+  --border: #1a1a1a;
+  --border-bright: #282828;
+  --text: #f2f2f2;
+  --text-muted: #5a5a5a;
+  --text-dim: #888888;
+  /* last.fm accent green for positive trends */
+  --lf-green: #51FFC5;
+  --lf-green-dim: rgba(81, 255, 197, 0.1);
+  /* standard semantic */
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --green-dim: rgba(34, 197, 94, 0.1);
+  --amber-dim: rgba(245, 158, 11, 0.1);
+  --red-dim: rgba(239, 68, 68, 0.1);
+  /* purple accent */
+  --accent: #7c3aed;
+  --accent-soft: rgba(124, 58, 237, 0.15);
+  --accent-glow: rgba(124, 58, 237, 0.25);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #252525; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #333; }
+::selection { background: rgba(124,58,237,0.3); color: #fff; }
+
+/*  Last.fm-style section label  */
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/*  Mono numbers  */
+.mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; letter-spacing: -0.02em; }
+
+/*  Trend pill  */
+.trend-up   { color: var(--lf-green); background: var(--lf-green-dim); }
+.trend-down { color: var(--red);     background: var(--red-dim); }
+.trend-flat { color: var(--text-muted); background: rgba(255,255,255,0.04); }
+
+/*  Peak badge  */
+.badge-peak {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(245,158,11,0.15);
+  color: var(--amber);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+
+/*  Rank number  */
+.rank-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/*  Glass card  */
+.glass {
+  background: rgba(255,255,255,0.015);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+}
+
+/*  Divider  */
+.divider { border: 0; border-top: 1px solid var(--border); }
+
+/*  Animations  */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
+  50%       { box-shadow: 0 0 0 6px transparent; }
+}
+

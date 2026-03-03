@@ -13,7 +13,7 @@ import api from '@/services/api';
 import { attendanceService } from '@/services/attendance.service';
 
 interface Course {
-    _id?: { $oid: string };
+    _id?: string | { $oid: string };
     title: string;
     platform: 'coursera' | 'udemy' | 'youtube' | 'edx' | 'linkedin' | 'college' | 'custom';
     url: string;
@@ -23,6 +23,15 @@ interface Course {
     certificateUrl?: string;
     instructor?: string;
     notes?: string;
+}
+
+/** Extract a stable string ID from _id regardless of format (string | {$oid} | ObjectId) */
+function getCourseId(course: Course): string {
+    const id = course._id;
+    if (!id) return '';
+    if (typeof id === 'string') return id;
+    if (typeof id === 'object' && '$oid' in id) return id.$oid;
+    return String(id);
 }
 
 const PLATFORMS = [
@@ -70,7 +79,7 @@ const Courses: React.FC = () => {
         // Optimistic update
         setCourses(newCourses);
         try {
-            await api.post('/api/courses/manual', newCourses);
+            await api.post('/api/academic/courses/manual', newCourses);
         } catch (error) {
             console.error('Failed to save courses', error);
             showToast('error', 'Failed to save changes');
@@ -99,7 +108,7 @@ const Courses: React.FC = () => {
 
     const handleDeleteCourse = (id: string) => {
         if (!confirm('Delete this course?')) return;
-        const updated = courses.filter(c => c._id?.$oid !== id);
+        const updated = courses.filter(c => getCourseId(c) !== id);
         saveCourses(updated);
         showToast('success', 'Course deleted');
     };
@@ -109,7 +118,7 @@ const Courses: React.FC = () => {
 
         if (editingCourse) {
             const updated = courses.map(c =>
-                c._id?.$oid === editingCourse._id?.$oid
+                getCourseId(c) === getCourseId(editingCourse)
                     ? { ...c, ...formData }
                     : c
             );
@@ -118,7 +127,7 @@ const Courses: React.FC = () => {
         } else {
             const newCourse = {
                 ...formData,
-                _id: { $oid: Date.now().toString() }
+                _id: Date.now().toString()
             } as Course;
             saveCourses([...courses, newCourse]);
             showToast('success', 'Course added');
@@ -188,7 +197,7 @@ const Courses: React.FC = () => {
 
                                 return (
                                     <motion.div
-                                        key={course._id?.$oid}
+                                        key={getCourseId(course) || `active-${index}`}
                                         initial={{ opacity: 0, scale: 0.95 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.9 }}
@@ -209,7 +218,7 @@ const Courses: React.FC = () => {
                                                         <Edit2 className="w-3 h-3 md:w-3.5 md:h-3.5 text-on-surface-variant" />
                                                     </button>
                                                     <button
-                                                        onClick={() => handleDeleteCourse(course._id!.$oid)}
+                                                        onClick={() => handleDeleteCourse(getCourseId(course))}
                                                         className="p-1.5 rounded-md hover:bg-surface-container transition-colors"
                                                     >
                                                         <Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5 text-error" />
@@ -267,7 +276,7 @@ const Courses: React.FC = () => {
                                                     className="h-8 md:h-9 text-xs md:text-sm"
                                                     onClick={() => {
                                                         const updated = courses.map(c =>
-                                                            c._id?.$oid === course._id?.$oid
+                                                            getCourseId(c) === getCourseId(course)
                                                                 ? { ...c, progress: Math.min(100, c.progress + 10) }
                                                                 : c
                                                         );
@@ -294,12 +303,12 @@ const Courses: React.FC = () => {
                         Completed Courses
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {completedCourses.map((course) => {
+                        {completedCourses.map((course, cIdx) => {
                             const platform = getPlatformConfig(course.platform);
                             const Icon = platform.icon;
 
                             return (
-                                <GlassCard key={course._id?.$oid} className="group p-4 opacity-80 hover:opacity-100 transition-opacity">
+                                <GlassCard key={getCourseId(course) || `completed-${cIdx}`} className="group p-4 opacity-80 hover:opacity-100 transition-opacity">
                                     <div className="flex justify-between items-start mb-2">
                                         <div className={`flex items-center gap-2 px-2 py-1 rounded-full ${platform.color} text-white text-xs font-bold w-fit`}>
                                             <Icon className="w-3 h-3" />
@@ -313,7 +322,7 @@ const Courses: React.FC = () => {
                                                 <Edit2 className="w-3 h-3 text-on-surface-variant" />
                                             </button>
                                             <button
-                                                onClick={() => handleDeleteCourse(course._id!.$oid)}
+                                                onClick={() => handleDeleteCourse(getCourseId(course))}
                                                 className="p-1 rounded-md hover:bg-surface-container transition-colors"
                                             >
                                                 <Trash2 className="w-3 h-3 text-error" />

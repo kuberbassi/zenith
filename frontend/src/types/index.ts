@@ -1,11 +1,48 @@
 export interface User {
+    _id?: string;
     email: string;
     name: string;
     picture?: string;
     course?: string;
+    branch?: string;
     college?: string;
     semester?: number;
+    current_semester?: number;
     batch?: string;
+    enrollment_number?: string;
+    attendance_threshold?: number;
+    warning_threshold?: number;
+    target_attendance?: number;
+    google_id?: string;
+    created_at?: string;
+}
+
+export interface IPUCaptchaResponse {
+    captcha_image: string;
+    hidden_fields: Record<string, string>;
+    field_names: { username: string; password: string; captcha: string };
+}
+
+export interface IPUSubjectResult {
+    name?: string;
+    code?: string;
+    credits?: string;
+    internal?: string;
+    external?: string;
+    marks?: string;
+    grade?: string;
+    status?: string;
+}
+
+export interface IPUSemesterResult {
+    subjects: IPUSubjectResult[];
+}
+
+export interface IPUFetchResult {
+    enrollment_number: string;
+    student_info: Record<string, string>;
+    semesters: IPUSemesterResult[];
+    raw_tables: { headers: string[]; rows: Record<string, string>[] }[];
 }
 
 export interface Subject {
@@ -147,6 +184,7 @@ export interface Holiday {
 
 export interface TimetableSlot {
     _id?: string;
+    id?: string;       // backend stores slots with 'id' field
     day: string;
     start_time: string; // HH:MM
     end_time: string;   // HH:MM

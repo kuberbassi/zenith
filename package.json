@@ -1,5 +1,17 @@
 {
+  "name": "acadhub",
+  "version": "3.0.0",
+  "private": true,
+  "scripts": {
+    "start": "concurrently --names \"API,WEB\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix api-node\" \"npm run dev --prefix frontend\"",
+    "dev": "npm start",
+    "api": "npm run dev --prefix api-node",
+    "web": "npm run dev --prefix frontend"
+  },
   "dependencies": {
     "@vercel/analytics": "^1.6.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

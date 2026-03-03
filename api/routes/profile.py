@@ -65,7 +65,7 @@ def handle_profile():
         
         if request.method in ['PUT', 'POST']:
             data = request.json
-            allowed_fields = ['name', 'branch', 'college', 'semester', 'batch', 'course', 'attendance_threshold', 'warning_threshold']
+            allowed_fields = ['name', 'branch', 'college', 'semester', 'batch', 'course', 'attendance_threshold', 'warning_threshold', 'enrollment_number']
             update_data = {k: v for k, v in data.items() if k in allowed_fields}
             
             # Handle Semester specifically if it's a string

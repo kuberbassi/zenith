@@ -1,25 +1,10 @@
-import React, { lazy, Suspense } from 'react';
+/**
+ * LazyCharts — Chart.js wrappers (recharts removed)
+ */
+import React, { Suspense } from 'react';
 import LoadingSpinner from './LoadingSpinner';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
 
-// Lazy load Recharts components
-const LazyBarChart = lazy(() => import('recharts').then(module => ({ default: module.BarChart })));
-const LazyLineChart = lazy(() => import('recharts').then(module => ({ default: module.LineChart })));
-const LazyPieChart = lazy(() => import('recharts').then(module => ({ default: module.PieChart })));
-
-// Re-export non-lazy components that are lightweight
-export {
-    Bar,
-    Line,
-    Pie,
-    Cell,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-} from 'recharts';
-
-// Wrapper components with Suspense
 const ChartSkeleton: React.FC<{ height?: number | string }> = ({ height = 300 }) => (
     <div
         className="animate-pulse bg-surface-container-high/50 rounded-xl flex items-center justify-center"
@@ -29,20 +14,26 @@ const ChartSkeleton: React.FC<{ height?: number | string }> = ({ height = 300 })
     </div>
 );
 
-export const LazyBarChartWrapper: React.FC<any> = (props) => (
-    <Suspense fallback={<ChartSkeleton height={props.height || 300} />}>
-        <LazyBarChart {...props} />
+export const LazyBarChartWrapper: React.FC<any> = ({ height = 300, data, options, ...rest }) => (
+    <Suspense fallback={<ChartSkeleton height={height} />}>
+        <div style={{ height }}>
+            <Bar data={data} options={{ responsive: true, maintainAspectRatio: false, ...options }} {...rest} />
+        </div>
     </Suspense>
 );
 
-export const LazyLineChartWrapper: React.FC<any> = (props) => (
-    <Suspense fallback={<ChartSkeleton height={props.height || 300} />}>
-        <LazyLineChart {...props} />
+export const LazyLineChartWrapper: React.FC<any> = ({ height = 300, data, options, ...rest }) => (
+    <Suspense fallback={<ChartSkeleton height={height} />}>
+        <div style={{ height }}>
+            <Line data={data} options={{ responsive: true, maintainAspectRatio: false, ...options }} {...rest} />
+        </div>
     </Suspense>
 );
 
-export const LazyPieChartWrapper: React.FC<any> = (props) => (
-    <Suspense fallback={<ChartSkeleton height={props.height || 300} />}>
-        <LazyPieChart {...props} />
+export const LazyPieChartWrapper: React.FC<any> = ({ height = 300, data, options, ...rest }) => (
+    <Suspense fallback={<ChartSkeleton height={height} />}>
+        <div style={{ height }}>
+            <Doughnut data={data} options={{ responsive: true, maintainAspectRatio: false, ...options }} {...rest} />
+        </div>
     </Suspense>
 );
