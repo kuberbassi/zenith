@@ -5,7 +5,7 @@
   "installCommand": "echo 'deps installed in buildCommand'",
   "framework": null,
   "functions": {
-    "api-node/dist/vercel.js": {
+    "api/[[...path]].js": {
       "maxDuration": 30,
       "memory": 1024
     }
@@ -13,11 +13,11 @@
   "rewrites": [
     {
       "source": "/health",
-      "destination": "/api-node/dist/vercel"
+      "destination": "/api"
     },
     {
       "source": "/api/:path*",
-      "destination": "/api-node/dist/vercel"
+      "destination": "/api"
     },
     {
       "source": "/((?!.*\\.).*)",

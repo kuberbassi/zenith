@@ -8,3 +8,14 @@ venv/
 *.log
 check_structure.py
 dev.py
+
+# Exclude legacy Python API files from serverless detection
+api/*.py
+api/**/*.py
+api/Dockerfile
+api/.dockerignore
+api/requirements.txt
+api/config/
+api/middleware/
+api/routes/
+api/utils/
