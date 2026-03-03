@@ -60,14 +60,17 @@ app.use(detectPlatform)
  * ══════════════════════════════════════════════════════════════ */
 
 /* ── Health ───────────────────────────────────────────────── */
-app.get('/health', (_, res) => {
+const healthResponse = (_: unknown, res: express.Response) => {
   res.json({
     status: 'ok',
     version: '2.0.0',
     api_versions: ['v1'],
     time: new Date().toISOString(),
   })
-})
+}
+app.get('/health', healthResponse)
+// Also at /api/health so Vercel serverless (api/ catch-all) can serve it
+app.get('/api/health', healthResponse)
 
 /* ── Flask URL Rewriting (must run before route mounts) ─── */
 app.use(flaskRewrite)
