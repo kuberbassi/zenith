@@ -12,7 +12,7 @@ import { useSemester } from '@/contexts/SemesterContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import GlassCard from '@/components/ui/GlassCard';
 import Skeleton from '@/components/ui/Skeleton';
-import { TrendingUp, TrendingDown, BookOpen, AlertCircle, CheckCircle, Award } from 'lucide-react';
+import { TrendingUp, TrendingDown, BookOpen, AlertCircle, CheckCircle } from 'lucide-react';
 
 ChartJS.register(
     CategoryScale, LinearScale, BarElement, PointElement, LineElement,
@@ -166,7 +166,7 @@ const Analytics: React.FC = () => {
                         color: 'text-rose-600 dark:text-rose-400',
                         bg: 'bg-rose-50 dark:bg-rose-900/20',
                     },
-                ].map((stat, i) => (
+                ].map((stat) => (
                     <GlassCard key={stat.label} className="p-4">
                         <div className={`inline-flex items-center justify-center w-9 h-9 rounded-xl mb-3 ${stat.bg} ${stat.color}`}>
                             {stat.icon}
