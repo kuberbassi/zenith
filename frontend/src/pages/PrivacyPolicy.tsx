@@ -15,8 +15,7 @@ const sections = [
         content: 'We collect only the information necessary to provide our services:',
         list: [
             { label: 'Google Account Information', desc: 'When you sign in with Google, we collect your email address, name, and profile picture.' },
-            { label: 'Academic Data', desc: 'We access your Google Classroom courses and coursework to display your academic planner.' },
-            { label: 'Calendar & Tasks', desc: 'We access your Google Calendar and Google Tasks to help you manage your schedule and deadlines.' },
+            { label: 'Profile Metadata', desc: 'We collect user-provided details like headline, college, and branch to enhance your profile.' },
         ]
     },
     {
@@ -24,9 +23,8 @@ const sections = [
         title: 'How We Use Your Information',
         content: 'We use your information solely to:',
         list: [
-            { label: 'Dashboard', desc: 'Provide and personalize the AcadHub dashboard.' },
-            { label: 'Sync', desc: 'Sync your academic schedule and deadlines.' },
-            { label: 'Manage', desc: 'Enable you to manage your Google Tasks directly from our platform.' },
+            { label: 'Dashboard', desc: 'Provide and personalize the AcadHub dashboard and attendance tracking.' },
+            { label: 'Profile Optimization', desc: 'Display your academic status and social connections on your profile.' },
         ],
         note: 'We do not sell your personal data to third parties.'
     },
@@ -61,7 +59,7 @@ const PrivacyPolicy: React.FC = () => {
                     </button>
                     <div>
                         <h1 className="text-sm font-black uppercase tracking-[0.3em] text-white/80">Privacy Policy</h1>
-                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Last updated: February 4, 2026 • v3.0.0</p>
+                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Last updated: March 5, 2026 • v3.5.0</p>
                     </div>
                 </div>
             </div>
