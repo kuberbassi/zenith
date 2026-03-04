@@ -24,7 +24,6 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.kuberbassi.acadhubmobilekuber",
       "versionCode": 350,
       "softwareKeyboardLayoutMode": "pan",

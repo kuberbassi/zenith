@@ -221,7 +221,13 @@ const AppContent: React.FC = () => {
   );
 };
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com'
+
+if (GOOGLE_CLIENT_ID === '86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com' && import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+  // Using env var - good
+} else if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
+  console.warn('[AcadHub] VITE_GOOGLE_CLIENT_ID env var not set, using hardcoded fallback. Set it in .env or Vercel dashboard.')
+}
 
 const App: React.FC = () => {
   return (

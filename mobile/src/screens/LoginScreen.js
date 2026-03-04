@@ -38,8 +38,8 @@ const LoginScreen = () => {
     useEffect(() => {
         GoogleSignin.configure({
             webClientId: '86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com', // Project 868 (AcadHub Mobile Kuber)
-            offlineAccess: true,
-            scopes: [],
+            offlineAccess: false,
+            scopes: ['email', 'profile'],
         });
     }, []);
 
@@ -52,16 +52,14 @@ const LoginScreen = () => {
                 const userInfo = await GoogleSignin.signIn();
 
                 // Get the Server Auth Code (Required for Backend)
-                const { serverAuthCode, user: googleUser } = userInfo.data || userInfo;
+                const signInData = userInfo.data || userInfo;
+                const idToken = signInData.idToken;
 
-                if (!serverAuthCode) throw new Error('No authorization code received');
+                if (!idToken) throw new Error('No ID token received from Google Sign-In');
 
+                // Send the Google ID token to backend (same format as web)
                 const backendResponse = await api.post('/api/auth/google', {
-                    code: serverAuthCode,
-                    redirect_uri: "", // Essential for Native Android code exchange
-                    email: googleUser.email,
-                    name: googleUser.name,
-                    photo: googleUser.photo
+                    credential: idToken,
                 });
 
                 const { user, token } = backendResponse.data;

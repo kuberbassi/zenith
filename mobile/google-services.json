@@ -12,7 +12,12 @@
                     "package_name": "com.kuberbassi.acadhub"
                 }
             },
-            "oauth_client": [],
+            "oauth_client": [
+                {
+                    "client_id": "86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com",
+                    "client_type": 3
+                }
+            ],
             "api_key": [
                 {
                     "current_key": "AIzaSyDwtCcw9FSSnAaXMxLAwDCaadItUa3aS4c"
@@ -20,7 +25,12 @@
             ],
             "services": {
                 "appinvite_service": {
-                    "other_platform_oauth_client": []
+                    "other_platform_oauth_client": [
+                        {
+                            "client_id": "86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com",
+                            "client_type": 3
+                        }
+                    ]
                 }
             }
         },
@@ -31,7 +41,12 @@
                     "package_name": "com.kuberbassi.acadhubmobilekuber"
                 }
             },
-            "oauth_client": [],
+            "oauth_client": [
+                {
+                    "client_id": "86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com",
+                    "client_type": 3
+                }
+            ],
             "api_key": [
                 {
                     "current_key": "AIzaSyDwtCcw9FSSnAaXMxLAwDCaadItUa3aS4c"
@@ -39,7 +54,12 @@
             ],
             "services": {
                 "appinvite_service": {
-                    "other_platform_oauth_client": []
+                    "other_platform_oauth_client": [
+                        {
+                            "client_id": "86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com",
+                            "client_type": 3
+                        }
+                    ]
                 }
             }
         }
