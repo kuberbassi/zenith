@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Briefcase, Code, Zap, Award, Plus, Trash2, Edit2, ChevronRight, ShieldCheck, Link2 } from 'lucide-react';
+import { Briefcase, Code, Zap, Award, Plus, Trash2, ChevronRight, ShieldCheck } from 'lucide-react';
 import { resumeService } from '@/services/resume.service';
 import type { Experience, Skill, Project, Certification } from '@/types';
 import { useToast } from '@/components/ui/Toast';

@@ -12,7 +12,7 @@ interface HeaderProps {
     notificationCount?: number;
 }
 
-const routeTitles: Record<string, { title: string; icon: React.ElementType }> = {
+const routeTitles: Record<string, { title: string; icon: any }> = {
     '/': { title: 'Dashboard', icon: LayoutDashboard },
     '/analytics': { title: 'Analytics', icon: PieChart },
     '/timetable': { title: 'Schedule', icon: CalendarClock },
