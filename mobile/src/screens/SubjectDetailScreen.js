@@ -73,7 +73,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
 
     const fetchLogs = async () => {
         try {
-            const response = await api.get(`/api/attendance_logs?subject_id=${subject._id}`);
+            const response = await api.get(`/api/attendance/logs?subject_id=${subject._id}`);
             setLogs(response.data.logs);
         } catch (error) { console.error(error); }
         finally { setLoading(false); setRefreshing(false); }
@@ -94,8 +94,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
 
     const saveSubject = async () => {
         try {
-            await api.post('/api/update_subject_full_details', {
-                subject_id: subject._id,
+            await api.put(`/api/academic/subjects/${subject._id}`, {
                 ...editForm
             });
             setSubject({ ...subject, ...editForm });
@@ -115,7 +114,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            await api.delete(`/api/delete_subject/${subject._id}`);
+                            await api.delete(`/api/academic/subjects/${subject._id}`);
                             navigation.goBack();
                         } catch (e) { Alert.alert("Error", "Failed to delete."); }
                     }
@@ -129,7 +128,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     const handleLogAction = async (newStatus) => {
         if (!selectedLog) return;
         try {
-            await api.post(`/api/edit_attendance/${selectedLog._id}`, {
+            await api.put(`/api/attendance/logs/${selectedLog._id}`, {
                 status: newStatus,
                 date: selectedLog.date, // Preserve date
                 notes: statusNote
@@ -147,7 +146,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
                 text: "Delete", style: "destructive",
                 onPress: async () => {
                     try {
-                        await api.delete(`/api/delete_attendance/${selectedLog._id}`);
+                        await api.delete(`/api/attendance/logs/${selectedLog._id}`);
                         setLogModalVisible(false);
                         fetchLogs();
                     } catch (e) { Alert.alert("Error", "Failed to delete log."); }

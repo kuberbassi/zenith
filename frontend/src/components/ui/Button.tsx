@@ -19,7 +19,7 @@ const Button: React.FC<ButtonProps> = ({
     disabled,
     ...props
 }) => {
-    const baseClasses = "inline-flex items-center justify-center font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden shrink-0";
+    const baseClasses = "inline-flex items-center justify-center font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden shrink-0 whitespace-nowrap flex-nowrap";
 
     const variantClasses: Record<string, string> = {
         primary: "bg-primary text-on-primary hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",

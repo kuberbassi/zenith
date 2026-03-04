@@ -203,7 +203,7 @@ const OnboardingScreen = ({ navigation, onComplete }) => {
             try {
                 setSaving(true);
                 const api = require('../services/api').default;
-                await api.post('/api/update_profile', {
+                await api.put('/api/profile', {
                     college: formData.college,
                     batch: formData.batch,
                     course: formData.course,

@@ -28,8 +28,9 @@ const ReportsScreen = () => {
             setLoading(true);
             // Simulate API call or use actual endpoint
             // Assuming backend generates the file
-            let endpoint = `/api/reports/export/${type}`;
-            if (year) endpoint += `?year=${year}`;
+            let endpoint = `/api/data/export_data`;
+            if (type) endpoint += `?format=${type}`;
+            if (year) endpoint += `${type ? '&' : '?'}year=${year}`;
 
             // Ideally this would download a file. 
             // For now, we'll assume the backend returns a URL or file content.

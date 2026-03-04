@@ -129,6 +129,17 @@ const DashboardScreen = ({ navigation }) => {
         }
     };
 
+    const handleMarkAttendance = async (subjectId, status) => {
+        try {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await attendanceService.markAttendance(subjectId, status);
+            fetchDashboardData();
+        } catch (error) {
+            console.error("Mark attendance failed", error);
+            Alert.alert('Error', 'Failed to mark attendance.');
+        }
+    };
+
     const threshold = user?.attendance_threshold || 75;
     const overallAttendance = dashboardData?.overall_attendance || 0;
     const isAtRisk = overallAttendance < threshold;
@@ -356,6 +367,7 @@ const DashboardScreen = ({ navigation }) => {
                                 setEditingSubject(subject);
                                 setModalVisible(true);
                             }}
+                            onMark={handleMarkAttendance}
                         />
                     ))}
 

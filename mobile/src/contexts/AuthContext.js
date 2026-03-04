@@ -116,12 +116,12 @@ export const AuthProvider = ({ children }) => {
 
     const fetchUserProfile = async () => {
         try {
-            const response = await api.get('/api/v1/profile/');
+            const response = await api.get('/api/profile/');
             if (response.data && response.data.success) {
                 const fetchedUser = response.data.data;
-                console.log('📥 AuthContext: Profile synced from server', { 
-                    semester: fetchedUser.semester, 
-                    hasPicture: !!fetchedUser.picture 
+                console.log('📥 AuthContext: Profile synced from server', {
+                    semester: fetchedUser.semester,
+                    hasPicture: !!fetchedUser.picture
                 });
                 // Merge with existing user state to keep locally added fields if any
                 setUser(prevUser => {

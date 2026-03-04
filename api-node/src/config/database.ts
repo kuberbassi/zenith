@@ -1,16 +1,29 @@
 import mongoose from 'mongoose'
 import { ENV } from './env.js'
 
-let connected = false
+let connectionPromise: Promise<void> | null = null
 
 export async function connectDB() {
-  if (connected) return
-  try {
-    await mongoose.connect(ENV.MONGODB_URI)
-    connected = true
-    console.log('[DB] Connected to MongoDB')
-  } catch (err) {
-    console.error('[DB] Connection failed:', err)
-    process.exit(1)
+  if (mongoose.connection.readyState === 1) return
+  // Clear stale promise if connection was lost
+  if (mongoose.connection.readyState === 0) connectionPromise = null
+  if (!connectionPromise) {
+    connectionPromise = mongoose
+      .connect(ENV.MONGODB_URI, {
+        maxPoolSize: 10,
+        minPoolSize: 1,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        bufferCommands: false,
+      })
+      .then(() => {
+        console.log('[DB] Connected to MongoDB')
+      })
+      .catch((err) => {
+        connectionPromise = null
+        console.error('[DB] Connection failed:', err)
+        throw err
+      })
   }
+  return connectionPromise
 }

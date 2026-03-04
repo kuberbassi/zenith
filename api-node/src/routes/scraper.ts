@@ -46,7 +46,9 @@ let _lastUpdated: number | null = null
 let _refreshing = false
 
 function getCollection() {
-  return mongoose.connection.db!.collection(CACHE_COLLECTION)
+  const db = mongoose.connection.db
+  if (!db) throw new Error('Database not connected')
+  return db.collection(CACHE_COLLECTION)
 }
 
 async function loadFromMongo(): Promise<boolean> {
@@ -118,20 +120,30 @@ async function scrapeIPUNotices(): Promise<Notice[]> {
 
         // Extract date
         let dateStr: string | null = null
+        const normalizeDate = (dm: RegExpMatchArray) => {
+          let y = dm[3];
+          if (y.length === 2) y = '20' + y;
+          return `${dm[1].padStart(2, '0')}-${dm[2].padStart(2, '0')}-${y}`;
+        };
+
         $row('td').each((_i, td) => {
           if (dateStr) return
           const txt = $row(td).text().trim()
           const dm = txt.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/)
-          if (dm) dateStr = dm[0]
+          if (dm) dateStr = normalizeDate(dm)
         })
+
         if (!dateStr) {
           const dm = title.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/)
-          if (dm) dateStr = dm[0]
+          if (dm) dateStr = normalizeDate(dm)
           else {
             const fm = href.match(/(\d{2})(\d{2})(\d{2})/)
             if (fm) {
               const [, d, m, y] = fm
-              dateStr = parseInt(d, 10) > 31 ? `${y}-${m}-20${d}` : `${d}-${m}-20${y}`
+              dateStr = parseInt(d, 10) > 31 ? `${d.padStart(2, '0')}-${m.padStart(2, '0')}-20${y}` : `${d.padStart(2, '0')}-${m.padStart(2, '0')}-20${y}` // Note: The previous logic flipped d and y weirdly, simplifying to assume DDMMYY if 6 digits. Wait, standard is DDMMYY or YYMMDD? usually DDMMYY for IPU URLs
+              // Actually, if d > 31, it was YYMMDD:
+              if (parseInt(d, 10) > 31) dateStr = `${y.padStart(2, '0')}-${m.padStart(2, '0')}-20${d}`;
+              else dateStr = `${d.padStart(2, '0')}-${m.padStart(2, '0')}-20${y}`;
             }
           }
         }
@@ -146,6 +158,18 @@ async function scrapeIPUNotices(): Promise<Notice[]> {
         continue
       }
     }
+
+    // Sort notices by date descending (latest on top)
+    notices.sort((a, b) => {
+      const pA = a.date.split('-');
+      const pB = b.date.split('-');
+      if (pA.length === 3 && pB.length === 3) {
+        const dA = new Date(`${pA[2]}-${pA[1]}-${pA[0]}`).getTime();
+        const dB = new Date(`${pB[2]}-${pB[1]}-${pB[0]}`).getTime();
+        return dB - dA;
+      }
+      return 0;
+    });
 
     return notices
   } catch (e) {

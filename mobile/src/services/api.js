@@ -1,87 +1,87 @@
+/**
+ * API Client — v3 (Node Backend)
+ *
+ * Single axios instance for all service modules.
+ *   • X-Platform header injection
+ *   • JWT Bearer auth via SecureStore
+ *   • 401 auto-clear + 429 exponential backoff
+ *   • __DEV__ request timing logs
+ */
 
 import { Platform } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// Replace with your local machine's IP address if testing on a physical device.
-// For Android Emulator, use 'http://10.0.2.2:5000'
-// For iOS Simulator, 'http://localhost:5000' works.
-// Physical Device (Your PC IP):
+// ── URLs ───────────────────────────────────────────────────
 const PROD_URL = 'https://acadhub.kuberbassi.com';
-const LOCAL_IP = 'http://127.0.0.1:5000'; // For USB Debugging with adb reverse
-const WEB_URL = 'http://localhost:5000';
 
-// Development URLs (Change IP as needed)
 const DEV_URLS = Platform.select({
-    web: WEB_URL,
-    android: 'http://192.168.0.159:5000',
-    ios: 'http://192.168.0.159:5000',
-    default: LOCAL_IP
+  web: 'http://localhost:5001',
+  android: 'http://192.168.0.159:5001',
+  ios: 'http://192.168.0.159:5001',
+  default: 'http://127.0.0.1:5001',
 });
 
-// Automatically select Production URL for Release builds, and Dev URL for local workflow
-// For v2.0.0 Production APK, ensuring it uses the correct deployed backend
-const isProdBuild = !__DEV__;
-export const API_URL = isProdBuild ? PROD_URL : DEV_URLS;
+export const API_URL = __DEV__ ? DEV_URLS : PROD_URL;
 
+// ── Axios instance ─────────────────────────────────────────
 const api = axios.create({
-    baseURL: API_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
-    withCredentials: true, // Important for session cookies
+  baseURL: API_URL,
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Platform': Platform.OS === 'ios' ? 'ios' : 'android',
+  },
 });
 
-// Add request interceptor to inject auth token
+// ── Request interceptor ────────────────────────────────────
 api.interceptors.request.use(
-    async (config) => {
-        try {
-            const token = await SecureStore.getItemAsync('auth_token');
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-            }
-        } catch (error) {
-            console.error('Error reading auth token:', error);
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
+  async (config) => {
+    try {
+      const token = await SecureStore.getItemAsync('auth_token');
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    } catch (_) { /* SecureStore may fail on web */ }
+    if (__DEV__) config._startTime = Date.now();
+    return config;
+  },
+  (err) => Promise.reject(err),
 );
 
-// Add response interceptor for error handling with retry logic
+// ── Response interceptor ───────────────────────────────────
 api.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-        const config = error.config;
-        const status = error.response?.status;
-
-        // 1. Handle 401 Unauthorized (Auth Expiry)
-        if (status === 401) {
-            console.log("🔒 401 Unauthorized in API - Redirecting to logout logic");
-            await SecureStore.deleteItemAsync('auth_token');
-            await SecureStore.deleteItemAsync('user_data');
-            // Redirection is handled by AuthContext state change or Navigation
-        }
-
-        // 2. Handle 429 Too Many Requests (Rate Limiting) with Exponential Backoff
-        if (status === 429 && !config._retry) {
-            config._retry = (config._retryCount || 0) + 1;
-            const maxRetries = 3;
-
-            if (config._retry <= maxRetries) {
-                // Exponential backoff: 1s, 2s, 4s...
-                const delay = Math.pow(2, config._retry - 1) * 1000 + Math.random() * 500;
-                console.warn(`⚠️ Rate limited (429). Retrying in ${Math.round(delay)}ms... (Attempt ${config._retry}/${maxRetries})`);
-
-                await new Promise(resolve => setTimeout(resolve, delay));
-                return api.request(config);
-            }
-        }
-
-        return Promise.reject(error);
+  (res) => {
+    if (__DEV__ && res.config._startTime) {
+      const ms = Date.now() - res.config._startTime;
+      console.log(`⚡ ${res.config.method?.toUpperCase()} ${res.config.url} → ${ms}ms`);
     }
+    return res;
+  },
+  async (err) => {
+    const config = err.config;
+    const status = err.response?.status;
+
+    // 401 → wipe auth tokens
+    if (status === 401) {
+      try {
+        await SecureStore.deleteItemAsync('auth_token');
+        await SecureStore.deleteItemAsync('user_data');
+      } catch (_) {}
+    }
+
+    // 429 → exponential backoff (max 3 retries)
+    if (status === 429 && config) {
+      const attempt = (config._retryCount || 0) + 1;
+      if (attempt <= 3) {
+        config._retryCount = attempt;
+        const delay = Math.pow(2, attempt - 1) * 1000 + Math.random() * 500;
+        if (__DEV__) console.warn(`⏳ 429 retry ${attempt}/3 in ${Math.round(delay)}ms`);
+        await new Promise((r) => setTimeout(r, delay));
+        return api.request(config);
+      }
+    }
+
+    return Promise.reject(err);
+  },
 );
 
 export default api;

@@ -66,6 +66,11 @@ const SettingsScreen = ({ navigation }) => {
         batch: user?.batch || '',
         email: user?.email || '',
         college: user?.college || '',
+        phone_number: user?.phone_number || '',
+        headline: user?.headline || '',
+        linkedin_url: user?.linkedin_url || '',
+        github_url: user?.github_url || '',
+        portfolio_url: user?.portfolio_url || '',
     });
 
     const [minAttendance, setMinAttendance] = useState(user?.attendance_threshold ? String(user.attendance_threshold) : '75');
@@ -83,9 +88,14 @@ const SettingsScreen = ({ navigation }) => {
                 name: user.name || prev.name,
                 email: user.email || prev.email,
                 course: user.course || user.branch || prev.course,
-                semester: user.semester ? String(user.semester) : prev.semester,
+                semester: user.semester || user.current_semester ? String(user.semester || user.current_semester) : prev.semester,
                 batch: user.batch || prev.batch,
-                college: user.college || prev.college
+                college: user.college || prev.college,
+                phone_number: user.phone_number || prev.phone_number,
+                headline: user.headline || prev.headline,
+                linkedin_url: user.linkedin_url || prev.linkedin_url,
+                github_url: user.github_url || prev.github_url,
+                portfolio_url: user.portfolio_url || prev.portfolio_url,
             }));
 
             // Sync preferences from user context
@@ -106,7 +116,7 @@ const SettingsScreen = ({ navigation }) => {
             if (profileResponse.data?.success && profileResponse.data?.data) {
                 const data = profileResponse.data.data;
                 console.log('📥 Profile loaded:', { email: data.email, semester: data.semester, attendance_threshold: data.attendance_threshold });
-                
+
                 setProfileData(prev => ({
                     ...prev,
                     name: data.name || prev.name,
@@ -115,6 +125,11 @@ const SettingsScreen = ({ navigation }) => {
                     batch: data.batch || prev.batch,
                     college: data.college || prev.college,
                     semester: data.semester ? String(data.semester) : prev.semester,
+                    phone_number: data.phone_number || prev.phone_number,
+                    headline: data.headline || prev.headline,
+                    linkedin_url: data.linkedin_url || prev.linkedin_url,
+                    github_url: data.github_url || prev.github_url,
+                    portfolio_url: data.portfolio_url || prev.portfolio_url,
                 }));
 
                 // Set attendance thresholds from profile
@@ -155,6 +170,11 @@ const SettingsScreen = ({ navigation }) => {
                     batch: data.batch || user.batch,
                     college: data.college || user.college,
                     semester: data.semester,
+                    phone_number: data.phone_number || user.phone_number,
+                    headline: data.headline || user.headline,
+                    linkedin_url: data.linkedin_url || user.linkedin_url,
+                    github_url: data.github_url || user.github_url,
+                    portfolio_url: data.portfolio_url || user.portfolio_url,
                     attendance_threshold: data.attendance_threshold,
                     warning_threshold: data.warning_threshold,
                 };
@@ -193,15 +213,20 @@ const SettingsScreen = ({ navigation }) => {
 
             const dataToSave = {
                 ...profileData,
+                semester: updatedSemester, // Ensure it's passed as number
                 attendance_threshold: attThreshold,
                 warning_threshold: warnThreshold
             };
 
-            console.log('💾 Saving profile and preferences:', { attendance_threshold: attThreshold, warning_threshold: warnThreshold });
+            console.log('💾 Saving profile and preferences:', {
+                name: dataToSave.name,
+                phone: dataToSave.phone_number,
+                attendance_threshold: attThreshold
+            });
 
             // Update Backend via Service
             await attendanceService.updateProfile(dataToSave);
-            
+
             // Also update preferences endpoint for proper sync
             try {
                 await attendanceService.updatePreferences({
@@ -214,14 +239,26 @@ const SettingsScreen = ({ navigation }) => {
             }
 
             // Update global semester context
-            await updateSemester(updatedSemester);
+            if (updateSemester) await updateSemester(updatedSemester);
 
-            // Update Local Context
-            await updateUser({
-                ...user,
-                ...dataToSave,
-                semester: updatedSemester
-            });
+            // Update Local Auth Context with fresh data from server to be safe
+            try {
+                const freshProfile = await attendanceService.getProfile();
+                if (freshProfile && freshProfile.data) {
+                    const data = freshProfile.data;
+                    updateUser({
+                        ...user,
+                        ...data,
+                        // Ensure semester stays synced
+                        semester: data.semester || data.current_semester || updatedSemester
+                    });
+                } else {
+                    // Fallback to local data
+                    updateUser({ ...user, ...dataToSave });
+                }
+            } catch (err) {
+                updateUser({ ...user, ...dataToSave });
+            }
 
             setEditingProfile(false);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -303,7 +340,7 @@ const SettingsScreen = ({ navigation }) => {
 
             setLoading(true);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            
+
             const file = result.assets[0];
 
             // Create form data matching backend expectations
@@ -317,7 +354,7 @@ const SettingsScreen = ({ navigation }) => {
             // Use direct Axios call with explicit multipart header
             const api = require('../services/api').default;
 
-            const response = await api.post('/api/upload_pfp', formData, {
+            const response = await api.post('/api/profile/upload_pfp', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -329,10 +366,10 @@ const SettingsScreen = ({ navigation }) => {
             if (response?.data?.url) {
                 // Update user context with new picture
                 await updateUser({ ...user, picture: response.data.url });
-                
+
                 // Also refresh profile data to ensure sync
                 await loadPrefs();
-                
+
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 Alert.alert("✓ Success", "Profile picture updated successfully!");
             } else {
@@ -497,10 +534,75 @@ const SettingsScreen = ({ navigation }) => {
                         </View>
                     </View>
 
-                    <View style={{ marginTop: 16 }}>
-                        <Text style={styles.label}>Email</Text>
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Headline</Text>
                         <TextInput
-                            style={[styles.input, { opacity: 0.7 }]} // Email usually read-only or less emphasized
+                            style={[styles.input, editingProfile && styles.inputActive]}
+                            value={profileData.headline}
+                            onChangeText={t => setProfileData({ ...profileData, headline: t })}
+                            editable={editingProfile}
+                            placeholder="Student / Developer / Explorer"
+                            placeholderTextColor={c.subtext}
+                        />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Phone Number</Text>
+                        <TextInput
+                            style={[styles.input, editingProfile && styles.inputActive]}
+                            value={profileData.phone_number}
+                            onChangeText={t => setProfileData({ ...profileData, phone_number: t })}
+                            editable={editingProfile}
+                            placeholder="+91 0000000000"
+                            placeholderTextColor={c.subtext}
+                            keyboardType="phone-pad"
+                        />
+                    </View>
+
+                    <View style={styles.row}>
+                        <View style={{ flex: 1, marginRight: 10 }}>
+                            <Text style={styles.label}>LinkedIn</Text>
+                            <TextInput
+                                style={[styles.input, editingProfile && styles.inputActive]}
+                                value={profileData.linkedin_url}
+                                onChangeText={t => setProfileData({ ...profileData, linkedin_url: t })}
+                                editable={editingProfile}
+                                placeholder="linkedin.com/in/..."
+                                placeholderTextColor={c.subtext}
+                                autoCapitalize="none"
+                            />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.label}>GitHub</Text>
+                            <TextInput
+                                style={[styles.input, editingProfile && styles.inputActive]}
+                                value={profileData.github_url}
+                                onChangeText={t => setProfileData({ ...profileData, github_url: t })}
+                                editable={editingProfile}
+                                placeholder="github.com/..."
+                                placeholderTextColor={c.subtext}
+                                autoCapitalize="none"
+                            />
+                        </View>
+                    </View>
+
+                    <View style={{ marginTop: 16 }}>
+                        <Text style={styles.label}>Portfolio / Website</Text>
+                        <TextInput
+                            style={[styles.input, editingProfile && styles.inputActive]}
+                            value={profileData.portfolio_url}
+                            onChangeText={t => setProfileData({ ...profileData, portfolio_url: t })}
+                            editable={editingProfile}
+                            placeholder="https://..."
+                            placeholderTextColor={c.subtext}
+                            autoCapitalize="none"
+                        />
+                    </View>
+
+                    <View style={{ marginTop: 16 }}>
+                        <Text style={styles.label}>Email Address</Text>
+                        <TextInput
+                            style={[styles.input, { opacity: 0.6 }]}
                             value={profileData.email}
                             editable={false}
                         />
@@ -713,16 +815,16 @@ const SettingsScreen = ({ navigation }) => {
                         style={[styles.dangerBtn, { marginTop: 12, borderColor: c.danger + '40', backgroundColor: c.danger + '05' }]}
                         onPress={() => {
                             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                            
+
                             // Get current user email for safety verification
                             const userEmail = user?.email?.toLowerCase() || '';
-                            
+
                             Alert.alert(
                                 "⚠️ DELETE ALL DATA",
                                 `This will permanently delete all your subjects, attendance logs, timetable, and settings.\n\n📥 A backup file will be saved to your device first.\n\n🔒 Deleting data for: ${userEmail}\n\nAre you absolutely sure?`,
                                 [
-                                    { 
-                                        text: "Cancel", 
+                                    {
+                                        text: "Cancel",
                                         style: "cancel",
                                         onPress: () => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -736,19 +838,19 @@ const SettingsScreen = ({ navigation }) => {
                                             setLoading(true);
                                             try {
                                                 console.log('🗑️ Attempting to delete all data for:', userEmail);
-                                                
+
                                                 // 📥 MANDATORY: Force download backup FIRST
                                                 Alert.alert("Downloading Backup", "Please wait while we save your backup file...");
-                                                
+
                                                 try {
                                                     // Export data first
                                                     const exportData = await attendanceService.exportData();
                                                     const filename = `acadhub-backup-BEFORE-DELETE-${userEmail.replace('@', '_at_').replace(/\./g, '_')}-${new Date().toISOString().split('T')[0]}.json`;
                                                     const fileUri = FileSystem.documentDirectory + filename;
-                                                    
+
                                                     // Write to file
                                                     await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(exportData, null, 2));
-                                                    
+
                                                     // Force share/save the backup
                                                     if (await Sharing.isAvailableAsync()) {
                                                         await Sharing.shareAsync(fileUri, {
@@ -759,7 +861,7 @@ const SettingsScreen = ({ navigation }) => {
                                                     } else {
                                                         Alert.alert("Backup Saved", `Backup saved to: ${fileUri}`);
                                                     }
-                                                    
+
                                                     console.log('✅ Backup downloaded successfully');
                                                 } catch (backupError) {
                                                     console.error('❌ Backup failed:', backupError);
@@ -771,7 +873,7 @@ const SettingsScreen = ({ navigation }) => {
                                                     setLoading(false);
                                                     return; // ABORT deletion if backup fails
                                                 }
-                                                
+
                                                 // Final confirmation after backup
                                                 Alert.alert(
                                                     "Backup Complete",
@@ -785,12 +887,12 @@ const SettingsScreen = ({ navigation }) => {
                                                                 try {
                                                                     const result = await attendanceService.deleteAllData(userEmail);
                                                                     console.log('✅ Delete result:', result);
-                                                                    
+
                                                                     const backupId = result?.backup_id || 'N/A';
-                                                                    
+
                                                                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                                                                     Alert.alert(
-                                                                        "✓ Reset Complete", 
+                                                                        "✓ Reset Complete",
                                                                         `All data has been deleted.\n\n📦 Server Backup ID: ${backupId}\n📥 Local backup saved to device.\n\nYou will now be logged out.`,
                                                                         [{
                                                                             text: "OK",

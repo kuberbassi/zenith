@@ -8,164 +8,183 @@
 
 @layer base {
   :root {
-    /* M3 System Colors - Light (High Contrast) */
-    --md-sys-color-primary: #EC4899;
+    /* Forced Stealth (Sea Green) */
+    --md-sys-color-primary: #10b981;
     --md-sys-color-on-primary: #FFFFFF;
-    --md-sys-color-primary-container: #EADDFF;
-    --md-sys-color-on-primary-container: #21005D;
+    --md-sys-color-primary-container: #064e3b;
+    --md-sys-color-on-primary-container: #d1fae5;
 
-    --md-sys-color-secondary: #625B71;
+    --md-sys-color-secondary: #059669;
     --md-sys-color-on-secondary: #FFFFFF;
-    --md-sys-color-secondary-container: #E8DEF8;
-    --md-sys-color-on-secondary-container: #1D192B;
-
-    --md-sys-color-tertiary: #7D5260;
-    --md-sys-color-on-tertiary: #FFFFFF;
-    --md-sys-color-tertiary-container: #FFD8E4;
-    --md-sys-color-on-tertiary-container: #31111D;
-
-    --md-sys-color-error: #B3261E;
-    --md-sys-color-on-error: #FFFFFF;
-    --md-sys-color-error-container: #F9DEDC;
-    --md-sys-color-on-error-container: #410E0B;
-
-    --md-sys-color-background: #FFFFFF;
-    /* Pure White Background */
-    --md-sys-color-on-background: #000000;
-    /* Pure Black Text */
-
-    --md-sys-color-surface: #F8F9FA;
-    /* Very slight grey for cards to pop against white bg */
-    --md-sys-color-on-surface: #000000;
-    /* Pure Black Text */
-    --md-sys-color-surface-variant: #E1E3E6;
-    --md-sys-color-on-surface-variant: #444746;
-    /* High contrast grey */
-
-    --md-sys-color-outline: #747775;
-    --md-sys-color-outline-variant: #C4C7C5;
-
-    /* Surface Containers for Light Mode */
-    --md-sys-color-surface-container: #F3F3F4;
-    --md-sys-color-surface-container-low: #FFFFFF;
-    /* Sidebar should be white in light mode or very light grey */
-    --md-sys-color-surface-container-high: #ECECEE;
-    --md-sys-color-surface-container-highest: #E6E6E8;
-    --md-sys-color-surface-dim: #DCDCDC;
-
-    /* M3 Elevation */
-    --md-sys-elevation-level-0: 0px 0px 0px 0px;
-    --md-sys-elevation-level-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.05), 0px 1px 2px 0px rgba(0, 0, 0, 0.1);
-    --md-sys-elevation-level-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.05), 0px 1px 2px 0px rgba(0, 0, 0, 0.1);
-    --md-sys-elevation-level-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.05), 0px 1px 3px 0px rgba(0, 0, 0, 0.1);
-
-    /* M3 Shape */
-    --md-sys-shape-corner-extra-small: 4px;
-    --md-sys-shape-corner-small: 12px;
-    --md-sys-shape-corner-medium: 16px;
-    --md-sys-shape-corner-large: 24px;
-    --md-sys-shape-corner-extra-large: 32px;
-  }
-
-  /* Responsive Scaling (Global Zoom Handling) */
-  html {
-    font-size: 15px;
-    /* Base - Slightly smaller */
-  }
-
-  @media (max-width: 1536px) {
-    html {
-      font-size: 14px;
-      /* Scaled down for 1080p laptops */
-    }
-  }
-
-  @media (max-width: 1280px) {
-    html {
-      font-size: 13.5px;
-      /* Compact */
-    }
-  }
-
-  @media (max-width: 1024px) {
-    html {
-      font-size: 13px;
-      /* Tablet */
-    }
-  }
-
-  @media (max-width: 768px) {
-    html {
-      font-size: 12.5px;
-      /* Mobile */
-    }
-  }
-
-  /* Dark Theme Tokens (Deep OLED Black) */
-  .dark {
-    --md-sys-color-primary: #EC4899;
-    --md-sys-color-on-primary: #381E72;
-    --md-sys-color-primary-container: #4F378B;
-    --md-sys-color-on-primary-container: #EADDFF;
-
-    --md-sys-color-secondary: #CCC2DC;
-    --md-sys-color-on-secondary: #332D41;
-    --md-sys-color-secondary-container: #4A4458;
-    --md-sys-color-on-secondary-container: #E8DEF8;
-
-    --md-sys-color-tertiary: #EFB8C8;
-    --md-sys-color-on-tertiary: #492532;
-    --md-sys-color-tertiary-container: #633B48;
-    --md-sys-color-on-tertiary-container: #FFD8E4;
-
-    --md-sys-color-error: #F2B8B5;
-    --md-sys-color-on-error: #601410;
-    --md-sys-color-error-container: #8C1D18;
-    --md-sys-color-on-error-container: #F9DEDC;
-
-    /* Pure Black Backgrounds */
-    --md-sys-color-background: #000000;
-    --md-sys-color-on-background: #E6E1E5;
-
-    /* Darker Surfaces */
-    --md-sys-color-surface: #0A0A0A;
-    --md-sys-color-on-surface: #E6E1E5;
-    --md-sys-color-surface-variant: #1C1C1C;
-    --md-sys-color-on-surface-variant: #CAC4D0;
-
-    --md-sys-color-outline: #938F99;
-    --md-sys-color-outline-variant: #49454F;
-
-    /* Surface Containers for Dark Mode */
-    --md-sys-color-surface-container: #141414;
-    --md-sys-color-surface-container-low: #0A0A0A;
-    --md-sys-color-surface-container-high: #1E1E1E;
-    --md-sys-color-surface-container-highest: #2A2A2A;
-    --md-sys-color-surface-dim: #111111;
-  }
-
-  * {
-    @apply border-[var(--md-sys-color-outline-variant)];
-  }
-
-  body {
-    @apply bg-[var(--md-sys-color-background)] text-[var(--md-sys-color-on-background)] font-sans antialiased transition-colors duration-300;
-  }
-
-  /* Heading typography override */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply font-display tracking-tight;
+    --md-sys-color-secondary-container: #064e3b;
+    --md-sys-color-on-secondary-container: #d1fae5;
   }
 }
 
-@layer utilities {
+body {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
 
-  /* Fade animations - can be used with Tailwind */
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  pointer-events: none;
+}
+
+:root {
+  --md-sys-color-tertiary: #34d399;
+  --md-sys-color-on-tertiary: #000000;
+  --md-sys-color-tertiary-container: #065f46;
+  --md-sys-color-on-tertiary-container: #a7f3d0;
+
+  --md-sys-color-error: #ef4444;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #7f1d1d;
+  --md-sys-color-on-error-container: #fee2e2;
+
+  --md-sys-color-background: #000000;
+  --md-sys-color-on-background: #ededed;
+
+  --md-sys-color-surface: #000000;
+  --md-sys-color-on-surface: #ededed;
+  --md-sys-color-surface-variant: #0a0a0a;
+  --md-sys-color-on-surface-variant: #888888;
+
+  --md-sys-color-outline: rgba(255, 255, 255, 0.12);
+  --md-sys-color-outline-variant: rgba(255, 255, 255, 0.06);
+
+  --md-sys-color-surface-container: #0a0a0a;
+  --md-sys-color-surface-container-low: #050505;
+  --md-sys-color-surface-container-high: #111111;
+  --md-sys-color-surface-container-highest: #171717;
+  --md-sys-color-surface-dim: #000000;
+
+  --md-sys-elevation-level-0: 0px 0px 0px 0px;
+  --md-sys-elevation-level-1: 0px 1px 3px 1px rgba(0, 0, 0, 0.05),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.1);
+  --md-sys-elevation-level-2: 0px 2px 6px 2px rgba(0, 0, 0, 0.05),
+    0px 1px 2px 0px rgba(0, 0, 0, 0.1);
+  --md-sys-elevation-level-3: 0px 4px 8px 3px rgba(0, 0, 0, 0.05),
+    0px 1px 3px 0px rgba(0, 0, 0, 0.1);
+
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 12px;
+  --md-sys-shape-corner-medium: 16px;
+  --md-sys-shape-corner-large: 24px;
+  --md-sys-shape-corner-extra-large: 32px;
+}
+
+.dark {
+  --md-sys-color-primary: #10b981;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: #064e3b;
+  --md-sys-color-on-primary-container: #d1fae5;
+}
+
+html {
+  font-size: 15px;
+}
+
+@media (max-width: 1536px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 1280px) {
+  html {
+    font-size: 13.5px;
+  }
+}
+
+@media (max-width: 1024px) {
+  html {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 12.5px;
+  }
+}
+
+*.glass-panel {
+  @apply bg-[#111111]/60 backdrop-blur-xl border border-white/[0.08];
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+/* Dark theme for date/time inputs */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(0.6);
+  cursor: pointer;
+}
+
+/* Hide native number spinners */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Custom scrollbar for dark theme */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+* {
+  @apply border-[var(--md-sys-color-outline-variant)];
+}
+
+body {
+  @apply bg-[var(--md-sys-color-background)] text-[var(--md-sys-color-on-background)] font-sans antialiased transition-colors duration-300;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  @apply font-display tracking-tight;
+}
+
+@layer utilities {
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
   }
@@ -175,7 +194,6 @@
   }
 }
 
-/* Material Symbols Font */
 .material-icons {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
@@ -190,10 +208,7 @@
   direction: ltr;
 }
 
-/* Performance Optimizations */
 @layer utilities {
-
-  /* Reduce motion for accessibility and low-end devices */
   @media (prefers-reduced-motion: reduce) {
 
     *,
@@ -206,20 +221,17 @@
     }
   }
 
-  /* GPU-accelerated animations */
   .gpu-accelerated {
     will-change: transform, opacity;
     transform: translateZ(0);
     backface-visibility: hidden;
   }
 
-  /* Optimize transitions */
   .smooth-transform {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
       opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Compact spacing utilities */
   .space-compact {
     gap: 1.5rem;
   }
@@ -229,7 +241,6 @@
   }
 }
 
-/* Skeleton loader animations */
 @keyframes skeleton-loading {
   0% {
     background-position: -200% 0;
@@ -249,19 +260,20 @@
   animation: skeleton-loading 1.5s ease-in-out infinite;
 }
 
-/* Badge pulse animation for mobile nav */
 @keyframes pulse-badge {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
   }
+
   50% {
     transform: scale(1.15);
     opacity: 0.9;
   }
 }
 
-/* Modern Sleek Scrollbars */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -281,7 +293,6 @@
   background: var(--md-sys-color-outline);
 }
 
-/* Firefox */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--md-sys-color-outline-variant) transparent;

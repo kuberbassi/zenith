@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import GlassCard from '@/components/ui/GlassCard';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
+import Sparkles from '@/components/ui/Sparkles';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import AttendanceModal from '@/components/modals/AttendanceModal';
 import { attendanceService } from '@/services/attendance.service';
@@ -20,26 +20,19 @@ const Calendar: React.FC = () => {
     const { currentSemester } = useSemester();
     const [loading, setLoading] = useState(true);
     const [currentDate, setCurrentDate] = useState(new Date());
-    // attendanceData is now a map of date -> list of records
     const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceRecord[]>>({});
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isMarkModalOpen, setIsMarkModalOpen] = useState(false);
 
-    useEffect(() => {
-        loadData();
-    }, [currentDate, currentSemester]);
-
+    useEffect(() => { loadData(); }, [currentDate, currentSemester]);
 
     const loadData = async (showLoading = true) => {
         try {
             if (showLoading) setLoading(true);
-            // Fetch for current month view
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth() + 1;
-
             const calendarData = await attendanceService.getCalendarData(year, month, currentSemester);
 
-            // Transform list to map: { "YYYY-MM-DD": [logs] }
             const dataMap: Record<string, AttendanceRecord[]> = {};
             if (Array.isArray(calendarData)) {
                 calendarData.forEach((log: any) => {
@@ -51,7 +44,7 @@ const Calendar: React.FC = () => {
             setAttendanceData(dataMap);
         } catch (error) {
             console.error(error);
-            showToast('error', 'Failed to load calendar data');
+            showToast('error', 'Sync Failed');
         } finally {
             setLoading(false);
         }
@@ -63,96 +56,75 @@ const Calendar: React.FC = () => {
         const firstDay = new Date(year, month, 1);
         const lastDay = new Date(year, month + 1, 0);
         const daysInMonth = lastDay.getDate();
-
-        // Convert to Monday-first week (0=Monday, 6=Sunday)
         let startingDayOfWeek = firstDay.getDay() - 1;
-        if (startingDayOfWeek === -1) startingDayOfWeek = 6; // Sunday becomes 6
-
+        if (startingDayOfWeek === -1) startingDayOfWeek = 6;
         return { daysInMonth, startingDayOfWeek, year, month };
     };
 
     const getAttendanceForDate = (date: Date) => {
-        // Construct date string manually to match API format YYYY-MM-DD
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
-
-        return attendanceData[dateStr] || [];
+        return attendanceData[`${year}-${month}-${day}`] || [];
     };
 
-    const handlePrevMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
-    };
+    const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1));
+    const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
 
-    const handleNextMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
-    };
-
-    const handleDayClick = async (day: number) => {
+    const handleDayClick = (day: number) => {
         const clickedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-        const year = clickedDate.getFullYear();
-        const month = String(clickedDate.getMonth() + 1).padStart(2, '0');
-        const dayStr = String(clickedDate.getDate()).padStart(2, '0');
-        const dateString = `${year}-${month}-${dayStr}`;
-
         setSelectedDate(clickedDate);
         setIsMarkModalOpen(true);
-
-
-        try {
-            await attendanceService.getClassesForDate(dateString, currentSemester);
-        } catch (error) {
-            console.error("Failed to fetch scheduled classes", error);
-        }
     };
 
     const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentDate);
-    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
     if (loading) return <LoadingSpinner fullScreen />;
 
     return (
-        <div className="pb-20 space-y-4 md:space-y-6">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-bold font-display text-on-surface tracking-tight mb-1">Calendar</h1>
-                    <p className="text-xs md:text-base text-on-surface-variant">Manage your academic schedule</p>
-                </div>
-                <div className="flex items-center gap-1 md:gap-2 bg-surface-container rounded-xl p-1 border border-outline-variant/30 self-start md:self-auto">
-                    <button
-                        onClick={handlePrevMonth}
-                        className="p-1.5 md:p-2 hover:bg-surface-container-high rounded-lg text-on-surface-variant transition-colors"
-                    >
-                        <ChevronLeft size={16} className="md:w-5 md:h-5" />
-                    </button>
-                    <span className="font-semibold text-sm md:text-base min-w-[100px] md:min-w-[120px] text-center">
-                        {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                    </span>
-                    <button
-                        onClick={handleNextMonth}
-                        className="p-1.5 md:p-2 hover:bg-surface-container-high rounded-lg text-on-surface-variant transition-colors"
-                    >
-                        <ChevronRight size={16} className="md:w-5 md:h-5" />
-                    </button>
-                </div>
-            </header>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto pb-32">
 
-            <GlassCard className="p-3 md:p-6">
+            {/* ── Cinematic Hero ────────────────────────────────────────── */}
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-12 relative rounded-[2.5rem] border border-white/[0.06] bg-[#0a0a0a] p-8 md:p-12 overflow-hidden shadow-2xl" style={{ boxShadow: '0 0 80px rgba(16,185,129,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-blue-500/[0.02] blur-[150px] pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div className="text-center md:text-left">
+                        <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/10">
+                                <CalendarIcon size={24} />
+                            </div>
+                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight uppercase">Operational Grid</h1>
+                        </div>
+                        <p className="text-white/30 font-bold text-xs md:text-sm tracking-[0.2em] uppercase max-w-md">Temporal mapping of academic engagements and attendance protocols.</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 p-2 rounded-2xl bg-[#050508] border border-white/[0.04] shadow-[inset_0_1px_10px_rgba(255,255,255,0.02)]">
+                        <button onClick={handlePrevMonth} className="w-10 h-10 rounded-xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"><ChevronLeft size={18} /></button>
+                        <div className="px-6 text-center min-w-[180px]">
+                            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-1">{currentDate.getFullYear()}</p>
+                            <p className="text-lg font-black text-white tracking-widest uppercase">{currentDate.toLocaleString('default', { month: 'long' })}</p>
+                        </div>
+                        <button onClick={handleNextMonth} className="w-10 h-10 rounded-xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"><ChevronRight size={18} /></button>
+                    </div>
+                </div>
+            </motion.div>
+
+            {/* ── Calendar Grid ─────────────────────────────────────────── */}
+            <div className="rounded-[2.5rem] border border-white/[0.06] bg-[#0a0a0a] p-4 md:p-8 relative overflow-hidden shadow-2xl" style={{ boxShadow: '0 40px 100px -20px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                 {/* Weekday Headers */}
-                <div className="grid grid-cols-7 mb-2 md:mb-4">
+                <div className="grid grid-cols-7 mb-6">
                     {weekDays.map(day => (
-                        <div key={day} className="text-center text-xs md:text-sm font-bold text-on-surface-variant uppercase tracking-wider py-1 md:py-2">
+                        <div key={day} className="text-center text-[10px] font-black text-white/20 uppercase tracking-[0.3em] py-2">
                             {day}
                         </div>
                     ))}
                 </div>
 
-                {/* Calendar Grid */}
-                <div className="grid grid-cols-7 gap-1 md:gap-3">
+                <div className="grid grid-cols-7 gap-2 md:gap-4 lg:gap-6">
                     {/* Empty Slots */}
                     {Array.from({ length: startingDayOfWeek }).map((_, i) => (
-                        <div key={`empty-${i}`} className="aspect-square" />
+                        <div key={`empty-${i}`} className="aspect-square opacity-0" />
                     ))}
 
                     {/* Days */}
@@ -161,35 +133,35 @@ const Calendar: React.FC = () => {
                         const date = new Date(year, month, day);
                         const attendance = getAttendanceForDate(date);
                         const isToday = new Date().toDateString() === date.toDateString();
-                        const presentCount = attendance.filter(a => a.status === 'present').length;
-                        const absentCount = attendance.filter(a => a.status === 'absent').length;
-                        const totalClasses = attendance.length;
+                        const present = attendance.filter(a => a.status === 'present');
+                        const absent = attendance.filter(a => a.status === 'absent');
+                        const total = attendance.length;
 
                         return (
                             <motion.button
                                 key={day}
-                                whileHover={{ scale: 1.05 }}
+                                whileHover={{ scale: 1.05, y: -4 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => handleDayClick(day)}
-                                className={`aspect-square rounded-xl md:rounded-2xl p-1 md:p-2 relative flex flex-col items-center justify-start transition-all border ${isToday
-                                    ? 'border-primary bg-primary/10 shadow-[0_0_10px_rgba(var(--primary),0.2)] md:shadow-[0_0_20px_rgba(var(--primary),0.3)]'
-                                    : totalClasses > 0
-                                        ? 'border-outline-variant/20 bg-surface-container-low hover:bg-surface-container'
-                                        : 'border-transparent hover:bg-surface-dim'
+                                className={`aspect-square rounded-2xl md:rounded-3xl p-2 md:p-4 relative flex flex-col items-center justify-center transition-all border ${isToday
+                                    ? 'bg-blue-500/10 border-blue-500/40 shadow-[0_0_30px_rgba(16,185,129,0.15)] z-10'
+                                    : total > 0
+                                        ? 'bg-white/[0.02] border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.04]'
+                                        : 'bg-transparent border-transparent hover:bg-white/[0.01] hover:border-white/[0.04]'
                                     }`}
                             >
-                                <span className={`text-xs md:text-base font-medium mt-0.5 md:mt-1 ${isToday ? 'text-primary font-bold' : 'text-on-surface'}`}>
+                                <span className={`text-base md:text-2xl font-black ${isToday ? 'text-blue-400' : 'text-white/80'}`}>
                                     {day}
                                 </span>
 
-                                <div className="mt-auto mb-1 md:mb-2 flex gap-0.5 md:gap-1 flex-wrap justify-center max-w-full px-0.5">
-                                    {new Array(Math.min(presentCount, 4)).fill(0).map((_, idx) => (
-                                        <div key={`p-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-green-500 shadow-sm" />
+                                <div className="absolute bottom-2 md:bottom-4 flex flex-wrap justify-center gap-1 px-1">
+                                    {present.slice(0, 4).map((_, idx) => (
+                                        <div key={`p-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
                                     ))}
-                                    {new Array(Math.min(absentCount, 4)).fill(0).map((_, idx) => (
-                                        <div key={`a-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-red-500 shadow-sm" />
+                                    {absent.slice(0, 4).map((_, idx) => (
+                                        <div key={`a-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-red-500/60 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
                                     ))}
-                                    {totalClasses > 8 && <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-on-surface-variant/30" />}
+                                    {total > 8 && <Sparkles size={8} className="text-white/20" />}
                                 </div>
                             </motion.button>
                         );
@@ -197,31 +169,24 @@ const Calendar: React.FC = () => {
                 </div>
 
                 {/* Legend */}
-                <div className="mt-4 md:mt-8 pt-4 md:pt-6 border-t border-outline-variant/10 flex flex-wrap justify-center gap-4 md:gap-8 text-xs md:text-sm font-medium">
-                    <div className="flex items-center gap-1.5 md:gap-2">
-                        <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-green-500 shadow-sm" />
-                        <span className="text-on-surface-variant">Present</span>
+                <div className="mt-12 pt-8 border-t border-white/[0.04] flex flex-wrap justify-center gap-10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
+                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Present Scan</span>
                     </div>
-                    <div className="flex items-center gap-1.5 md:gap-2">
-                        <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-red-500 shadow-sm" />
-                        <span className="text-on-surface-variant">Absent</span>
+                    <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full bg-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.4)]" />
+                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Absent Signal</span>
                     </div>
-                    <div className="flex items-center gap-1.5 md:gap-2">
-                        <div className="w-2 h-2 md:w-3 md:h-3 rounded border md:border-2 border-primary bg-primary/10" />
-                        <span className="text-primary font-bold">Today</span>
+                    <div className="flex items-center gap-3">
+                        <div className="px-3 py-1 rounded-lg border border-blue-500/40 bg-blue-500/10 text-[10px] font-black text-blue-400 uppercase tracking-widest">Temporal Origin</div>
+                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">(Current Date)</span>
                     </div>
                 </div>
-            </GlassCard>
+            </div>
 
-            <AttendanceModal
-                isOpen={isMarkModalOpen}
-                onClose={() => setIsMarkModalOpen(false)}
-                defaultDate={selectedDate || new Date()}
-                onSuccess={() => {
-                    loadData(false); // Reload silently, do not close modal
-                }}
-            />
-        </div>
+            <AttendanceModal isOpen={isMarkModalOpen} onClose={() => setIsMarkModalOpen(false)} defaultDate={selectedDate || new Date()} onSuccess={() => loadData(false)} />
+        </motion.div >
     );
 };
 

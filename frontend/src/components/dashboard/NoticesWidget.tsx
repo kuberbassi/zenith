@@ -73,7 +73,7 @@ const NoticesWidget: React.FC = () => {
                                     <div className="flex items-center gap-2 mt-3">
                                         <div className="h-1 w-1 rounded-full bg-primary/50" />
                                         <p className="text-[10px] uppercase tracking-wider font-semibold text-on-surface-variant/70">
-                                            {notice.date}
+                                            {notice.date.replace('2061', '2026')}
                                         </p>
                                     </div>
                                 </div>
@@ -128,7 +128,7 @@ const NoticesWidget: React.FC = () => {
                                     </div>
                                     <div className="flex items-center gap-2 mt-2">
                                         <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
-                                            {notice.date}
+                                            {notice.date.replace('2061', '2026')}
                                         </span>
                                     </div>
                                 </a>

@@ -16,6 +16,9 @@ const AnalyticsScreen = () => {
     const { isDark } = useTheme();
     const insets = useSafeAreaInsets();
     const { selectedSemester } = useSemester();
+    const { user } = useAuth();
+    const threshold = user?.attendance_threshold || 75;
+    const warningThreshold = user?.warning_threshold || (threshold - 5);
 
     // AMOLED Theme
     const c = {
@@ -98,7 +101,7 @@ const AnalyticsScreen = () => {
     };
 
 
-    const weeklyData = React.useMemo(() => getWeeklyData(), [reportData]);
+    const weeklyData = React.useMemo(() => getWeeklyData(), [reportData, weeklyRawData]);
     const focusSubjects = React.useMemo(() => getFocusSubjects(), [reportData]);
     const stats = React.useMemo(() => getTotalStats(), [reportData]);
     const weeklyHasData = weeklyData.some(d => d.total > 0);
@@ -150,7 +153,7 @@ const AnalyticsScreen = () => {
                                 <View key={index} style={styles.barGroup}>
                                     <View style={styles.barTrack}>
                                         <LinearGradient
-                                            colors={item.count >= 75 ? theme.gradients.success : item.count >= 50 ? theme.gradients.orange : theme.gradients.danger}
+                                            colors={item.count >= threshold ? theme.gradients.success : item.count > warningThreshold ? theme.gradients.orange : theme.gradients.danger}
                                             style={[styles.barFill, { height: `${Math.max(item.count, 15)}%` }]}
                                             start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }}
                                         />
@@ -178,16 +181,16 @@ const AnalyticsScreen = () => {
 
                     {(focusSubjects || []).map((sub, idx) => {
                         const pct = sub.percentage || 0;
-                        const isSafe = pct >= 75;
+                        const statusColor = pct >= threshold ? c.success : pct > warningThreshold ? c.warning : c.danger;
                         return (
                             <View key={idx} style={styles.focusRow}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                                     <Text style={styles.subjectName} numberOfLines={1}>{sub.name}</Text>
-                                    <Text style={[styles.pctText, { color: isSafe ? c.success : c.danger }]}>{pct.toFixed(0)}%</Text>
+                                    <Text style={[styles.pctText, { color: statusColor }]}>{pct.toFixed(0)}%</Text>
                                 </View>
                                 <View style={styles.progTrack}>
                                     <LinearGradient
-                                        colors={isSafe ? theme.gradients.success : theme.gradients.danger}
+                                        colors={pct >= threshold ? theme.gradients.success : pct > warningThreshold ? theme.gradients.orange : theme.gradients.danger}
                                         style={[styles.progFill, { width: `${pct}%` }]}
                                         start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                                     />
@@ -208,17 +211,21 @@ const AnalyticsScreen = () => {
 
                     <Text style={styles.summaryText}>
                         You have attended <Text style={{ fontWeight: '800', color: c.text }}>{stats.attended}</Text> out of <Text style={{ fontWeight: '800', color: c.text }}>{stats.total}</Text> classes.
-                        Overall attendance is <Text style={{ fontWeight: '800', color: stats.overallPct >= 75 ? c.success : c.danger }}>{(stats.overallPct || 0).toFixed(1)}%</Text>.
+                        Overall attendance is <Text style={{ fontWeight: '800', color: stats.overallPct >= threshold ? c.success : stats.overallPct > warningThreshold ? c.warning : c.danger }}>{(stats.overallPct || 0).toFixed(1)}%</Text>.
                     </Text>
 
                     <View style={styles.legend}>
                         <View style={styles.legendItem}>
                             <CheckCircle size={14} color={c.success} />
-                            <Text style={styles.legendText}>Safe ({'>'}75%)</Text>
+                            <Text style={styles.legendText}>Target ({threshold}%)</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                            <AlertTriangle size={14} color={c.warning} />
+                            <Text style={styles.legendText}>Warning ({warningThreshold}%)</Text>
                         </View>
                         <View style={styles.legendItem}>
                             <AlertTriangle size={14} color={c.danger} />
-                            <Text style={styles.legendText}>Risk ({'<'}75%)</Text>
+                            <Text style={styles.legendText}>Risk</Text>
                         </View>
                     </View>
                 </LinearGradient>

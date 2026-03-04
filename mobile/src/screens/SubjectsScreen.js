@@ -28,8 +28,8 @@ const SubjectsScreen = ({ navigation }) => {
 
     const fetchSubjects = async () => {
         try {
-            const response = await api.get(`/api/subjects?semester=${selectedSemester}`);
-            setSubjects(response.data);
+            const response = await api.get(`/api/academic/subjects?semester=${selectedSemester}`);
+            setSubjects(response.data?.data || response.data);
         } catch (error) {
             console.error(error);
         } finally {

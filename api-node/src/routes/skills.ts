@@ -38,7 +38,7 @@ router.post('/', async (req: AuthRequest, res) => {
     const userId = req.userId!
     const body = SkillSchema.parse(req.body)
     const skill = await Skill.create({ ...body, ...ownership(req) })
-    await sysLog(userId, 'Skill Added', `Added skill: ${body.name}`)
+    sysLog(userId, 'Skill Added', `Added skill: ${body.name}`).catch(() => {})
     created(res, skill.toObject())
   } catch (err) {
     if (err instanceof z.ZodError) { fail(res, 'Validation failed', 'INVALID_PARAMS'); return }
@@ -60,7 +60,7 @@ router.put('/:id', async (req: AuthRequest, res) => {
     )
     if (!result) { fail(res, 'Skill not found', 'NOT_FOUND', 404); return }
 
-    await sysLog(userId, 'Skill Updated', `Updated skill: ${data.name ?? req.params.id}`)
+    sysLog(userId, 'Skill Updated', `Updated skill: ${data.name ?? req.params.id}`).catch(() => {})
     ok(res, { message: 'Skill updated successfully' })
   } catch (err) {
     if (err instanceof z.ZodError) { fail(res, 'Validation failed', 'INVALID_PARAMS'); return }
@@ -76,7 +76,7 @@ router.delete('/:id', async (req: AuthRequest, res) => {
     const skill = await Skill.findOneAndDelete({ _id: req.params.id, ...uf(req) })
     if (!skill) { fail(res, 'Skill not found', 'NOT_FOUND', 404); return }
 
-    await sysLog(userId, 'Skill Deleted', `Deleted skill: ${skill.name}`)
+    sysLog(userId, 'Skill Deleted', `Deleted skill: ${skill.name}`).catch(() => {})
     ok(res, { message: 'Skill deleted successfully' })
   } catch (err) {
     console.error('[skills DELETE]', err)

@@ -9,15 +9,15 @@ export const useAnalytics = () => {
     const dayOfWeekQuery = useQuery({
         queryKey: ['analytics', 'dayOfWeek', currentSemester],
         queryFn: () => attendanceService.getDayOfWeekAnalytics(currentSemester),
-        staleTime: 5 * 60 * 1000,
-        refetchOnWindowFocus: false,
+        staleTime: 30 * 1000,
+        refetchOnWindowFocus: true,
     });
 
     const reportsQuery = useQuery({
         queryKey: ['analytics', 'reports', currentSemester],
         queryFn: () => attendanceService.getReportsData(currentSemester),
-        staleTime: 5 * 60 * 1000,
-        refetchOnWindowFocus: false,
+        staleTime: 30 * 1000,
+        refetchOnWindowFocus: true,
     });
 
     return {

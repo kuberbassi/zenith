@@ -1,7 +1,8 @@
 import { Router } from 'express'
-import { requireAuth, type AuthRequest } from '../middleware/auth.js'
+import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middleware/auth.js'
 import { User } from '../models/User.js'
 import { UserPreference } from '../models/UserPreference.js'
+import { Subject } from '../models/Subject.js'
 import { SystemLog } from '../models/SystemLog.js'
 import { ok, fail } from '../utils/response.js'
 import { uf } from '../utils/userFilter.js'
@@ -49,7 +50,7 @@ router.put('/', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const data = req.body as Record<string, unknown>
-    const allowedFields = ['name','branch','college','semester','batch','course','attendance_threshold','warning_threshold','enrollment_number']
+    const allowedFields = ['name', 'branch', 'college', 'semester', 'batch', 'course', 'attendance_threshold', 'warning_threshold', 'enrollment_number', 'phone_number', 'headline', 'linkedin_url', 'github_url', 'portfolio_url']
     const updateData: Record<string, unknown> = {}
 
     for (const k of allowedFields) {
@@ -65,8 +66,35 @@ router.put('/', async (req: AuthRequest, res) => {
     if ('course' in updateData && !('branch' in updateData)) updateData.branch = updateData.course
     else if ('branch' in updateData && !('course' in updateData)) updateData.course = updateData.branch
 
-    await User.updateOne({ _id: userId }, { $set: updateData })
-    await sysLog(userId, 'Profile Updated', 'User updated their profile information.')
+    // Sync target_attendance = attendance_threshold
+    if ('attendance_threshold' in updateData) {
+      updateData.target_attendance = updateData.attendance_threshold
+    }
+
+    console.log(`[profile PUT] Updating user ${userId}:`, updateData)
+    const result = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true })
+    console.log(`[profile PUT] New user doc exists:`, !!result)
+    if (result) {
+      console.log(`[profile PUT] Saved phone_number:`, result.phone_number)
+    }
+
+    // Mirror thresholds to UserPreference doc for consistency
+    const thresholdMirror: Record<string, unknown> = {}
+    if ('attendance_threshold' in data) thresholdMirror.attendance_threshold = data.attendance_threshold
+    if ('warning_threshold' in data) thresholdMirror.warning_threshold = data.warning_threshold
+    if (Object.keys(thresholdMirror).length) {
+      const existing = await UserPreference.findOne({ user_id: userId }).lean()
+      const existingPrefs = (existing?.preferences ?? {}) as Record<string, unknown>
+      const merged = { ...existingPrefs, ...thresholdMirror }
+      await UserPreference.findOneAndUpdate(
+        existing ? { _id: existing._id } : { user_id: userId },
+        { $set: { user_id: userId, preferences: merged, updated_at: new Date() } },
+        { upsert: true },
+      )
+    }
+
+    invalidateAuthCache(req.headers.authorization?.slice(7))
+    sysLog(userId, 'Profile Updated', 'User updated their profile information.').catch(() => { })
     ok(res, { message: 'Profile updated' })
   } catch (err) {
     console.error('[profile PUT]', err)
@@ -79,12 +107,17 @@ router.post('/', async (req: AuthRequest, res) => {
   const userId = req.userId!
   try {
     const body = req.body as Record<string, unknown>
-    const allowed = ['name','branch','course','college','batch','enrollment_number','current_semester',
-      'attendance_threshold','warning_threshold','target_attendance']
+    const allowed = ['name', 'branch', 'course', 'college', 'batch', 'enrollment_number', 'current_semester',
+      'attendance_threshold', 'warning_threshold', 'target_attendance', 'phone_number', 'headline', 'linkedin_url', 'github_url', 'portfolio_url']
     const updateData: Record<string, unknown> = {}
     for (const k of allowed) { if (k in body) updateData[k] = body[k] }
     if (Object.keys(updateData).length === 0) { ok(res, { message: 'No changes' }); return }
-    await User.findByIdAndUpdate(userId, { $set: updateData })
+
+    console.log(`[profile POST] Updating user ${userId}:`, updateData)
+    const result = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true })
+    console.log(`[profile POST] Result exists:`, !!result)
+
+    invalidateAuthCache(req.headers.authorization?.slice(7))
     ok(res, { message: 'Profile updated' })
   } catch (err) {
     console.error('[profile POST]', err)
@@ -104,7 +137,7 @@ router.post('/upload_pfp', upload.single('file'), async (req: AuthRequest, res) 
     const pfpUrl = `data:${mime};base64,${b64}`
 
     await User.updateOne({ _id: userId }, { $set: { picture: pfpUrl } })
-    await sysLog(userId, 'PFP Updated', 'User uploaded a new profile picture.')
+    sysLog(userId, 'PFP Updated', 'User uploaded a new profile picture.').catch(() => { })
     ok(res, { url: pfpUrl })
   } catch (err) {
     console.error('[profile/upload_pfp]', err)
@@ -154,16 +187,44 @@ router.post('/preferences', async (req: AuthRequest, res) => {
 
     // Mirror thresholds to user doc
     const mirror: Record<string, unknown> = {}
-    if ('attendance_threshold' in data) mirror.attendance_threshold = data.attendance_threshold
+    if ('attendance_threshold' in data) {
+      mirror.attendance_threshold = data.attendance_threshold
+      mirror.target_attendance = data.attendance_threshold // keep in sync
+    }
     if ('warning_threshold' in data) mirror.warning_threshold = data.warning_threshold
     if (Object.keys(mirror).length) await User.updateOne({ _id: userId }, { $set: mirror })
 
-    await sysLog(userId, 'Preferences Updated', `Updated preferences: ${Object.keys(data).join(', ')}`)
+    invalidateAuthCache(req.headers.authorization?.slice(7))
+    sysLog(userId, 'Preferences Updated', `Updated preferences: ${Object.keys(data).join(', ')}`).catch(() => { })
 
     ok(res, { message: 'Preferences saved' })
   } catch (err) {
     console.error('[profile/preferences POST]', err)
     fail(res, 'Failed to save preferences', 'SAVE_FAILED', 500)
+  }
+})
+
+// ─── Sync Thresholds to Subjects ─────────────────────────────────────────────
+
+router.post('/sync-thresholds', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const user = await User.findById(userId).lean()
+    if (!user) { fail(res, 'User not found', 'NOT_FOUND', 404); return }
+
+    const threshold = user.attendance_threshold ?? 75
+    const semester = req.body.semester ? parseInt(String(req.body.semester)) : undefined
+
+    const filter: Record<string, unknown> = { user_id: userId }
+    if (semester) filter.semester = semester
+
+    const result = await Subject.updateMany(filter, { $set: { target: threshold } })
+
+    sysLog(userId, 'Thresholds Synced', `Updated ${result.modifiedCount} subjects to ${threshold}% target${semester ? ` (semester ${semester})` : ''}`).catch(() => { })
+    ok(res, { message: `Updated ${result.modifiedCount} subjects`, threshold, modified: result.modifiedCount })
+  } catch (err) {
+    console.error('[profile/sync-thresholds]', err)
+    fail(res, 'Failed to sync thresholds', 'SYNC_FAILED', 500)
   }
 })
 

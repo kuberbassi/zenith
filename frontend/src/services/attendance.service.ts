@@ -13,6 +13,15 @@ import type {
 
 export const attendanceService = {
     // Preferences & Profile
+    getPreferences: async (): Promise<Preferences> => {
+        const response = await api.get('/api/profile/preferences');
+        return response.data;
+    },
+
+    updatePreferences: async (data: Partial<Preferences>): Promise<void> => {
+        await api.post('/api/profile/preferences', data);
+    },
+
     uploadPfp: async (formData: FormData): Promise<{ url: string }> => {
         const response = await api.post('/api/profile/upload_pfp', formData, {
             headers: {
@@ -51,7 +60,8 @@ export const attendanceService = {
         status: string,
         date?: string,
         notes?: string,
-        substitutedById?: string
+        substitutedById?: string,
+        semester?: number
     ): Promise<void> => {
         await api.post('/api/attendance/mark', {
             subject_id: subjectId,
@@ -59,19 +69,25 @@ export const attendanceService = {
             date,
             notes,
             substituted_by: substitutedById,
+            semester,
         });
     },
 
     markAllAttendance: async (
         subjectIds: string[],
         status: string,
-        date?: string
+        date?: string,
+        semester?: number
     ): Promise<void> => {
-        await Promise.all(
+        const results = await Promise.allSettled(
             subjectIds.map(subject_id =>
-                api.post('/api/attendance/mark', { subject_id, status, date })
+                api.post('/api/attendance/mark', { subject_id, status, date, semester })
             )
         );
+        const failures = results.filter(r => r.status === 'rejected');
+        if (failures.length > 0) {
+            throw new Error(`${failures.length} of ${subjectIds.length} marks failed`);
+        }
     },
 
     getCalendarData: async (year: number, month: number, semester?: number) => {
@@ -175,8 +191,7 @@ export const attendanceService = {
         professor?: string,
         classroom?: string
     ): Promise<void> => {
-        console.log('📚 Adding subject:', { subjectName, semester, categories, code, professor, classroom });
-        // Use modern REST endpoint as legacy '/api/add_subject' is not registered
+        // Use modern REST endpoint
         await api.post('/api/academic/subjects', {
             name: subjectName, // Backend expects 'name', not 'subject_name'
             semester,
@@ -196,7 +211,7 @@ export const attendanceService = {
         professor?: string,
         classroom?: string
     ): Promise<void> => {
-        console.log('✏️ Updating subject details:', { subjectId, professor, classroom });
+
         await api.put(`/api/academic/subjects/${subjectId}`, {
             professor,
             classroom,
@@ -207,7 +222,7 @@ export const attendanceService = {
         subjectId: string,
         data: Partial<Subject>
     ): Promise<void> => {
-        console.log('📝 Updating full subject details:', { subjectId, data });
+
         await api.put(`/api/academic/subjects/${subjectId}`, data);
     },
 
@@ -216,7 +231,7 @@ export const attendanceService = {
         attended: number,
         total: number
     ): Promise<void> => {
-        console.log('🔢 Updating attendance count:', { subjectId, attended, total });
+
         await api.post(`/api/academic/subjects/${subjectId}/attendance-count`, {
             attended,
             total,
@@ -227,7 +242,7 @@ export const attendanceService = {
         subjectId: string,
         data: { total?: number; completed?: number; hardcopy?: boolean }
     ): Promise<void> => {
-        console.log('🔬 Updating practicals:', { subjectId, data });
+
         await api.put(`/api/academic/subjects/${subjectId}`, { practicals: data });
     },
 
@@ -235,7 +250,7 @@ export const attendanceService = {
         subjectId: string,
         data: { total?: number; completed?: number }
     ): Promise<void> => {
-        console.log('📄 Updating assignments:', { subjectId, data });
+
         await api.put(`/api/academic/subjects/${subjectId}`, { assignments: data });
     },
 
@@ -276,25 +291,9 @@ export const attendanceService = {
         return response.data.data;
     },
 
-    getMonthlyAnalytics: async (_semester: number = 1, _year?: number) => {
-        // Not yet implemented in Node backend — return empty
-        return [];
-    },
 
-    getAllSemestersOverview: async () => {
-        // Not yet implemented in Node backend — return empty
-        return [];
-    },
 
-    // Preferences
-    getPreferences: async (): Promise<Preferences> => {
-        const response = await api.get('/api/profile/preferences');
-        return response.data.data;
-    },
 
-    updatePreferences: async (preferences: Partial<Preferences>): Promise<void> => {
-        await api.post('/api/profile/preferences', preferences);
-    },
 
     getHolidays: async (): Promise<Holiday[]> => {
         const response = await api.get('/api/timetable/holidays');
@@ -369,9 +368,19 @@ export const attendanceService = {
     },
 
     // User Profile
+    getProfile: async () => {
+        const response = await api.get('/api/profile/');
+        return response.data.data;
+    },
+
     updateProfile: async (data: any) => {
         const response = await api.put('/api/profile/', data);
         return response.data;
+    },
+
+    syncThresholds: async (semester?: number): Promise<{ modified: number; threshold: number }> => {
+        const response = await api.post('/api/profile/sync-thresholds', { semester });
+        return response.data.data;
     },
 
     // System logs

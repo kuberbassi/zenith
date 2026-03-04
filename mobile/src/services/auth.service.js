@@ -1,75 +1,52 @@
+/**
+ * Auth Service — v1 API
+ *
+ * Google OAuth, session management, token storage.
+ */
+
 import api from './api';
 import * as SecureStore from 'expo-secure-store';
 
-export const authService = {
-    // Login with Google (handled via Expo AuthSession in AuthContext)
-    // This service mainly handles token storage and user session
+// ── Google login ───────────────────────────────────────────
+export const googleLogin = async (idToken) => {
+  const { data } = await api.post('/api/auth/google', { token: idToken });
+  if (data.success && data.data?.token) {
+    await SecureStore.setItemAsync('auth_token', data.data.token);
+    if (data.data.user) {
+      await SecureStore.setItemAsync('user_data', JSON.stringify(data.data.user));
+    }
+  }
+  return data;
+};
 
-    loginWithGoogle: async (authCode) => {
-        try {
-            const response = await api.post('/api/auth/google', {
-                code: authCode
-            });
+// ── Get current user ───────────────────────────────────────
+export const getCurrentUser = async () => {
+  const { data } = await api.get('/api/auth/me');
+  return data;
+};
 
-            const { token, user } = response.data;
+// ── Logout ─────────────────────────────────────────────────
+export const logout = async () => {
+  try {
+    await api.post('/api/auth/logout');
+  } catch (_) { /* best-effort */ }
+  await SecureStore.deleteItemAsync('auth_token');
+  await SecureStore.deleteItemAsync('user_data');
+};
 
-            if (token) {
-                await SecureStore.setItemAsync('auth_token', token);
-            }
+// ── Token helpers ──────────────────────────────────────────
+export const getStoredToken = () => SecureStore.getItemAsync('auth_token');
+export const getStoredUser = async () => {
+  const raw = await SecureStore.getItemAsync('user_data');
+  return raw ? JSON.parse(raw) : null;
+};
+export const isAuthenticated = async () => !!(await getStoredToken());
 
-            return user;
-        } catch (error) {
-            console.error('Google login error:', error);
-            throw error;
-        }
-    },
-
-    getCurrentUser: async () => {
-        try {
-            const response = await api.get('/api/current_user');
-            return response.data;
-        } catch (error) {
-            return null;
-        }
-    },
-
-    logout: async () => {
-        try {
-            await api.post('/api/auth/logout');
-        } catch (error) {
-            console.error('Logout error:', error);
-        } finally {
-            await SecureStore.deleteItemAsync('auth_token');
-            await SecureStore.deleteItemAsync('user');
-        }
-    },
-
-    isAuthenticated: async () => {
-        const token = await SecureStore.getItemAsync('auth_token');
-        return !!token;
-    },
-
-    getStoredUser: async () => {
-        const userStr = await SecureStore.getItemAsync('user');
-        if (userStr) {
-            try {
-                return JSON.parse(userStr);
-            } catch {
-                return null;
-            }
-        }
-        return null;
-    },
-
-    storeUser: async (user) => {
-        await SecureStore.setItemAsync('user', JSON.stringify(user));
-    },
-
-    getAuthToken: async () => {
-        return await SecureStore.getItemAsync('auth_token');
-    },
-
-    setAuthToken: async (token) => {
-        await SecureStore.setItemAsync('auth_token', token);
-    },
+export default {
+  googleLogin,
+  getCurrentUser,
+  logout,
+  getStoredToken,
+  getStoredUser,
+  isAuthenticated,
 };

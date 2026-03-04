@@ -4,7 +4,7 @@ import PressableScale from './PressableScale';
 import { theme } from '../theme';
 import { LinearGradient } from './LinearGradient';
 
-const EnhancedSubjectCard = ({ subject, onPress, isDark, threshold: propThreshold }) => {
+const EnhancedSubjectCard = ({ subject, onPress, isDark, threshold: propThreshold, onMark }) => {
     // Aquamorphic Palette
     const c = {
         glassBgStart: isDark ? 'rgba(43, 45, 48, 0.9)' : 'rgba(255, 255, 255, 0.9)',
@@ -101,6 +101,22 @@ const EnhancedSubjectCard = ({ subject, onPress, isDark, threshold: propThreshol
                         <Text style={[styles.statValue, { color: statsColor }]}>{statsValue}</Text>
                         <Text style={[styles.statLabel, { color: statsColor }]}>{statsLabel}</Text>
                     </View>
+                </View>
+
+                {/* Quick Actions */}
+                <View style={styles.actionRow}>
+                    <TouchableOpacity
+                        onPress={() => onMark?.(subject._id, 'present')}
+                        style={[styles.actionBtn, { backgroundColor: c.success + '15', borderColor: c.success + '30' }]}
+                    >
+                        <Text style={[styles.actionBtnText, { color: c.success }]}>PRESENT</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => onMark?.(subject._id, 'absent')}
+                        style={[styles.actionBtn, { backgroundColor: c.danger + '15', borderColor: c.danger + '30' }]}
+                    >
+                        <Text style={[styles.actionBtnText, { color: c.danger }]}>ABSENT</Text>
+                    </TouchableOpacity>
                 </View>
             </LinearGradient>
         </PressableScale>
@@ -218,6 +234,24 @@ const getStyles = (c, isDark) => StyleSheet.create({
         fontWeight: '700',
         textAlign: 'center',
         letterSpacing: -0.2
+    },
+    actionRow: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 16
+    },
+    actionBtn: {
+        flex: 1,
+        paddingVertical: 10,
+        borderRadius: 14,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center'
+    },
+    actionBtnText: {
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 1
     }
 });
 

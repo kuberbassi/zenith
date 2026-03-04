@@ -63,9 +63,27 @@ router.post('/mark', async (req: AuthRequest, res) => {
     const userId = new Types.ObjectId(req.userId!)
     const subjectId = new Types.ObjectId(body.subject_id)
     const markDate = body.date ?? today()
+    const logType = body.type ?? 'Lecture'
 
     const subject = await Subject.findOne({ _id: subjectId, ...uf(req) })
     if (!subject) { fail(res, 'Subject not found', 'NOT_FOUND', 404); return }
+
+    // Resolve semester: explicit > subject > user profile > 1
+    const semester = body.semester ?? subject.semester ?? (req as any).user?.current_semester ?? 1
+
+    // ── Idempotency guard (MUST run before any writes) ──
+    const dedupQuery: Record<string, unknown> = {
+      ...uf(req),
+      subject_id: subjectId,
+      date: markDate,
+      type: logType,
+    }
+    const existingLog = await AttendanceLog.findOne(dedupQuery).lean()
+    if (existingLog) {
+      const updatedSubject = await Subject.findById(subjectId).lean()
+      created(res, { log: existingLog, subject: updatedSubject, duplicate: true })
+      return
+    }
 
     const logData: Record<string, unknown> = {
       ...ownership(req),
@@ -73,8 +91,8 @@ router.post('/mark', async (req: AuthRequest, res) => {
       subject_name: subject.name,
       date: markDate,
       status: body.status,
-      type: body.type ?? 'Lecture',
-      semester: body.semester ?? subject.semester,
+      type: logType,
+      semester,
     }
     if (body.notes) logData.notes = body.notes
 
@@ -93,7 +111,7 @@ router.post('/mark', async (req: AuthRequest, res) => {
           status: 'present',
           type: 'substitution_class',
           notes: `Substitution for ${subject.name}`,
-          semester: body.semester ?? subSubject.semester,
+          semester: semester,
         })
         await recomputeSubjectStats(subById, userId)
       }
@@ -103,11 +121,11 @@ router.post('/mark', async (req: AuthRequest, res) => {
     await recomputeSubjectStats(subjectId, userId)
     const updatedSubject = await Subject.findById(subjectId).lean()
 
-    // System log
+    // System log (fire-and-forget)
     const statusLabel = body.status === 'substituted' && body.substituted_by
       ? `substituted (by ${substituteLog?.subject_name || 'another subject'})`
       : body.status
-    await sysLog(req.userId!, 'Attendance Marked', `Marked ${subject.name} as ${statusLabel} on ${markDate}`)
+    sysLog(req.userId!, 'Attendance Marked', `Marked ${subject.name} as ${statusLabel} on ${markDate}`).catch(() => { })
 
     created(res, { log, substitute_log: substituteLog, subject: updatedSubject })
   } catch (err) {
@@ -121,7 +139,6 @@ router.post('/mark', async (req: AuthRequest, res) => {
 
 router.get('/logs', async (req: AuthRequest, res) => {
   try {
-    const userId = new Types.ObjectId(req.userId!)
     const limit = Math.min(parseInt((req.query.limit as string) ?? '50', 10), 500)
     const page = Math.max(parseInt((req.query.page as string) ?? '1', 10), 1)
     const subject_id = req.query.subject_id as string | undefined
@@ -157,10 +174,12 @@ router.get('/logs', async (req: AuthRequest, res) => {
         { $limit: limit },
         { $lookup: { from: 'subjects', localField: 'subject_id', foreignField: '_id', as: 'subject_info' } },
         { $lookup: { from: 'subjects', localField: 'substituted_by', foreignField: '_id', as: 'substituted_subject_info' } },
-        { $addFields: {
+        {
+          $addFields: {
             subject_info: { $arrayElemAt: ['$subject_info', 0] },
             substituted_subject_info: { $arrayElemAt: ['$substituted_subject_info', 0] },
-        }},
+          }
+        },
       ]),
       AttendanceLog.countDocuments(match),
     ])
@@ -176,21 +195,22 @@ router.get('/logs', async (req: AuthRequest, res) => {
 
 router.get('/classes-for-date', async (req: AuthRequest, res) => {
   try {
-    const userId = new Types.ObjectId(req.userId!)
     const date = (req.query.date as string | undefined) ?? today()
-    const semester = req.query.semester as string | undefined
+    // Default semester from user profile when not explicitly provided
+    const semesterStr = req.query.semester as string | undefined
+    const semester = semesterStr ? parseInt(semesterStr, 10) : (req.user?.current_semester ?? 1)
 
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const dayName = dayNames[new Date(date + 'T00:00:00').getDay()]
 
     const [timetableDoc, logsForDate, subjects] = await Promise.all([
-      Timetable.findOne({ ...uf(req), ...(semester ? { semester: parseInt(semester, 10) } : {}) }).lean(),
+      Timetable.findOne({ ...uf(req), semester }).lean(),
       AttendanceLog.find({ ...uf(req), date }).lean(),
-      Subject.find({ ...uf(req) }).lean(),
+      Subject.find({ ...uf(req), semester }).lean(),
     ])
 
     const subjectMap = new Map(subjects.map(s => [s._id.toString(), s]))
-    type Slot = { subject_id?: string; subjectId?: string; time?: string; type?: string; [k: string]: unknown }
+    type Slot = { subject_id?: string; subjectId?: string; time?: string; type?: string;[k: string]: unknown }
     const schedule = (timetableDoc?.schedule as Record<string, Slot[]> | undefined) ?? {}
 
     // Filter out break/free/lunch slots and slots without a subject (like Flask)
@@ -351,7 +371,7 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
     await recomputeSubjectStats(log.subject_id as Types.ObjectId, userId)
     const updatedSubject = await Subject.findById(log.subject_id).lean()
 
-    await sysLog(req.userId!, 'Attendance Edited', `Edited ${log.subject_name || 'subject'} to ${log.status} on ${log.date}`)
+    sysLog(req.userId!, 'Attendance Edited', `Edited ${log.subject_name || 'subject'} to ${log.status} on ${log.date}`).catch(() => { })
 
     ok(res, { log, subject: updatedSubject })
   } catch (err) {
@@ -387,7 +407,7 @@ router.delete('/logs/:logId', async (req: AuthRequest, res) => {
     await recomputeSubjectStats(subjectId, userId)
     const updatedSubject = await Subject.findById(subjectId).lean()
 
-    await sysLog(req.userId!, 'Attendance Deleted', `Deleted ${deletedSubjectName} (${deletedStatus}) on ${deletedDate}`)
+    sysLog(req.userId!, 'Attendance Deleted', `Deleted ${deletedSubjectName} (${deletedStatus}) on ${deletedDate}`).catch(() => { })
 
     ok(res, { message: 'Log deleted', subject: updatedSubject })
   } catch (err) {
@@ -400,7 +420,6 @@ router.delete('/logs/:logId', async (req: AuthRequest, res) => {
 
 router.get('/calendar_data', async (req: AuthRequest, res) => {
   try {
-    const userId = new Types.ObjectId(req.userId!)
     const month = req.query.month as string | undefined   // YYYY-MM
     const start = req.query.start as string | undefined   // YYYY-MM-DD
     const end = req.query.end as string | undefined       // YYYY-MM-DD
@@ -430,7 +449,10 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
       match.$and = match.$and ? [...(match.$and as unknown[]), semFilter] : [semFilter]
     }
 
-    const logs = await AttendanceLog.find(match).sort({ date: 1, timestamp: 1 }).lean()
+    const logs = await AttendanceLog.find(match)
+      .select('date status subject_name subject_id timestamp semester')
+      .sort({ date: 1, timestamp: 1 })
+      .lean()
 
     // Group by date and build summary
     const calendar: Record<string, unknown> = {}
@@ -462,7 +484,6 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
 
 router.get('/dashboard', async (req: AuthRequest, res) => {
   try {
-    const userId = new Types.ObjectId(req.userId!)
     const semester = req.query.semester as string | undefined
 
     const subjectFilter: Record<string, unknown> = { ...uf(req) }

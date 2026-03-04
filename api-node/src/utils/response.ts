@@ -23,7 +23,17 @@ export interface PaginationMeta {
   hasPrev: boolean
 }
 
-export function ok<T>(res: Response, data: T, statusCode = 200) {
+/** Set Cache-Control header (seconds). 0 = no-cache. */
+function setCacheHeaders(res: Response, maxAge: number) {
+  if (maxAge > 0) {
+    res.set('Cache-Control', `private, max-age=${maxAge}`)
+  } else {
+    res.set('Cache-Control', 'no-cache')
+  }
+}
+
+export function ok<T>(res: Response, data: T, statusCode = 200, cacheSeconds = 0) {
+  setCacheHeaders(res, cacheSeconds)
   return res.status(statusCode).json({ success: true, data })
 }
 
@@ -33,7 +43,9 @@ export function paginated<T>(
   data: T,
   pagination: PaginationMeta,
   statusCode = 200,
+  cacheSeconds = 0,
 ) {
+  setCacheHeaders(res, cacheSeconds)
   return res.status(statusCode).json({
     success: true,
     data,

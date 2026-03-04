@@ -15,8 +15,17 @@ router.get('/data', async (req: AuthRequest, res) => {
   try {
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
 
-    const subjects = await Subject.find({ ...uf(req), semester }).sort({ name: 1 }).lean()
-    const summary = AttendanceCalculator.getAttendanceSummary(subjects)
+    const [subjects, recentLogs] = await Promise.all([
+      Subject.find({ ...uf(req), semester })
+        .select('name code attended total target semester type professor')
+        .sort({ name: 1 })
+        .lean(),
+      AttendanceLog.find({ ...uf(req), semester })
+        .sort({ date: -1, timestamp: -1 })
+        .limit(30)
+        .lean(),
+    ])
+    const summary = AttendanceCalculator.getAttendanceSummary(subjects, req.user?.attendance_threshold, req.user?.warning_threshold)
 
     const enriched = subjects.map((sub) => {
       const pct = AttendanceCalculator.calculatePercentage(sub.attended, sub.total)
@@ -32,9 +41,10 @@ router.get('/data', async (req: AuthRequest, res) => {
       overall_attendance: summary.overall_percentage,
       total_subjects: subjects.length,
       subjects: enriched,
+      recent_logs: recentLogs,
       summary,
       last_updated: new Date().toISOString(),
-    })
+    }, 200, 30) // 30s cache
   } catch (err) {
     console.error('[dashboard/data]', err)
     fail(res, 'Failed to fetch dashboard data', 'FETCH_FAILED', 500)
@@ -46,27 +56,75 @@ router.get('/data', async (req: AuthRequest, res) => {
 router.get('/reports_data', async (req: AuthRequest, res) => {
   try {
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
+    const user = req.user
+    const userTarget = user?.attendance_threshold ?? 75
+    const userWarning = user?.warning_threshold ?? 60
 
     const [subjects, logs] = await Promise.all([
-      Subject.find({ ...uf(req), semester }).lean(),
-      AttendanceLog.find({ ...uf(req), semester }).lean(),
+      Subject.find({ ...uf(req), semester })
+        .select('name attended total target semester')
+        .lean(),
+      AttendanceLog.find({ ...uf(req), semester })
+        .select('date status subject_name')
+        .sort({ date: -1 })
+        .lean(),
     ])
 
     let totalAbsences = 0
+    let totalAttended = 0
+    let totalClasses = 0
+    let atRiskCount = 0
+
     const processedSubjects = subjects.map((sub) => {
       const attended = sub.attended ?? 0
       const total = sub.total ?? 0
+      const target = sub.target ?? userTarget
       const pct = total > 0 ? Math.round((attended / total) * 1000) / 10 : 0
-      totalAbsences += total - attended
-      return { ...sub, _id: String(sub._id), percentage: pct }
+      const missed = total - attended
+      totalAbsences += missed
+      totalAttended += attended
+      totalClasses += total
+      if (total > 0 && pct < target) atRiskCount++
+      return { ...sub, _id: String(sub._id), percentage: pct, target }
     })
+
+    const overallPct = totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 1000) / 10 : 0
 
     const bestSubject = processedSubjects.length
       ? processedSubjects.reduce((a, b) => (a.percentage > b.percentage ? a : b))
       : null
     const worstSubject = processedSubjects.length
-      ? processedSubjects.reduce((a, b) => (a.percentage < b.percentage ? a : b))
+      ? processedSubjects.reduce((a, b) => {
+        if (a.total === 0) return b
+        if (b.total === 0) return a
+        return a.percentage < b.percentage ? a : b
+      })
       : null
+
+    // Calculate attendance streak (consecutive days present)
+    let streak = 0
+    const dateSet = new Set<string>()
+    for (const log of logs) {
+      if (['present', 'late', 'approved_medical', 'substituted'].includes(log.status ?? '')) {
+        dateSet.add(log.date)
+      }
+    }
+    const sortedDates = [...dateSet].sort().reverse()
+    const today = new Date()
+    for (let i = 0; i < sortedDates.length; i++) {
+      const d = new Date(sortedDates[i] + 'T00:00:00')
+      const expected = new Date(today)
+      expected.setDate(expected.getDate() - i)
+      // Skip weekends
+      while (expected.getDay() === 0 || expected.getDay() === 6) {
+        expected.setDate(expected.getDate() - 1)
+      }
+      if (d.toISOString().slice(0, 10) === expected.toISOString().slice(0, 10)) {
+        streak++
+      } else {
+        break
+      }
+    }
 
     const heatmapData: Record<string, string[]> = {}
     for (const log of logs) {
@@ -84,10 +142,15 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
         worst_subject_name: worstSubject?.name ?? 'N/A',
         worst_subject_percent: worstSubject ? `${worstSubject.percentage}%` : '0%',
         total_absences: totalAbsences,
+        overall_percentage: overallPct,
+        attendance_streak: streak,
+        at_risk_count: atRiskCount,
+        total_subjects: subjects.length,
+        target_threshold: userTarget,
       },
       subject_breakdown: processedSubjects,
       heatmap_data: heatmapData,
-    })
+    }, 200, 15)
   } catch (err) {
     console.error('[dashboard/reports_data]', err)
     fail(res, 'Failed to fetch reports data', 'FETCH_FAILED', 500)
@@ -145,7 +208,7 @@ router.get('/analytics/day-of-week', async (req: AuthRequest, res) => {
       }
     })
 
-    ok(res, { days: daysData })
+    ok(res, { days: daysData }, 200, 120) // 2 min cache
   } catch (err) {
     console.error('[dashboard/analytics/day-of-week]', err)
     fail(res, 'Failed to fetch analytics', 'ANALYTICS_FAILED', 500)
@@ -156,18 +219,28 @@ router.get('/analytics/day-of-week', async (req: AuthRequest, res) => {
 
 router.get('/notifications', async (req: AuthRequest, res) => {
   try {
-    const subjects = await Subject.find({ ...uf(req) }).lean()
+    const semester = req.query.semester ? parseInt(String(req.query.semester)) : undefined
+    const filter = semester ? { ...uf(req), semester } : uf(req)
+    const subjects = await Subject.find(filter)
+      .select('name attended total target')
+      .lean()
     const notifications: Array<Record<string, unknown>> = []
+
+    // Use user's warning_threshold from profile, not hardcoded value
+    const userWarningThreshold = (req as AuthRequest).user?.warning_threshold ?? 76
 
     for (const sub of subjects) {
       const target = sub.target ?? 75
       const guard = AttendanceCalculator.calculateBunkGuard(sub.attended, sub.total, target)
-      if (!guard.can_bunk && guard.count > 0) {
+      const pct = sub.total > 0 ? Math.round((sub.attended / sub.total) * 1000) / 10 : 100
+
+      // Trigger warning if percentage is at or below warning threshold, or can't bunk
+      if (pct <= userWarningThreshold || (!guard.can_bunk && guard.count > 0)) {
         notifications.push({
           type: 'warning',
           title: 'Attendance Warning',
-          message: `Critical: ${sub.name} is at ${guard.percentage}%. ${guard.status_message}`,
-          priority: 'high',
+          message: `Critical: ${sub.name} is at ${pct}%. ${guard.status_message}`,
+          priority: pct < target ? 'high' : 'medium',
         })
       }
     }

@@ -14,4 +14,5 @@ export const ENV = {
   PORT: parseInt(process.env.PORT ?? '5001', 10),
   NODE_ENV: process.env.NODE_ENV ?? 'development',
   ALLOWED_ORIGINS: (process.env.ALLOWED_ORIGINS ?? 'http://localhost:3002').split(','),
+  GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
 }

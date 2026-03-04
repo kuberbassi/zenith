@@ -20,6 +20,7 @@ router.use(requireAuth)
 // In-memory rate limit for destructive ops (use Redis in production)
 const _deleteAttempts = new Map<string, Date>()
 const DELETE_COOLDOWN_MS = 5 * 60 * 1000
+const MAX_DELETE_ENTRIES = 500
 
 function checkDeleteRateLimit(userId: string): { ok: boolean; waitMinutes: number } {
   const now = new Date()
@@ -29,6 +30,12 @@ function checkDeleteRateLimit(userId: string): { ok: boolean; waitMinutes: numbe
     if (diff < DELETE_COOLDOWN_MS) {
       const wait = Math.ceil((DELETE_COOLDOWN_MS - diff) / 60000)
       return { ok: false, waitMinutes: wait }
+    }
+  }
+  // Prune stale entries if map grows too large
+  if (_deleteAttempts.size > MAX_DELETE_ENTRIES) {
+    for (const [key, date] of _deleteAttempts) {
+      if (now.getTime() - date.getTime() > DELETE_COOLDOWN_MS) _deleteAttempts.delete(key)
     }
   }
   _deleteAttempts.set(userId, now)

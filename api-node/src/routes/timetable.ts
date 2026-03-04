@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { Types } from 'mongoose'
+import { z } from 'zod'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { Timetable } from '../models/Timetable.js'
 import { Holiday } from '../models/Holiday.js'
@@ -13,6 +14,21 @@ router.use(requireAuth)
 async function sysLog(user_id: string, action: string, description: string) {
   await SystemLog.create({ user_id, action, description }).catch(() => null)
 }
+
+// ─── Validation Schemas ──────────────────────────────────────────────────────
+
+const SlotSchema = z.object({
+  day: z.string().min(1, 'Day is required'),
+  subject_id: z.string().optional(),
+  start_time: z.string().optional(),
+  end_time: z.string().optional(),
+  type: z.string().optional().default('Lecture'),
+}).passthrough()
+
+const HolidaySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD format'),
+  name: z.string().min(1, 'Holiday name is required').max(200),
+})
 
 // ─── Timetable ───────────────────────────────────────────────────────────────
 
@@ -43,7 +59,7 @@ router.post('/', async (req: AuthRequest, res) => {
       { $set: { schedule, semester, updated_at: new Date() } },
       { upsert: true },
     )
-    await sysLog(userId, 'Schedule Updated', `User updated timetable for Semester ${semester}.`)
+    sysLog(userId, 'Schedule Updated', `User updated timetable for Semester ${semester}.`).catch(() => { })
     ok(res, { message: 'Timetable updated' })
   } catch (err) {
     console.error('[timetable POST]', err)
@@ -84,12 +100,12 @@ router.get('/holidays', async (req: AuthRequest, res) => {
 router.post('/holidays', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const { date, name } = req.body as { date: string; name: string }
-    if (!date || !name) { fail(res, 'Date and name required', 'MISSING_FIELDS'); return }
+    const body = HolidaySchema.parse(req.body)
 
-    const holiday = await Holiday.create({ ...ownership(req), date, name })
+    const holiday = await Holiday.create({ ...ownership(req), date: body.date, name: body.name })
     ok(res, { message: 'Holiday added', id: String(holiday._id) })
   } catch (err) {
+    if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[timetable/holidays POST]', err)
     fail(res, 'Failed to add holiday', 'CREATE_FAILED', 500)
   }
@@ -112,9 +128,9 @@ router.post('/slot', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
-    const slotData = { ...(req.body as Record<string, unknown>) }
-    const day = slotData.day as string | undefined
-    if (!day) { fail(res, 'Day required', 'MISSING_FIELD'); return }
+    const parsed = SlotSchema.parse(req.body)
+    const slotData = { ...parsed } as Record<string, unknown>
+    const day = slotData.day as string
 
     if (!slotData.id && !slotData._id) slotData.id = new Types.ObjectId().toString()
 

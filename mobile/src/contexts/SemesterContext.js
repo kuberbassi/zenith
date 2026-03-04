@@ -28,7 +28,7 @@ export const SemesterProvider = ({ children }) => {
 
     const fetchSemesterPreference = async () => {
         try {
-            const res = await api.get('/api/preferences');
+            const res = await api.get('/api/profile/preferences');
             if (res.data && res.data.selected_semester) {
                 const serverSem = Number(res.data.selected_semester);
                 setSelectedSemester(serverSem);
@@ -50,7 +50,7 @@ export const SemesterProvider = ({ children }) => {
         offlineStorage.saveData('selected_semester', semesterNum);
         try {
             // Save to backend
-            await api.post('/api/preferences', {
+            await api.post('/api/profile/preferences', {
                 selected_semester: semesterNum
             });
         } catch (e) {

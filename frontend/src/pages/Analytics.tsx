@@ -1,329 +1,303 @@
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
+import { Doughnut, Radar, Line } from 'react-chartjs-2';
 import {
-    Chart as ChartJS,
-    CategoryScale, LinearScale, BarElement, PointElement, LineElement,
-    ArcElement, RadialLinearScale, Filler, Tooltip as ChartTooltip, Legend,
-    type ChartOptions,
+    Chart as ChartJS, CategoryScale, LinearScale, BarElement,
+    PointElement, LineElement, Title, Tooltip, Legend,
+    RadialLinearScale, ArcElement, Filler
 } from 'chart.js';
-import { Bar, Doughnut, Radar } from 'react-chartjs-2';
+import { motion } from 'framer-motion';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import { useSemester } from '@/contexts/SemesterContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import GlassCard from '@/components/ui/GlassCard';
 import Skeleton from '@/components/ui/Skeleton';
-import { TrendingUp, TrendingDown, BookOpen, AlertCircle, CheckCircle } from 'lucide-react';
+import { TrendingUp, Activity, Award, AlertTriangle, CalendarDays } from 'lucide-react';
+import Sparkles from '@/components/ui/Sparkles';
+import { useAuth } from '@/contexts/AuthContext';
 
 ChartJS.register(
     CategoryScale, LinearScale, BarElement, PointElement, LineElement,
-    ArcElement, RadialLinearScale, Filler, ChartTooltip, Legend
+    Title, Tooltip, Legend, RadialLinearScale, ArcElement, Filler
 );
 
 const Analytics: React.FC = () => {
-    const { theme } = useTheme();
-    const { currentSemester } = useSemester();
-    const { dayOfWeekData, reportsData, loading } = useAnalytics();
-    const isDark = theme === 'dark';
+    const { reportsData, dayOfWeekData, loading } = useAnalytics();
+    const { user } = useAuth();
+    const targetThreshold = user?.attendance_threshold || 75;
 
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-    const tickColor = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.5)';
-    const tooltipBg = isDark ? '#1e1e2e' : '#fff';
-    const tooltipText = isDark ? '#e2e8f0' : '#1e293b';
+    if (loading) {
+        return (
+            <div className="p-8 space-y-8 max-w-7xl mx-auto">
+                <Skeleton className="h-40 w-full rounded-[3rem]" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Skeleton className="h-32 rounded-3xl" />
+                    <Skeleton className="h-32 rounded-3xl" />
+                    <Skeleton className="h-32 rounded-3xl" />
+                    <Skeleton className="h-32 rounded-3xl" />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <Skeleton className="h-80 rounded-[2.5rem]" />
+                    <Skeleton className="h-80 rounded-[2.5rem]" />
+                    <Skeleton className="h-80 rounded-[2.5rem]" />
+                </div>
+            </div>
+        );
+    }
 
-    const weeklyData = useMemo(() => {
-        const raw = dayOfWeekData?.days || [];
-        return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => {
-            const d: any = raw.find((x: any) => x.day === day) || { present: 0, total: 0, percentage: 0 };
-            return { day, present: d.present, absent: Math.max(0, d.total - d.present), percentage: d.percentage, total: d.total };
-        });
-    }, [dayOfWeekData]);
+    const kpis: any = reportsData?.kpis || {};
+    const subjects = reportsData?.subject_breakdown || [];
+    const days = dayOfWeekData?.days || [];
 
-    const subjects = useMemo(() =>
-        (reportsData?.subject_breakdown || [])
-            .map((s: any) => ({
-                ...s,
-                percentage: s.percentage ?? (s.total > 0 ? Math.round((s.attended / s.total) * 100) : 0),
-            }))
-            .sort((a: any, b: any) => b.percentage - a.percentage),
-        [reportsData]
-    );
+    const totalAttended = subjects.reduce((acc: number, s: any) => acc + (s.attended || 0), 0);
+    const totalClasses = subjects.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
+    const overallAttendance = totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 100) : 0;
 
-    const totalPresent = weeklyData.reduce((a, d) => a + d.present, 0);
-    const totalAbsent = weeklyData.reduce((a, d) => a + d.absent, 0);
+    // Theme Colors (Mission Blue)
+    const accentColor = '#3b82f6';
+    const gridColor = 'rgba(255, 255, 255, 0.05)';
+    const tickColor = 'rgba(255, 255, 255, 0.3)';
 
-    const overallPct = useMemo(() => {
-        const att = subjects.reduce((a: number, s: any) => a + (s.attended || 0), 0);
-        const tot = subjects.reduce((a: number, s: any) => a + (s.total || 0), 0);
-        return tot > 0 ? Math.round((att / tot) * 100) : 0;
-    }, [subjects]);
+    // --- Chart Data ---
 
-    const safeSubs = subjects.filter((s: any) => s.percentage >= 75).length;
-    const atRiskSubs = subjects.filter((s: any) => s.percentage < 75).length;
-    const isOnTrack = overallPct >= 75;
-
-    const weekBarData = {
-        labels: weeklyData.map(d => d.day),
-        datasets: [
-            { label: 'Present', data: weeklyData.map(d => d.present), backgroundColor: '#10b981', borderRadius: 6, borderSkipped: false },
-            { label: 'Absent', data: weeklyData.map(d => d.absent), backgroundColor: isDark ? 'rgba(244,63,94,0.5)' : 'rgba(244,63,94,0.4)', borderRadius: 0, borderSkipped: false },
-        ],
+    const radarData = {
+        labels: subjects.map((s: any) => s.name.substring(0, 10) + (s.name.length > 10 ? '..' : '')),
+        datasets: [{
+            label: 'Attendance %',
+            data: subjects.map((s: any) => s.percentage || 0),
+            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+            borderColor: accentColor,
+            borderWidth: 2,
+            pointBackgroundColor: accentColor,
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: accentColor,
+            fill: true,
+        }]
     };
-    const weekBarOpts: ChartOptions<'bar'> = {
-        responsive: true, maintainAspectRatio: false,
+
+    const radarOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
-            tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tickColor, borderColor: gridColor, borderWidth: 1 },
+            tooltip: {
+                backgroundColor: '#0a0a0a',
+                titleFont: { size: 10, weight: 'bold' as const },
+                bodyFont: { size: 12 },
+                padding: 12,
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+            }
         },
         scales: {
-            x: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: tickColor, font: { size: 11 } } },
-            y: { stacked: true, grid: { color: gridColor }, border: { display: false }, ticks: { color: tickColor, font: { size: 10 }, maxTicksLimit: 5 } },
-        },
+            r: {
+                min: 0,
+                max: 100,
+                ticks: { display: false, stepSize: 20 },
+                grid: { color: gridColor },
+                angleLines: { color: gridColor },
+                pointLabels: {
+                    color: tickColor,
+                    font: { size: 10, weight: 'bold' as const }
+                }
+            }
+        }
     };
 
     const doughnutData = {
-        labels: ['Present', 'Absent'],
-        datasets: [{ data: [totalPresent, totalAbsent], backgroundColor: ['#10b981', isDark ? 'rgba(244,63,94,0.55)' : 'rgba(244,63,94,0.4)'], borderWidth: 0, hoverOffset: 6 }],
-    };
-    const doughnutOpts: ChartOptions<'doughnut'> = {
-        responsive: true, maintainAspectRatio: false, cutout: '70%',
-        plugins: { legend: { display: false }, tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tickColor } },
-    };
-
-    const radarSubjs = subjects.slice(0, 7);
-    const radarData = {
-        labels: radarSubjs.map((s: any) => s.name?.length > 12 ? s.name.slice(0, 12) + '\u2026' : s.name),
+        labels: ['Attended', 'Missed'],
         datasets: [{
-            label: 'Attendance %',
-            data: radarSubjs.map((s: any) => s.percentage),
-            backgroundColor: isDark ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.1)',
-            borderColor: '#6366f1', borderWidth: 2,
-            pointBackgroundColor: '#6366f1', pointRadius: 3,
-        }],
-    };
-    const radarOpts: ChartOptions<'radar'> = {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { backgroundColor: tooltipBg, titleColor: tooltipText, bodyColor: tickColor } },
-        scales: {
-            r: {
-                min: 0, max: 100,
-                ticks: { stepSize: 25, color: tickColor, font: { size: 9 }, backdropColor: 'transparent' },
-                grid: { color: gridColor },
-                pointLabels: { color: tickColor, font: { size: 10 } },
-                angleLines: { color: gridColor },
-            },
-        },
+            data: [totalAttended, totalClasses - totalAttended],
+            backgroundColor: [accentColor, 'rgba(255,255,255,0.03)'],
+            borderWidth: 0,
+            hoverOffset: 4
+        }]
     };
 
-    if (loading) return (
-        <div className="space-y-6 pb-24">
-            <Skeleton className="h-28 rounded-2xl" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <Skeleton className="lg:col-span-2 h-72 rounded-2xl" />
-                <Skeleton className="h-72 rounded-2xl" />
-            </div>
-        </div>
-    );
+    const doughnutOptions = {
+        cutout: '85%',
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        responsive: true,
+        maintainAspectRatio: false,
+    };
+
+    const lineData = {
+        labels: days.map((d: any) => d.day),
+        datasets: [
+            {
+                label: 'Present',
+                data: days.map((d: any) => d.present),
+                borderColor: accentColor,
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: '#0a0a0a',
+                pointBorderColor: accentColor,
+                pointBorderWidth: 2,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+            }
+        ]
+    };
+
+    const lineOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: '#0a0a0a',
+                titleFont: { size: 10, weight: 'bold' as const },
+                bodyFont: { size: 12 },
+                padding: 12,
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+            }
+        },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: tickColor, font: { size: 10, weight: 'bold' as const } } },
+            y: { grid: { color: gridColor }, ticks: { color: tickColor, stepSize: 1, font: { size: 10 } }, beginAtZero: true }
+        }
+    };
 
     return (
-        <div className="pb-24 space-y-6">
+        <div className="pb-32 max-w-7xl mx-auto px-4 lg:px-8">
+            {/* ── Cinematic Analytics Header ── */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 mb-8 relative rounded-[3rem] border border-white/[0.06] bg-[#050508] p-10 md:p-14 overflow-hidden shadow-2xl group transition-all duration-700">
+                <div className="absolute inset-0 bg-blue-500/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-500/[0.05] blur-[100px] pointer-events-none group-hover:bg-blue-500/[0.08] transition-all duration-700" />
 
-            {/* Header */}
-            <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}>
-                <h1 className="text-2xl font-bold text-on-surface">Analytics</h1>
-                <p className="text-sm text-on-surface-variant mt-0.5">Semester {currentSemester} — attendance breakdown</p>
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div className="text-center md:text-left">
+                        <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+                                <Activity size={24} />
+                            </div>
+                            <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">Deep Analytics</h1>
+                        </div>
+                        <p className="text-white/30 font-bold text-xs md:text-sm tracking-[0.2em] uppercase max-w-lg leading-relaxed">
+                            Comprehensive tracking of academic metrics, periodic footprint, and cognitive engagement.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        <div className="text-right">
+                            <div className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">Overall Integrity</div>
+                            <div className="text-5xl font-black text-white tracking-tighter">{overallAttendance}%</div>
+                        </div>
+                    </div>
+                </div>
             </motion.div>
 
-            {/* Overview stat cards */}
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}
-                className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* ── Last.fm Style KPI Cards ── */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
                 {[
-                    {
-                        label: 'Overall', value: `${overallPct}%`,
-                        icon: isOnTrack ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />,
-                        color: isOnTrack ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400',
-                        bg: isOnTrack ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20',
-                        badge: isOnTrack ? 'On Track' : 'At Risk',
-                        badgeColor: isOnTrack ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
-                    },
-                    {
-                        label: 'Subjects', value: subjects.length,
-                        icon: <BookOpen className="w-5 h-5" />,
-                        color: 'text-indigo-600 dark:text-indigo-400',
-                        bg: 'bg-indigo-50 dark:bg-indigo-900/20',
-                    },
-                    {
-                        label: 'Safe', value: safeSubs,
-                        icon: <CheckCircle className="w-5 h-5" />,
-                        color: 'text-emerald-600 dark:text-emerald-400',
-                        bg: 'bg-emerald-50 dark:bg-emerald-900/20',
-                    },
-                    {
-                        label: 'At Risk', value: atRiskSubs,
-                        icon: <AlertCircle className="w-5 h-5" />,
-                        color: 'text-rose-600 dark:text-rose-400',
-                        bg: 'bg-rose-50 dark:bg-rose-900/20',
-                    },
-                ].map((stat) => (
-                    <GlassCard key={stat.label} className="p-4">
-                        <div className={`inline-flex items-center justify-center w-9 h-9 rounded-xl mb-3 ${stat.bg} ${stat.color}`}>
-                            {stat.icon}
+                    { label: 'Overall Rate', val: `${kpis.overall_percentage ?? overallAttendance}%`, sub: `Target: ${kpis.target_threshold ?? targetThreshold}%`, icon: <Activity size={18} />, color: '#3b82f6' },
+                    { label: 'Attendance Streak', val: `${kpis.attendance_streak ?? 0}`, sub: 'Consecutive Days', icon: <TrendingUp size={18} />, color: '#10b981' },
+                    { label: 'Subjects at Risk', val: `${kpis.at_risk_count ?? 0}`, sub: `of ${kpis.total_subjects ?? subjects.length} Tracks`, icon: <AlertTriangle size={18} />, color: '#ef4444' },
+                    { label: 'Engagements', val: `${totalAttended}`, sub: `${totalClasses} Total Sessions`, icon: <CalendarDays size={18} />, color: '#8b5cf6' },
+                    { label: 'Performance Peak', val: kpis.best_subject_name || 'N/A', sub: kpis.best_subject_percent || '0%', icon: <Award size={18} />, color: '#f59e0b' },
+                    { label: 'Absence Count', val: String(kpis.total_absences || 0), sub: 'Sessions Missed', icon: <TrendingUp size={18} className="rotate-180" />, color: '#f43f5e' },
+                ].map((k, i) => (
+                    <div key={i} className="rounded-[2rem] border border-white/[0.04] bg-[#0a0a0a] p-8 flex flex-col justify-between group hover:bg-white/[0.01] transition-all duration-500 hover:border-blue-500/20 shadow-xl overflow-hidden relative">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-transparent to-white/[0.02] opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="flex justify-between items-start mb-6 relative z-10">
+                            <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">{k.label}</span>
+                            <div className="w-10 h-10 rounded-2xl flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:rotate-12 group-hover:scale-110 transition-all duration-500" style={{ backgroundColor: `${k.color}10`, color: k.color, border: `1px solid ${k.color}20` }}>
+                                {k.icon}
+                            </div>
                         </div>
-                        <p className="text-xs text-on-surface-variant font-medium">{stat.label}</p>
-                        <p className={`text-2xl font-bold mt-0.5 ${stat.color}`}>{stat.value}</p>
-                        {stat.badge && (
-                            <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${stat.badgeColor}`}>
-                                {stat.badge}
-                            </span>
-                        )}
-                    </GlassCard>
+                        <div className="relative z-10">
+                            <p className="text-3xl font-black text-white tracking-tighter truncate leading-none mb-2">{k.val}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2" style={{ color: k.color }}>
+                                <span className="w-1 h-1 rounded-full" style={{ backgroundColor: k.color }} />
+                                {k.sub}
+                            </p>
+                        </div>
+                    </div>
                 ))}
             </motion.div>
 
-            {/* Weekly bar + Doughnut */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <motion.div className="lg:col-span-2" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                    <GlassCard className="p-5 h-full flex flex-col">
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Weekly Breakdown</p>
-                                <h3 className="text-base font-bold text-on-surface mt-0.5">Day-by-Day Attendance</h3>
-                            </div>
-                            <div className="flex gap-4 text-xs text-on-surface-variant">
-                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block" />Present</span>
-                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-rose-400 inline-block" />Absent</span>
-                            </div>
+            {/* ── Visualizations Row ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+                {/* Global Presence Doughnut */}
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="rounded-[2.5rem] bg-[#0a0a0a] border border-white/[0.04] p-8 flex flex-col items-center justify-center relative shadow-xl hover:border-blue-500/20 group transition-all">
+                    <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-6 absolute top-8 left-8">Attendance Ratio</h3>
+                    <div className="relative w-56 h-56 mt-4">
+                        <Doughnut data={doughnutData} options={doughnutOptions} />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span className="text-5xl font-black text-white tracking-tighter">{overallAttendance}%</span>
+                            <span className="text-[10px] mt-1 font-black text-blue-500 uppercase tracking-widest">Global</span>
                         </div>
-                        <div className="flex-1" style={{ minHeight: 240 }}>
-                            <Bar data={weekBarData} options={weekBarOpts} />
-                        </div>
-                    </GlassCard>
+                    </div>
                 </motion.div>
 
-                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}>
-                    <GlassCard className="p-5 h-full flex flex-col">
-                        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-1">Split</p>
-                        <h3 className="text-base font-bold text-on-surface mb-4">Present vs Absent</h3>
-                        <div className="flex-1 relative flex items-center justify-center" style={{ minHeight: 180 }}>
-                            <Doughnut data={doughnutData} options={doughnutOpts} />
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className={`text-2xl font-bold ${isOnTrack ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}`}>{overallPct}%</span>
-                                <span className="text-[10px] text-on-surface-variant">overall</span>
-                            </div>
+                {/* Day of Week Spline */}
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }} className="lg:col-span-2 rounded-[2.5rem] bg-[#0a0a0a] border border-white/[0.04] p-8 flex flex-col shadow-xl hover:border-blue-500/20 transition-all">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xs font-black text-white/50 uppercase tracking-widest">Weekly Consistency Pattern</h3>
+                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-black uppercase">
+                            <Sparkles size={12} /> Trajectory
                         </div>
-                        <div className="mt-4 space-y-2 text-sm">
-                            {[
-                                { label: 'Present', val: totalPresent, color: 'bg-emerald-500' },
-                                { label: 'Absent', val: totalAbsent, color: 'bg-rose-400' },
-                            ].map(item => (
-                                <div key={item.label} className="flex justify-between items-center">
-                                    <span className="flex items-center gap-2 text-on-surface-variant">
-                                        <span className={`w-2 h-2 rounded-full ${item.color}`} />
-                                        {item.label}
-                                    </span>
-                                    <span className="font-semibold text-on-surface">{item.val}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </GlassCard>
+                    </div>
+                    <div className="flex-1 w-full relative min-h-[220px]">
+                        {days.length > 0 ? (
+                            <Line data={lineData} options={lineOptions} />
+                        ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest">No data available</div>
+                        )}
+                    </div>
                 </motion.div>
             </div>
 
-            {/* Rankings + Radar */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Subject Rankings */}
-                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
-                    <GlassCard className="p-5 h-full flex flex-col">
-                        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-1">Rankings</p>
-                        <h3 className="text-base font-bold text-on-surface mb-4">Subjects by Attendance</h3>
-                        <div className="space-y-2 flex-1">
-                            {subjects.length === 0 && (
-                                <p className="text-on-surface-variant/60 text-sm py-6 text-center">No subjects for this semester</p>
-                            )}
-                            {subjects.slice(0, 7).map((s: any, i: number) => {
-                                const pct = s.percentage;
-                                const safe = pct >= 75;
-                                return (
-                                    <div key={s._id || i} className="flex items-center gap-3 group">
-                                        <span className={`text-sm font-bold w-5 text-center shrink-0 ${i === 0 ? 'text-amber-500' : 'text-on-surface-variant/30'}`}>
-                                            {i + 1}
-                                        </span>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <p className="text-sm font-medium text-on-surface truncate">{s.name}</p>
-                                                <span className={`text-xs font-bold ml-2 shrink-0 ${safe ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                                    {pct}%
-                                                </span>
-                                            </div>
-                                            <div className="h-1.5 rounded-full bg-outline-variant/40 overflow-hidden">
-                                                <div
-                                                    className={`h-full rounded-full transition-all duration-700 ${safe ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                                                    style={{ width: `${pct}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                        {i === 0 && (
-                                            <span className="shrink-0 text-[9px] font-bold text-amber-600 dark:text-amber-400 border border-amber-400/40 px-1.5 py-0.5 rounded">TOP</span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </GlassCard>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+                {/* Subject Matrix Radar */}
+                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 }} className="lg:col-span-1 rounded-[2.5rem] bg-[#0a0a0a] border border-white/[0.04] p-8 relative shadow-xl hover:border-blue-500/20 transition-all flex flex-col items-center">
+                    <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-6 w-full text-left">Subject Matrix</h3>
+                    <div className="h-[260px] w-full mt-2">
+                        {subjects.length > 0 ? (
+                            <Radar data={radarData} options={radarOptions} />
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest">Not enough subjects</div>
+                        )}
+                    </div>
                 </motion.div>
 
-                {/* Radar */}
-                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
-                    <GlassCard className="p-5 h-full flex flex-col">
-                        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-1">Fingerprint</p>
-                        <h3 className="text-base font-bold text-on-surface mb-4">Subject Radar</h3>
-                        {radarSubjs.length > 2 ? (
-                            <div className="flex-1" style={{ minHeight: 260 }}>
-                                <Radar data={radarData} options={radarOpts} />
+                {/* Detailed Breakdown Grid */}
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="lg:col-span-2 rounded-[2.5rem] bg-[#0a0a0a] border border-white/[0.04] p-8 shadow-xl">
+                    <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-6">Deep Component Tracking</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        {subjects.map((subject: any, idx: number) => (
+                            <div key={idx} className="rounded-2xl border border-white/[0.03] bg-white/[0.01] p-5 hover:bg-white/[0.02] hover:border-blue-500/10 transition-colors group">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h4 className="font-bold text-sm text-white/90 truncate mr-3 group-hover:text-blue-400 transition-colors uppercase">{subject.name}</h4>
+                                    <span className="text-lg font-black text-white tracking-tighter leading-none">{subject.percentage || 0}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/[0.02] mb-3">
+                                    <div
+                                        className={`h-full transition-all duration-700 ${subject.percentage < targetThreshold ? 'bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]'}`}
+                                        style={{ width: `${subject.percentage || 0}%` }}
+                                    />
+                                </div>
+                                <div className="flex justify-between items-center text-[9px] font-black tracking-widest uppercase text-white/30">
+                                    <span>{subject.attended} / {subject.total} Sessions</span>
+                                    <span>Target: {subject.target && subject.target !== 75 ? subject.target : targetThreshold}%</span>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center text-on-surface-variant/40 text-sm py-8">
-                                Need \u2265 3 subjects to show radar
+                        ))}
+                        {subjects.length === 0 && (
+                            <div className="col-span-1 md:col-span-2 text-center py-10 text-white/20 text-xs font-bold tracking-widest uppercase">
+                                No subject data available.
                             </div>
                         )}
-                    </GlassCard>
+                    </div>
                 </motion.div>
             </div>
 
-            {/* At Risk */}
-            {atRiskSubs > 0 && (
-                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}>
-                    <GlassCard className="p-5 border-rose-200 dark:border-rose-800/50">
-                        <div className="flex items-center gap-2 mb-4">
-                            <AlertCircle className="w-4 h-4 text-rose-500" />
-                            <h3 className="text-base font-bold text-on-surface">At Risk Subjects</h3>
-                            <span className="ml-auto text-xs text-on-surface-variant">Need 75% to be safe</span>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {subjects.filter((s: any) => s.percentage < 75).map((s: any, i: number) => {
-                                const needed = Math.max(0, Math.ceil((0.75 * s.total - s.attended) / 0.25));
-                                return (
-                                    <div key={s._id || i} className="p-4 rounded-xl border border-rose-200 dark:border-rose-800/40 bg-rose-50 dark:bg-rose-900/10">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <p className="font-semibold text-sm text-on-surface">{s.name}</p>
-                                            <span className="text-sm font-bold text-rose-600 dark:text-rose-400">{s.percentage}%</span>
-                                        </div>
-                                        <div className="h-1.5 rounded-full bg-rose-100 dark:bg-rose-900/40 overflow-hidden mb-2">
-                                            <div className="h-full bg-rose-500 rounded-full" style={{ width: `${s.percentage}%` }} />
-                                        </div>
-                                        <p className="text-xs text-on-surface-variant">
-                                            Attend <span className="font-bold text-rose-600 dark:text-rose-400">{needed}</span> more consecutive classes to reach 75%
-                                        </p>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </GlassCard>
-                </motion.div>
-            )}
-
+            <style>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(59,130,246,0.5); }
+            `}</style>
         </div>
     );
 };

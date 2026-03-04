@@ -25,6 +25,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
     const [scheduledClasses, setScheduledClasses] = useState<any[]>([]);
     const [allSubjects, setAllSubjects] = useState<any[]>([]);
     const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
+    const [actionInProgress, setActionInProgress] = useState(false);
 
     // Detailed marking state
     const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
@@ -107,9 +108,10 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
     };
 
     const markSimple = async (subject: any, status: 'present' | 'absent') => {
+        if (actionInProgress) return;
+        setActionInProgress(true);
         try {
             const dateStr = getDateStr(selectedDate);
-            // Check for existing log to Edit instead of Mark
             if (subject.log_id) {
                 await attendanceService.editAttendance(subject.log_id, status, undefined, dateStr);
                 showToast('success', `Updated to ${status}`);
@@ -118,29 +120,33 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                 showToast('success', `Marked ${status}`);
             }
 
-            loadClassesForDate(selectedDate, true); // Silent reload
-            fetchAttendanceLogs(selectedDate); // Refresh logs section
+            await loadClassesForDate(selectedDate, true);
+            await fetchAttendanceLogs(selectedDate);
             if (onSuccess) onSuccess();
         } catch (error: any) {
             showToast('error', error.response?.data?.error || 'Failed to mark');
+        } finally {
+            setActionInProgress(false);
         }
     };
 
     const handleDelete = async (subject: any) => {
+        if (actionInProgress) return;
+        if (!subject.log_id) {
+            showToast('error', 'No attendance record found to delete.');
+            return;
+        }
+        setActionInProgress(true);
         try {
-            // We need the log_id. getClassesForDate returns it.
-            if (!subject.log_id) {
-                showToast('error', 'No attendance record found to delete.');
-                return;
-            }
-
             await attendanceService.deleteAttendance(subject.log_id);
             showToast('success', 'Attendance cleared');
-            loadClassesForDate(selectedDate, true);
-            fetchAttendanceLogs(selectedDate); // Refresh logs section
+            await loadClassesForDate(selectedDate, true);
+            await fetchAttendanceLogs(selectedDate);
             if (onSuccess) onSuccess();
         } catch (error: any) {
             showToast('error', error.response?.data?.error || 'Failed to delete');
+        } finally {
+            setActionInProgress(false);
         }
     };
 
@@ -221,17 +227,17 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
         >
             <div className="space-y-6">
                 {/* Date Picker */}
-                <div className="flex items-center gap-4 p-3 bg-surface-container rounded-xl border border-outline-variant/30">
-                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                <div className="flex items-center gap-4 p-3 bg-[#111] rounded-2xl border border-white/[0.08]">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
                         <CalendarIcon size={20} />
                     </div>
                     <div className="flex-1">
-                        <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider block mb-1">
+                        <label className="text-xs font-semibold text-white/50 uppercase tracking-wider block mb-1">
                             Date
                         </label>
                         <input
                             type="date"
-                            className="bg-transparent border-none p-0 text-on-surface font-sans font-medium focus:ring-0 w-full"
+                            className="bg-transparent border-none p-0 text-white font-sans font-medium focus:ring-0 w-full"
                             value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`}
                             onChange={handleDateChange}
                         />
@@ -246,7 +252,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                     <div className="space-y-6 max-h-[60vh] overflow-y-auto px-1 custom-scrollbar">
                         {/* Scheduled List */}
                         <div>
-                            <h3 className="text-sm font-bold text-on-surface-variant mb-3 uppercase tracking-wider">Scheduled Classes</h3>
+                            <h3 className="text-sm font-bold text-white/50 mb-3 uppercase tracking-wider">Scheduled Classes</h3>
                             {scheduledClasses.length > 0 ? (
                                 <div className="space-y-3">
                                     {groupConsecutiveClasses(scheduledClasses).map((subject, idx) => {
@@ -268,13 +274,12 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                                     }
                                                 }}
                                                 onDelete={(subj: any) => {
-                                                    if (subj.isMerged) {
-                                                        // Clear all associated logs for robustness
-                                                        subj.originalClasses.forEach((cls: any) => {
-                                                            if (cls.log_id) handleDelete(cls);
-                                                        });
+                                                    // Only delete the PRIMARY log — merged classes share ONE log
+                                                    const primary = subj.isMerged ? subj.originalClasses[0] : subj;
+                                                    if (primary.log_id) {
+                                                        handleDelete(primary);
                                                     } else {
-                                                        handleDelete(subj);
+                                                        showToast('error', 'No attendance record found to delete.');
                                                     }
                                                 }}
                                                 onOpenDetails={(id: string, status: string) => openDetails(id, status, subject.notes)}
@@ -301,16 +306,16 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                     })}
                                 </div>
                             ) : (
-                                <p className="text-sm text-on-surface-variant/70 italic text-center py-4">No classes scheduled.</p>
+                                <p className="text-sm text-white/40 italic text-center py-4">No classes scheduled.</p>
                             )}
                         </div>
 
                         {/* Divider */}
-                        <div className="my-6 border-t border-stroke"></div>
+                        <div className="my-6 border-t border-white/[0.08]"></div>
 
                         {/* All Attendance Logs Section */}
                         <div>
-                            <h3 className="text-sm font-bold text-on-surface-variant mb-3 uppercase tracking-wider flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-white/50 mb-3 uppercase tracking-wider flex items-center gap-2">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                                     <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -339,31 +344,31 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                         });
 
                                         const statusColors: any = {
-                                            'present': 'text-green-600 bg-green-50',
-                                            'absent': 'text-red-600 bg-red-50',
-                                            'late': 'text-orange-600 bg-orange-50',
-                                            'medical': 'text-blue-600 bg-blue-50',
-                                            'approved_medical': 'text-blue-600 bg-blue-50',
-                                            'cancelled': 'text-gray-600 bg-gray-50',
-                                            'substituted': 'text-purple-600 bg-purple-50'
+                                            'present': 'text-green-400 bg-green-500/10',
+                                            'absent': 'text-red-400 bg-red-500/10',
+                                            'late': 'text-orange-400 bg-orange-500/10',
+                                            'medical': 'text-blue-400 bg-blue-500/10',
+                                            'approved_medical': 'text-blue-400 bg-blue-500/10',
+                                            'cancelled': 'text-white/60 bg-white/5',
+                                            'substituted': 'text-purple-400 bg-purple-500/10'
                                         };
-                                        const statusColor = statusColors[log.status] || 'text-gray-600 bg-gray-50';
+                                        const statusColor = statusColors[log.status] || 'text-white/60 bg-white/5';
 
                                         const logId = getSafeId(log._id);
 
                                         return (
                                             <div
                                                 key={`log-entry-${logId}-${idx}`}
-                                                className="flex items-center justify-between p-3 rounded-lg bg-surface-variant/30 border border-stroke"
+                                                className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.02] border border-white/[0.08]"
                                             >
                                                 <div className="flex-1">
-                                                    <div className="font-semibold text-sm">{log.subject_name || log.subject_info?.name || logSubject?.name || 'Unknown Subject'}</div>
+                                                    <div className="font-semibold text-sm text-white/90">{log.subject_name || log.subject_info?.name || logSubject?.name || 'Unknown Subject'}</div>
                                                     <div className="flex items-center gap-2 mt-1">
-                                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${statusColor}`}>
                                                             {String(log.status).toUpperCase()}
                                                         </span>
                                                         {log.notes && (
-                                                            <span className="text-xs text-on-surface-variant">• {log.notes}</span>
+                                                            <span className="text-xs text-white/50">• {log.notes}</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -374,10 +379,10 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                                             deleteLog(logId);
                                                         }
                                                     }}
-                                                    className="p-2 hover:bg-error/10 rounded-lg transition-colors"
+                                                    className="p-2 hover:bg-red-500/10 rounded-xl transition-colors"
                                                     title="Delete this log entry"
                                                 >
-                                                    <Trash2 size={18} className="text-error" />
+                                                    <Trash2 size={18} className="text-red-400" />
                                                 </button>
                                             </div>
                                         );
@@ -385,8 +390,8 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                 </div>
                             ) : (
                                 <div className="text-center py-8">
-                                    <div className="text-4xl mb-2">📋</div>
-                                    <p className="text-sm text-on-surface-variant/70 italic">No attendance marked for this date</p>
+                                    <div className="text-4xl mb-2 opacity-50">📋</div>
+                                    <p className="text-sm text-white/40 italic">No attendance marked for this date</p>
                                 </div>
                             )}
                         </div>
@@ -407,10 +412,10 @@ const SubjectRow = ({
 
     if (expanded) {
         return (
-            <div className="bg-surface-container rounded-xl p-4 border border-primary/30 shadow-md">
-                <div className="flex justify-between items-center mb-4 border-b border-outline-variant/10 pb-3">
-                    <h4 className="font-bold text-on-surface">{subject.name}</h4>
-                    <button onClick={onCloseDetails} className="text-on-surface-variant hover:text-on-surface p-1 rounded-full hover:bg-surface-dim">
+            <div className="bg-[#111] rounded-2xl p-4 border border-white/[0.08] shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+                <div className="flex justify-between items-center mb-4 border-b border-white/[0.08] pb-3">
+                    <h4 className="font-bold text-white/90">{subject.name}</h4>
+                    <button onClick={onCloseDetails} className="text-white/40 hover:text-white/80 p-1 rounded-xl hover:bg-white/[0.06] transition-colors">
                         <X size={18} />
                     </button>
                 </div>
@@ -419,18 +424,18 @@ const SubjectRow = ({
                     {/* Status Grid */}
                     <div className="grid grid-cols-2 gap-2">
                         {[
-                            { id: 'present', label: 'Present', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
-                            { id: 'absent', label: 'Absent', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
-                            { id: 'medical', label: 'Medical Leave', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' }, // Map to approved_medical
-                            { id: 'cancelled', label: 'Cancelled', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
-                            { id: 'substituted', label: 'Substituted', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
+                            { id: 'present', label: 'Present', color: 'bg-green-500/15 text-green-400 border border-green-500/30' },
+                            { id: 'absent', label: 'Absent', color: 'bg-red-500/15 text-red-400 border border-red-500/30' },
+                            { id: 'medical', label: 'Medical Leave', color: 'bg-blue-500/15 text-blue-400 border border-blue-500/30' }, // Map to approved_medical
+                            { id: 'cancelled', label: 'Cancelled', color: 'bg-white/10 text-white/70 border border-white/20' },
+                            { id: 'substituted', label: 'Substituted', color: 'bg-purple-500/15 text-purple-400 border border-purple-500/30' },
                         ].map(opt => (
                             <button
                                 key={opt.id}
                                 onClick={() => setDetailStatus(opt.id === 'medical' ? 'approved_medical' : opt.id)}
-                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${(detailStatus === opt.id || (opt.id === 'medical' && detailStatus === 'approved_medical'))
-                                    ? `ring-2 ring-primary ${opt.color}`
-                                    : 'bg-surface-dim text-on-surface hover:bg-surface-container-high'
+                                className={`px-3 py-2 rounded-xl text-sm font-bold transition-all ${(detailStatus === opt.id || (opt.id === 'medical' && detailStatus === 'approved_medical'))
+                                    ? opt.color
+                                    : 'bg-white/[0.02] border border-transparent text-white/40 hover:bg-white/[0.06] hover:text-white/70'
                                     }`}
                             >
                                 {opt.label}
@@ -439,40 +444,39 @@ const SubjectRow = ({
                     </div>
 
                     {/* Substitution Dropdown */}
-                    {detailStatus === 'substituted' && (
-                        <div className="animate-fade-in p-3 bg-purple-50 dark:bg-purple-900/10 rounded-lg border border-purple-200 dark:border-purple-800/30">
-                            <label className="text-xs font-bold text-purple-700 dark:text-purple-300 uppercase block mb-2">
-                                Substituted By
-                            </label>
-                            <select
-                                className="w-full bg-white dark:bg-black border border-outline rounded-lg p-2 text-sm"
-                                value={detailSubstitutedBy}
-                                onChange={(e) => setDetailSubstitutedBy(e.target.value)}
-                            >
-                                <option value="">Select Subject...</option>
-                                {allSubjects.filter((s: any) => {
-                                    const sId = String(s._id || s.id);
-                                    const currentId = String(subject._id || subject.id);
-                                    return sId !== currentId;
-                                }).map((s: any) => {
-                                    // Robust ID extraction for unique key
-                                    const rawId = s._id || s.id;
-                                    const sId = (rawId && typeof rawId === 'object' && rawId.$oid) ? rawId.$oid : String(rawId);
-                                    return (
-                                        <option key={`sub-opt-${sId}`} value={sId}>{s.name}</option>
-                                    );
-                                })}
-                            </select>
-                        </div>
-                    )}
+                    {detailStatus === 'substituted' && (() => {
+                        const filteredSubjects = allSubjects.filter((s: any) => {
+                            const sId = String(s._id || s.id);
+                            const currentId = String(subject._id || subject.id);
+                            return sId !== currentId;
+                        });
+                        const selectedSub = filteredSubjects.find((s: any) => {
+                            const rawId = s._id || s.id;
+                            const sId = (rawId && typeof rawId === 'object' && rawId.$oid) ? rawId.$oid : String(rawId);
+                            return sId === detailSubstitutedBy;
+                        });
+                        return (
+                            <div className="animate-fade-in p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
+                                <label className="text-xs font-bold text-purple-400 uppercase block mb-2">
+                                    Substituted By
+                                </label>
+                                <SubstitutionDropdown
+                                    subjects={filteredSubjects}
+                                    value={detailSubstitutedBy}
+                                    selectedName={selectedSub?.name}
+                                    onChange={setDetailSubstitutedBy}
+                                />
+                            </div>
+                        );
+                    })()}
 
                     {/* Notes */}
                     <div>
-                        <label className="text-xs font-semibold text-on-surface-variant uppercase block mb-1">
+                        <label className="text-xs font-semibold text-white/50 uppercase block mb-1">
                             Notes (Optional)
                         </label>
                         <textarea
-                            className="w-full bg-surface-dim border border-transparent focus:border-primary/50 rounded-lg p-3 text-sm resize-none"
+                            className="w-full bg-white/[0.02] border border-white/[0.08] focus:border-blue-500/50 focus:bg-white/[0.06] rounded-xl p-3 text-sm resize-none text-white placeholder:text-white/30 focus:outline-none transition-all"
                             placeholder="Add details..."
                             rows={2}
                             value={detailNotes}
@@ -482,8 +486,8 @@ const SubjectRow = ({
 
                     <div className="flex gap-2">
                         {isMarked && (
-                            <Button variant="ghost" className="text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10" onClick={() => onDelete(subject)}>
-                                <Trash2 size={18} className="mr-2" /> Clear Mark
+                            <Button variant="ghost" className="text-red-400 hover:bg-red-500/10 hover:text-red-300" onClick={() => onDelete(subject)}>
+                                Clear Mark
                             </Button>
                         )}
                         <Button className="flex-1" onClick={() => onSubmitDetail(subject._id || subject.id)}>
@@ -491,14 +495,14 @@ const SubjectRow = ({
                         </Button>
                     </div>
                 </div>
-            </div>
+            </div >
         );
     }
 
     // Collapsed View
     return (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container hover:bg-surface-container-high transition-colors border border-transparent hover:border-outline-variant/20 group">
-            <span className="font-bold text-on-surface">{subject.name}</span>
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-[#111] hover:bg-white/[0.04] transition-colors border border-white/[0.08] hover:border-white/[0.15] group">
+            <span className="font-bold text-white/90">{subject.name}</span>
             <div className="flex gap-2">
                 {!isMarked ? (
                     <>
@@ -506,7 +510,7 @@ const SubjectRow = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => onSimpleMark(subject, 'present')}
-                            className="h-8 w-8 p-0 rounded-full text-green-600 hover:bg-green-100 dark:hover:bg-green-900/20"
+                            className="h-8 w-8 p-0 rounded-full text-green-400 hover:bg-green-500/10"
                             title="Mark Present"
                         >
                             <Check size={16} />
@@ -515,7 +519,7 @@ const SubjectRow = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => onSimpleMark(subject, 'absent')}
-                            className="h-8 w-8 p-0 rounded-full text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20"
+                            className="h-8 w-8 p-0 rounded-full text-red-400 hover:bg-red-500/10"
                             title="Mark Absent"
                         >
                             <X size={16} />
@@ -523,9 +527,9 @@ const SubjectRow = ({
                     </>
                 ) : (
                     <div className="flex items-center gap-2 mr-2">
-                        <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${status === 'present' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300' :
-                            status === 'absent' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300' :
-                                'bg-surface-dim text-on-surface-variant'
+                        <span className={`text-[10px] uppercase px-2 py-0.5 rounded-md font-bold ${status === 'present' ? 'bg-green-500/15 text-green-400 border border-green-500/30' :
+                            status === 'absent' ? 'bg-red-500/15 text-red-400 border border-red-500/30' :
+                                'bg-white/[0.05] text-white/50 border border-white/10'
                             }`}>
                             {status === 'approved_medical' ? 'Medical' : status}
                         </span>
@@ -534,7 +538,7 @@ const SubjectRow = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => onDelete(subject)}
-                            className="h-8 w-8 p-0 rounded-full text-on-surface-variant hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10"
+                            className="h-8 w-8 p-0 rounded-full text-white/40 hover:text-red-400 hover:bg-red-500/10"
                             title="Delete/Clear"
                         >
                             <Trash2 size={16} />
@@ -546,7 +550,7 @@ const SubjectRow = ({
                     size="sm"
                     variant="ghost"
                     onClick={() => onOpenDetails(subject._id || subject.id, status, subject.notes)}
-                    className="h-8 w-8 p-0 rounded-full text-on-surface-variant hover:bg-surface-dim"
+                    className="h-8 w-8 p-0 rounded-full text-white/40 hover:text-white hover:bg-white/[0.06]"
                 >
                     <MoreHorizontal size={16} />
                 </Button>
@@ -555,13 +559,30 @@ const SubjectRow = ({
     );
 };
 
+const parseTime = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return 0;
+    let [_, h, m, ampm] = match;
+    let hours = parseInt(h, 10);
+    const minutes = parseInt(m, 10);
+    if (ampm.toUpperCase() === 'PM' && hours < 12) hours += 12;
+    if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+};
+
 const groupConsecutiveClasses = (classes: any[]) => {
     if (!classes || classes.length === 0) return [];
+
+    // Sort classes by starting time before grouping
+    const sortedClasses = [...classes].sort((a, b) => {
+        return parseTime(a.time) - parseTime(b.time);
+    });
 
     const grouped: any[] = [];
     let currentGroup: any = null;
 
-    classes.forEach((slot) => {
+    sortedClasses.forEach((slot) => {
         // Robust ID Extraction
         const getSafeId = (val: any) => {
             if (!val) return '';
@@ -613,11 +634,65 @@ const groupConsecutiveClasses = (classes: any[]) => {
 
     return grouped.map(g => ({
         ...g,
-        isMerged: g.originalClasses.length > 1, // Only true if actually merged > 1
-        // If meant to be single, revert isMerged? No, consistent struct is fine.
-        // Actually if length is 1, treat as normal?
-        // Logic above sets isMerged=true always. Let's fix.
+        isMerged: g.originalClasses.length > 1,
     }));
+};
+
+const SubstitutionDropdown = ({ subjects, value, selectedName, onChange }: {
+    subjects: any[];
+    value: string;
+    selectedName?: string;
+    onChange: (val: string) => void;
+}) => {
+    const [open, setOpen] = useState(false);
+    const ref = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                type="button"
+                onClick={() => setOpen(!open)}
+                className="w-full bg-[#111] border border-white/[0.08] text-white rounded-xl px-4 py-2.5 text-sm text-left flex items-center justify-between hover:border-purple-500/30 transition-all"
+            >
+                <span className={value ? 'text-white' : 'text-white/30'}>{selectedName || 'Select Subject...'}</span>
+                <svg className={`w-4 h-4 text-white/30 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {open && (
+                <div className="absolute left-0 right-0 z-[60] mt-1 rounded-xl border border-white/[0.1] bg-[#111] shadow-2xl overflow-hidden max-h-[180px] overflow-y-auto custom-scrollbar" style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}>
+                    <button
+                        type="button"
+                        onClick={() => { onChange(''); setOpen(false); }}
+                        className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${!value ? 'bg-purple-500/15 text-purple-400' : 'text-white/50 hover:bg-white/[0.05] hover:text-white'}`}
+                    >
+                        Select Subject...
+                    </button>
+                    {subjects.map((s: any) => {
+                        const rawId = s._id || s.id;
+                        const sId = (rawId && typeof rawId === 'object' && rawId.$oid) ? rawId.$oid : String(rawId);
+                        const isSelected = sId === value;
+                        return (
+                            <button
+                                key={`sub-drop-${sId}`}
+                                type="button"
+                                onClick={() => { onChange(sId); setOpen(false); }}
+                                className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${isSelected ? 'bg-purple-500/15 text-purple-400' : 'text-white/70 hover:bg-white/[0.05] hover:text-white'}`}
+                            >
+                                {s.name}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
 };
 
 export default AttendanceModal;

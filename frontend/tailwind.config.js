@@ -73,6 +73,12 @@ export default {
         'DEFAULT': '8px',
       },
 
+      dropShadow: {
+        'glow-primary': '0 0 10px rgba(59, 130, 246, 0.5)',
+        'glow-success': '0 0 10px rgba(34, 197, 94, 0.5)',
+        'glow-secondary': '0 0 10px rgba(168, 85, 247, 0.5)',
+      },
+
       animation: {
         'float': 'float 3s ease-in-out infinite',
         'fade-in': 'fadeIn 0.4s ease-out',

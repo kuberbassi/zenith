@@ -1,43 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
-import GlassCard from '@/components/ui/GlassCard';
+import {
+    Rocket, ShieldCheck, Sparkles, Edit2, Trash2, Plus
+} from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useToast } from '@/components/ui/Toast';
 import { skillsService, type Skill } from '@/services/skills.service';
 
 const SKILL_CATEGORIES = [
-    'Technical',
-    'Creative',
-    'Language',
-    'Professional',
-    'Life',
-    'Other'
+    'Technical', 'Creative', 'Language', 'Professional', 'Life', 'Other'
 ];
 
-const getCategoryColor = (category: string) => {
-    switch (category) {
-        case 'Technical': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300';
-        case 'Creative': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
-        case 'Language': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
-        case 'Professional': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
-        case 'Life': return 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300';
-        default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
-    }
-};
 const SKILL_LEVELS: Skill['level'][] = ['beginner', 'intermediate', 'advanced', 'expert'];
 
-const getLevelColor = (level: string) => {
-    switch (level) {
-        case 'beginner': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
-        case 'intermediate': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300';
-        case 'advanced': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
-        case 'expert': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
-        default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
-    }
+const LEVEL_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
+    beginner: { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)' },
+    intermediate: { color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.2)' },
+    advanced: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
+    expert: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' },
 };
 
 const SkillTracker: React.FC = () => {
@@ -50,229 +34,127 @@ const SkillTracker: React.FC = () => {
     const [filter, setFilter] = useState('all');
 
     const [formData, setFormData] = useState<Omit<Skill, '_id'>>({
-        name: '',
-        category: 'Technical',
-        level: 'beginner',
-        progress: 0,
-        notes: ''
+        name: '', category: 'Technical', level: 'beginner', progress: 0, notes: ''
     });
 
-    const normalizeSkill = (skill: any): Skill => {
-        if (skill._id && typeof skill._id === 'object' && skill._id.$oid) {
-            return { ...skill, _id: skill._id.$oid };
-        }
-        return skill;
-    };
-
-    useEffect(() => {
-        loadSkills();
-    }, []);
+    useEffect(() => { loadSkills(); }, []);
 
     const loadSkills = async () => {
         try {
             setLoading(true);
             const data = await skillsService.getSkills();
             const skillsList = Array.isArray(data) ? data : (data as any).skills || [];
-            setSkills(skillsList.map(normalizeSkill));
+            setSkills(skillsList.map((s: any) => ({ ...s, _id: s._id?.$oid || s._id })));
         } catch (error) {
-            console.error('Failed to load skills:', error);
-            showToast('error', 'Failed to load skills');
+            showToast('error', 'Sync Failed');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAddSkill = () => {
-        setEditingSkill(null);
-        setFormData({
-            name: '',
-            category: 'Technical',
-            level: 'beginner',
-            progress: 0,
-            notes: ''
-        });
-        setIsModalOpen(true);
-    };
-
-    const handleEditSkill = (skill: Skill) => {
-        setEditingSkill(skill);
-        setFormData({
-            name: skill.name,
-            category: skill.category,
-            level: skill.level,
-            progress: skill.progress,
-            notes: skill.notes || ''
-        });
-        setIsModalOpen(true);
-    };
-
     const handleSave = async () => {
-        if (!formData.name) {
-            showToast('error', 'Skill name is required');
-            return;
-        }
-
+        if (!formData.name) { showToast('error', 'Identity Required'); return; }
         try {
             setIsSaving(true);
-            if (editingSkill && editingSkill._id) {
+            if (editingSkill?._id) {
                 await skillsService.updateSkill(editingSkill._id, formData);
-                showToast('success', 'Skill updated successfully');
+                showToast('success', 'Sequence Updated');
             } else {
                 await skillsService.addSkill(formData);
-                showToast('success', 'Skill created successfully');
+                showToast('success', 'Sequence Initiated');
             }
             setIsModalOpen(false);
             loadSkills();
-        } catch (error) {
-            console.error('Failed to save skill:', error);
-            showToast('error', 'Failed to save skill');
+        } catch {
+            showToast('error', 'Operation Failed');
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleDeleteSkill = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this skill?')) return;
+    const handleDelete = async (id: string) => {
+        if (!confirm('Terminate this capability sequence?')) return;
         try {
             await skillsService.deleteSkill(id);
-            showToast('success', 'Skill deleted');
+            showToast('success', 'Sequence Terminated');
             loadSkills();
-        } catch (error) {
-            showToast('error', 'Failed to delete skill');
-        }
+        } catch { showToast('error', 'Termination Failed'); }
     };
 
-    const filteredSkills = filter === 'all'
-        ? skills
-        : skills.filter(s => s.category === filter);
-
-    if (loading) {
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
-                {[1, 2, 3].map(i => (
-                    <div key={i} className="h-48 bg-surface-container/50 rounded-3xl" />
-                ))}
-            </div>
-        );
-    }
+    const filteredSkills = filter === 'all' ? skills : skills.filter(s => s.category === filter);
 
     return (
-        <div className="pb-24 max-w-7xl mx-auto">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-end justify-between gap-3 md:gap-4"
-            >
-                <div>
-                    <h1 className="text-2xl md:text-3xl font-display font-bold text-on-surface mb-1 md:mb-2">Skill Tracker</h1>
-                    <p className="text-sm md:text-base text-on-surface-variant">Track and improve your skills across different domains</p>
+        <div className="pb-32 max-w-7xl mx-auto px-4">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12 relative rounded-[2.5rem] border border-white/[0.06] bg-[#0a0a0a] p-8 md:p-12 overflow-hidden shadow-2xl" style={{ boxShadow: '0 0 80px rgba(59,130,246,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-blue-500/[0.02] blur-[150px] pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
+                    <div className="text-center md:text-left">
+                        <div className="flex items-center justify-center md:justify-start gap-5 mb-5">
+                            <div className="w-14 h-14 rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/10">
+                                <Rocket size={28} />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none mb-1">Capability Matrix</h1>
+                                <div className="flex items-center justify-center md:justify-start gap-2 text-blue-400/60 font-mono text-[10px] uppercase tracking-[0.2em] font-black">
+                                    <ShieldCheck size={12} className="animate-pulse" />
+                                    Active Evolution: Node {skills.length}
+                                </div>
+                            </div>
+                        </div>
+                        <p className="text-white/30 font-bold text-xs md:text-sm tracking-[0.15em] uppercase max-w-lg leading-relaxed">Mapping professional aptitude and cognitive skill sets for mission-critical objectives.</p>
+                    </div>
+
+                    <Button icon={<Plus size={16} />} onClick={() => { setEditingSkill(null); setFormData({ name: '', category: 'Technical', level: 'beginner', progress: 0, notes: '' }); setIsModalOpen(true); }} className="h-14 px-8 rounded-2xl bg-blue-500 text-white font-black tracking-widest uppercase text-xs hover:bg-blue-600 shadow-xl shadow-blue-500/20">New Capability</Button>
                 </div>
-                <Button icon={<Plus size={16} />} size="md" onClick={handleAddSkill} className="w-full md:w-auto justify-center">Add Skill</Button>
             </motion.div>
 
-            {/* Category Filter */}
-            <div className="mb-4 md:mb-6 flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                <button
-                    onClick={() => setFilter('all')}
-                    className={`px-3 md:px-4 py-2 md:py-2 rounded-full text-xs md:text-sm font-medium whitespace-nowrap transition-all ${filter === 'all'
-                        ? 'bg-primary text-on-primary shadow-sm'
-                        : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                        }`}
-                >
-                    All
-                </button>
-                {SKILL_CATEGORIES.map((cat) => (
-                    <button
-                        key={cat}
-                        onClick={() => setFilter(cat)}
-                        className={`px-3 md:px-4 py-2 md:py-2 rounded-full text-xs md:text-sm font-medium whitespace-nowrap transition-all ${filter === cat
-                            ? 'bg-primary text-on-primary shadow-sm'
-                            : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                            }`}
-                    >
+            <div className="mb-10 flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                {['all', ...SKILL_CATEGORIES].map(cat => (
+                    <button key={cat} onClick={() => setFilter(cat)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
                         {cat}
                     </button>
                 ))}
             </div>
 
-            {/* Skills Grid */}
-            {filteredSkills.length === 0 ? (
-                <div className="text-center py-16 md:py-20 bg-surface-container-low rounded-3xl border border-dashed border-outline-variant">
-                    <p className="text-on-surface-variant mb-4 font-medium">No skills found. Start adding some!</p>
-                    <Button variant="tonal" onClick={handleAddSkill}>Create First Skill</Button>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-4">
+            {loading ? <div className="flex justify-center py-20"><LoadingSpinner /></div> : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <AnimatePresence>
-                        {filteredSkills.map((skill, index) => {
-                            const levelColor = getLevelColor(skill.level);
-                            // Ensure ID is a string; handle potential Mongo ObjectId objects
-                            const skillId = (typeof skill._id === 'string' ? skill._id : null)
-                                || (skill.name ? `${skill.name}-${index}` : `skill-${index}`);
-
+                        {filteredSkills.map(skill => {
+                            const cfg = LEVEL_CONFIG[skill.level] || LEVEL_CONFIG.beginner;
                             return (
-                                <motion.div
-                                    key={skillId}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    transition={{ duration: 0.2 }}
-                                >
-                                    <GlassCard hover className="relative overflow-hidden group h-full flex flex-col p-4 md:p-5">
-                                        <div className="flex justify-between items-start mb-3 md:mb-4">
-                                            <div>
-                                                <div className="flex items-center gap-2 md:gap-2 mb-1 md:mb-1">
-                                                    <span className={`text-[10px] md:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${levelColor}`}>
-                                                        {skill.level}
-                                                    </span>
-                                                    <span className={`text-[10px] md:text-xs px-2 py-0.5 rounded font-medium ${getCategoryColor(skill.category)}`}>
-                                                        {skill.category}
-                                                    </span>
+                                <motion.div key={skill._id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
+                                    <div className="group relative rounded-[2.5rem] border border-white/[0.06] bg-[#0a0a0a] p-8 h-full flex flex-col transition-all hover:bg-white/[0.01] hover:border-white/[0.12] shadow-xl overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}>
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                                        <div className="flex justify-between items-start mb-6">
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest" style={{ color: cfg.color, backgroundColor: cfg.bg, border: `1px solid ${cfg.border}` }}>{skill.level}</span>
+                                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">{skill.category}</span>
                                                 </div>
-                                                <h3 className="text-base md:text-xl font-bold text-on-surface leading-tight">{skill.name}</h3>
+                                                <h3 className="text-xl font-black text-white tracking-tight uppercase group-hover:text-blue-400 transition-colors uppercase">{skill.name}</h3>
                                             </div>
-                                            <div className="flex gap-1 md:gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => handleEditSkill(skill)}
-                                                    className="p-2 md:p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant transition-colors"
-                                                >
-                                                    <Edit2 size={14} className="md:w-4 md:h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteSkill(skillId)}
-                                                    className="p-2 md:p-2 rounded-lg hover:bg-error/10 text-error transition-colors"
-                                                >
-                                                    <Trash2 size={14} className="md:w-4 md:h-4" />
-                                                </button>
+                                            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
+                                                <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/20 hover:text-white hover:bg-white/10 transition-all border border-white/5"><Edit2 size={14} /></button>
+                                                <button onClick={() => handleDelete(skill._id!)} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all border border-white/5"><Trash2 size={14} /></button>
                                             </div>
                                         </div>
 
-                                        <p className="text-xs md:text-sm text-on-surface-variant mb-4 md:mb-6 line-clamp-2 min-h-[2.5em] leading-relaxed">
-                                            {skill.notes || "No description provided."}
-                                        </p>
+                                        <p className="text-xs font-medium text-white/30 leading-relaxed mb-8 flex-1 italic">"{skill.notes || 'No intelligence data recorded'}"</p>
 
-                                        <div className="mt-auto">
-                                            <div className="flex justify-between items-center mb-1.5 md:mb-2">
-                                                <span className="text-[10px] md:text-xs font-medium text-on-surface-variant">Progress</span>
-                                                <span className="text-xs md:text-xs font-bold text-primary">{skill.progress}%</span>
+                                        <div className="mt-auto pt-6 border-t border-white/[0.04]">
+                                            <div className="flex justify-between items-end mb-3">
+                                                <div>
+                                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-0.5">Integration</p>
+                                                    <p className="text-xs font-black text-white tracking-widest">{skill.progress}%</p>
+                                                </div>
+                                                <Sparkles size={14} className="text-blue-500/20 group-hover:text-blue-400 transition-colors" />
                                             </div>
-                                            <div className="h-2 md:h-2 bg-surface-container-high rounded-full overflow-hidden">
-                                                <motion.div
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: `${skill.progress}%` }}
-                                                    transition={{ duration: 0.8, ease: "easeOut" }}
-                                                    className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
-                                                />
-                                            </div>
-                                            <div className="flex justify-between mt-1 md:mt-1 text-[9px] md:text-[10px] text-on-surface-variant/70 font-medium">
-                                                <span>Beginner</span>
-                                                <span>Expert</span>
+                                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden p-0.5 border border-white/[0.04]">
+                                                <motion.div initial={{ width: 0 }} animate={{ width: `${skill.progress}%` }} className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400" />
                                             </div>
                                         </div>
-
-                                        <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors" />
-                                    </GlassCard>
+                                    </div>
                                 </motion.div>
                             );
                         })}
@@ -280,62 +162,21 @@ const SkillTracker: React.FC = () => {
                 </div>
             )}
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title={editingSkill ? 'Edit Skill' : 'Add New Skill'}
-            >
-                <div className="space-y-3 md:space-y-4">
-                    <Input
-                        label="Skill Name"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="e.g. React Native"
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                        <Select
-                            label="Category"
-                            value={formData.category}
-                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                            options={SKILL_CATEGORIES.map(c => ({ value: c, label: c }))}
-                        />
-                        <Select
-                            label="Level"
-                            value={formData.level}
-                            onChange={(e) => setFormData({ ...formData, level: e.target.value as Skill['level'] })}
-                            options={SKILL_LEVELS.map(l => ({ value: l, label: l.charAt(0).toUpperCase() + l.slice(1) }))}
-                        />
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingSkill ? 'Recalibrate' : 'Initiate'}>
+                <div className="space-y-6">
+                    <Input label="Capability Identifier" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Neural Networks" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Select label="Sector" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} options={SKILL_CATEGORIES.map(c => ({ value: c, label: c }))} />
+                        <Select label="Phase" value={formData.level} onChange={e => setFormData({ ...formData, level: e.target.value as Skill['level'] })} options={SKILL_LEVELS.map(l => ({ value: l, label: l.charAt(0).toUpperCase() + l.slice(1) }))} />
                     </div>
-
+                    <Input label="Description" value={formData.notes || ''} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Enter capability details..." />
                     <div>
-                        <label className="block text-xs font-medium text-on-surface-variant mb-1.5">Progress ({formData.progress}%)</label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="5"
-                            value={formData.progress}
-                            onChange={(e) => setFormData({ ...formData, progress: parseInt(e.target.value) })}
-                            className="w-full h-2 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-primary"
-                        />
+                        <div className="flex justify-between mb-3"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Efficiency</span><span className="text-xs font-black text-blue-400">{formData.progress}%</span></div>
+                        <input type="range" min="0" max="100" step="5" value={formData.progress} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) })} className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-blue-500" />
                     </div>
-
-                    <div className="space-y-1.5">
-                        <label className="block text-xs font-medium text-on-surface-variant">Notes</label>
-                        <textarea
-                            className="w-full px-4 py-3 rounded-xl bg-surface-container-highest border border-outline-variant/50 text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all duration-200 text-xs md:text-sm resize-none h-20 md:h-24"
-                            placeholder="Briefly describe your goals..."
-                            value={formData.notes || ''}
-                            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                        />
-                    </div>
-
-                    <div className="flex justify-end gap-2 mt-4 pt-2 border-t border-outline-variant/10">
-                        <Button variant="outlined" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSave} disabled={isSaving} isLoading={isSaving}>
-                            {editingSkill ? 'Update Skill' : 'Add Skill'}
-                        </Button>
+                    <div className="flex gap-3 pt-4">
+                        <Button variant="outlined" onClick={() => setIsModalOpen(false)} className="flex-1 uppercase tracking-widest text-[10px] font-black h-12">Abort</Button>
+                        <Button onClick={handleSave} isLoading={isSaving} className="flex-1 uppercase tracking-widest text-[10px] font-black h-12 bg-blue-500 text-white shadow-xl shadow-blue-500/20">{editingSkill ? 'Commit' : 'Start'}</Button>
                     </div>
                 </div>
             </Modal>

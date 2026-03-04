@@ -3,8 +3,8 @@ import { OAuth2Client } from 'google-auth-library'
 import jwt from 'jsonwebtoken'
 import { ENV } from '../config/env.js'
 import { User } from '../models/User.js'
-import { requireAuth, type AuthRequest } from '../middleware/auth.js'
-import { ok } from '../utils/response.js'
+import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middleware/auth.js'
+import { ok, fail } from '../utils/response.js'
 
 const router = Router()
 const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID)
@@ -15,7 +15,7 @@ router.post('/google', async (req, res) => {
   try {
     const { credential } = req.body as { credential: string }
     if (!credential) {
-      res.status(400).json({ error: 'credential is required' })
+      fail(res, 'credential is required', 'MISSING_FIELD')
       return
     }
 
@@ -26,7 +26,7 @@ router.post('/google', async (req, res) => {
     })
     const payload = ticket.getPayload()
     if (!payload?.sub) {
-      res.status(401).json({ error: 'Invalid Google token' })
+      fail(res, 'Invalid Google token', 'INVALID_TOKEN', 401)
       return
     }
 
@@ -44,14 +44,13 @@ router.post('/google', async (req, res) => {
       expiresIn: '30d',
     })
 
-    res.json({
+    ok(res, {
       token,
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
         picture: user.picture,
-        google_id: user.google_id,
         course: user.course,
         branch: user.branch,
         college: user.college,
@@ -62,12 +61,17 @@ router.post('/google', async (req, res) => {
         target_attendance: user.target_attendance,
         attendance_threshold: user.attendance_threshold,
         warning_threshold: user.warning_threshold,
+        phone_number: user.phone_number,
+        headline: user.headline,
+        linkedin_url: user.linkedin_url,
+        github_url: user.github_url,
+        portfolio_url: user.portfolio_url,
         created_at: user.created_at,
       },
     })
   } catch (err) {
     console.error('[auth/google]', err)
-    res.status(500).json({ error: 'Authentication failed' })
+    fail(res, 'Authentication failed', 'AUTH_FAILED', 500)
   }
 })
 
@@ -79,7 +83,6 @@ router.get('/me', requireAuth, (req: AuthRequest, res) => {
     name: user.name,
     email: user.email,
     picture: user.picture,
-    google_id: user.google_id,
     course: user.course,
     branch: user.branch,
     college: user.college,
@@ -90,36 +93,41 @@ router.get('/me', requireAuth, (req: AuthRequest, res) => {
     target_attendance: user.target_attendance,
     attendance_threshold: user.attendance_threshold,
     warning_threshold: user.warning_threshold,
+    phone_number: user.phone_number,
+    headline: user.headline,
+    linkedin_url: user.linkedin_url,
+    github_url: user.github_url,
+    portfolio_url: user.portfolio_url,
     created_at: user.created_at,
   })
 })
 
-/* GET /api/auth/debug_db — DEV ONLY, check raw DB contents */
-router.get('/debug_db', async (req, res) => {
-  if (ENV.NODE_ENV === 'production') { res.status(403).json({ error: 'Not available' }); return }
+/* GET /api/auth/debug_db — DEV ONLY, check raw DB contents (admin only) */
+router.get('/debug_db', requireAuth, async (req: AuthRequest, res) => {
+  if (ENV.NODE_ENV === 'production') { fail(res, 'Not available', 'FORBIDDEN', 403); return }
   try {
-    // Raw collection access to bypass Mongoose schema
     const mongoose = await import('mongoose')
     const db = mongoose.default.connection.db
-    if (!db) { res.status(500).json({ error: 'No DB connection' }); return }
-    const subjects = await db.collection('subjects').find({}).limit(5).toArray()
-    const distinctEmails = await db.collection('subjects').distinct('owner_email')
-    const distinctUserIds = await db.collection('subjects').distinct('user_id')
+    if (!db) { fail(res, 'No DB connection', 'DB_ERROR', 500); return }
+    const subjects = await db.collection('subjects').find({ user_id: req.userId }).limit(5).toArray()
     res.json({
-      subjects_count: await db.collection('subjects').countDocuments(),
+      subjects_count: await db.collection('subjects').countDocuments({ user_id: req.userId }),
       sample_subjects: subjects,
-      distinct_owner_emails: distinctEmails,
-      distinct_user_ids: distinctUserIds,
     })
   } catch (err) {
     console.error('[auth/debug_db]', err)
-    res.status(500).json({ error: String(err) })
+    fail(res, String(err), 'DB_ERROR', 500)
   }
 })
 
 /* POST /api/auth/logout  (stateless — just a confirmation) */
-router.post('/logout', (_, res) => {
-  res.json({ message: 'Logged out' })
+router.post('/logout', (req, res) => {
+  // Invalidate cached auth entry for this token
+  const token = req.headers.authorization?.slice(7)
+  if (token) {
+    invalidateAuthCache(token)
+  }
+  ok(res, { message: 'Logged out' })
 })
 
 export default router

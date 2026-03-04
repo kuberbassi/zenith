@@ -3,6 +3,7 @@ import https from 'https'
 import { Types } from 'mongoose'
 import axios, { type AxiosInstance } from 'axios'
 import * as cheerio from 'cheerio'
+import { LRUCache } from 'lru-cache'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { SemesterResult } from '../models/SemesterResult.js'
 import { User } from '../models/User.js'
@@ -30,7 +31,7 @@ const HEADERS = {
 
 /* ── Per-user axios session store (keeps cookies across requests) ────── */
 
-const _sessions = new Map<string, AxiosInstance>()
+const _sessions = new LRUCache<string, AxiosInstance>({ max: 100, ttl: 30 * 60 * 1000 })
 
 function getSession(userId: string): AxiosInstance {
   if (!_sessions.has(userId)) {

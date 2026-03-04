@@ -11,6 +11,11 @@ export interface IUser extends Document {
   college?: string
   batch?: string
   enrollment_number?: string
+  phone_number?: string
+  headline?: string
+  linkedin_url?: string
+  github_url?: string
+  portfolio_url?: string
   semester?: number          // Flask legacy field
   current_semester: number
   target_attendance: number
@@ -33,6 +38,11 @@ const UserSchema = new Schema<IUser>(
     college: { type: String },
     batch: { type: String },
     enrollment_number: { type: String },
+    phone_number: { type: String },
+    headline: { type: String },
+    linkedin_url: { type: String },
+    github_url: { type: String },
+    portfolio_url: { type: String },
     current_semester: { type: Number, default: 1 },
     target_attendance: { type: Number, default: 75 },
     attendance_threshold: { type: Number, default: 75 },

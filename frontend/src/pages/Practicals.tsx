@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Beaker, CheckCircle, Plus, Minus, Edit2 } from 'lucide-react';
-import GlassCard from '@/components/ui/GlassCard';
+import { CheckCircle, Plus, Minus, Edit2, Target, FlaskConical } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useToast } from '@/components/ui/Toast';
@@ -15,10 +14,10 @@ const Practicals: React.FC = () => {
     const { currentSemester } = useSemester();
     const [loading, setLoading] = useState(true);
     const [subjects, setSubjects] = useState<Subject[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState<string>('All');
+    const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
 
-    useEffect(() => {
-        loadData();
-    }, [currentSemester]);
+    useEffect(() => { loadData(); }, [currentSemester]);
 
     const loadData = async () => {
         try {
@@ -27,80 +26,35 @@ const Practicals: React.FC = () => {
             setSubjects(data);
         } catch (error) {
             console.error(error);
-            showToast('error', 'Failed to load subjects');
+            showToast('error', 'Sync Failed');
         } finally {
             setLoading(false);
         }
     };
 
     const handleUpdate = async (id: string | any, updates: { total?: number; completed?: number; hardcopy?: boolean }) => {
-        // Safe ID extraction with type casting
         const subjectId = (typeof id === 'object' && id !== null) ? ((id as any).$oid || id.toString()) : id;
-
         try {
             await attendanceService.updatePracticals(subjectId, updates);
-            // Optimistic update
             setSubjects((prev: Subject[]) => prev.map(sub => {
                 const subIdRaw = sub._id as any;
-                const subId = (typeof subIdRaw === 'object' && subIdRaw !== null)
-                    ? (subIdRaw.$oid || subIdRaw.toString())
-                    : subIdRaw;
-
+                const subId = (typeof subIdRaw === 'object' && subIdRaw !== null) ? (subIdRaw.$oid || subIdRaw.toString()) : subIdRaw;
                 if (subId === subjectId) {
-                    const currentPracticals = sub.practicals || { total: 10, completed: 0, hardcopy: false };
+                    const current = sub.practicals || { total: 10, completed: 0, hardcopy: false };
                     return {
-                        ...sub,
-                        practicals: {
-                            ...currentPracticals,
-                            ...updates,
-                            total: updates.total ?? currentPracticals.total,
-                            completed: updates.completed ?? currentPracticals.completed,
-                            hardcopy: updates.hardcopy ?? currentPracticals.hardcopy
+                        ...sub, practicals: {
+                            ...current, ...updates,
+                            total: updates.total ?? current.total,
+                            completed: updates.completed ?? current.completed,
+                            hardcopy: updates.hardcopy ?? current.hardcopy
                         }
                     };
                 }
                 return sub;
             }));
-            showToast('success', 'Updated successfully');
-        } catch (error) {
-            console.error(error);
-            showToast('error', 'Failed to update practicals');
-            loadData(); // Revert on error
-        }
+            showToast('success', 'Records Updated');
+        } catch { showToast('error', 'Update Error'); }
     };
-
-    const [selectedCategory, setSelectedCategory] = useState<string>('All');
-    const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
-
-    const filteredSubjects = subjects.filter(sub => {
-        const cats = sub.categories || (sub.category ? [sub.category] : ['Theory']); // Compatibility
-
-        // 1. Core Filter: Must have either 'Practical' or 'Assignment' category to be shown here
-        const hasWork = cats.includes('Practical') || cats.includes('Assignment');
-        if (!hasWork) return false;
-
-        // 2. Tab Filter
-        if (selectedCategory === 'All') return true;
-        return cats.includes(selectedCategory);
-    });
-
-    // Default sort: Theory first, then Lab, then uncategorized
-    const sortSubjectsByCategory = (subs: Subject[]) => {
-        return [...subs].sort((a, b) => {
-            const getCategoryPriority = (sub: Subject) => {
-                const cats = sub.categories || [];
-                if (cats.includes('Theory')) return 0;
-                if (cats.includes('Lab')) return 1;
-                if (cats.length === 0) return 2;
-                return 1; // Other categories treated as Lab-level priority
-            };
-            return getCategoryPriority(a) - getCategoryPriority(b);
-        });
-    };
-
-    const sortedFilteredSubjects = sortSubjectsByCategory(filteredSubjects);
-
-    const categories = ['All', 'Theory', 'Practical', 'Assignment', 'Project'];
 
     const handleAssignmentUpdate = async (id: string | any, updates: { total?: number; completed?: number; hardcopy?: boolean }) => {
         const subjectId = (typeof id === 'object' && id !== null) ? ((id as any).$oid || id.toString()) : id;
@@ -116,229 +70,119 @@ const Practicals: React.FC = () => {
                             ...current, ...updates,
                             total: updates.total ?? current.total,
                             completed: updates.completed ?? current.completed,
-                            hardcopy: updates.hardcopy ?? (current as any).hardcopy // Cast as any if type isn't updated instantly in check, but logic remains valid
+                            hardcopy: updates.hardcopy ?? (current as any).hardcopy
                         }
                     };
                 }
                 return sub;
             }));
-            showToast('success', 'Updated successfully');
-        } catch (error) {
-            console.error(error);
-            showToast('error', 'Failed to update');
-        }
+            showToast('success', 'Assignments Updated');
+        } catch { showToast('error', 'Update Error'); }
     };
+
+    const filteredSubjects = subjects.filter(sub => {
+        const cats = sub.categories || (sub.category ? [sub.category] : ['Theory']);
+        const hasWork = cats.includes('Practical') || cats.includes('Assignment');
+        if (!hasWork) return false;
+        if (selectedCategory === 'All') return true;
+        return cats.includes(selectedCategory);
+    });
+
+    const categories = ['All', 'Theory', 'Practical', 'Assignment', 'Project'];
 
     if (loading) return <LoadingSpinner fullScreen />;
 
     return (
-        <div className="pb-32 space-y-4 md:space-y-8">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-col gap-4 md:gap-6"
-            >
-                {/* Header ... */}
-                <div className="flex items-center gap-3">
-                    <div className="p-2 md:p-2.5 rounded-xl bg-primary/10 text-primary">
-                        <Beaker size={20} className="md:w-6 md:h-6" />
-                    </div>
-                    <h1 className="text-2xl md:text-3xl font-display font-bold text-on-surface">Assignments & Practicals Manager</h1>
-                </div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto pb-32">
 
-                {/* Filter Chips */}
-                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                    {categories.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`px-3 md:px-4 py-1 md:py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors whitespace-nowrap
-                                ${selectedCategory === cat
-                                    ? 'bg-primary text-on-primary'
-                                    : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                                }
-                            `}
-                        >
-                            {cat}
-                        </button>
-                    ))}
+            {/* ── Cinematic Hero ────────────────────────────────────────── */}
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-12 relative rounded-[2rem] border border-white/[0.06] bg-[#050508] p-8 md:p-12 overflow-hidden shadow-2xl group transition-all duration-700">
+                <div className="absolute inset-0 bg-blue-500/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/[0.03] blur-[150px] pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
+                    <div>
+                        <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/10">
+                                <FlaskConical size={24} />
+                            </div>
+                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Mission Execution</h1>
+                        </div>
+                        <p className="text-white/40 font-medium max-w-md">Track your project submissions, practical records, and assignment milestones in ultra-stealth mode.</p>
+                    </div>
+                    <div className="flex gap-4 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+                        {categories.map(cat => (
+                            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedCategory === cat ? 'bg-blue-500 text-white shadow-xl shadow-blue-500/20' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{cat}</button>
+                        ))}
+                    </div>
                 </div>
             </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+            {/* ── Subject Grid ──────────────────────────────────────────── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <AnimatePresence mode="popLayout">
-                    {sortedFilteredSubjects.map((subject, index) => {
+                    {filteredSubjects.map((subject, index) => {
                         const cats = subject.categories || (subject.category ? [subject.category] : ['Theory']);
                         const hasPracticals = cats.includes('Practical');
                         const hasAssignments = cats.includes('Assignment');
+                        const p = subject.practicals || { total: 10, completed: 0, hardcopy: false };
+                        const a = subject.assignments || { total: 4, completed: 0, hardcopy: false };
 
-                        const practicals = {
-                            total: subject.practicals?.total ?? 10,
-                            completed: subject.practicals?.completed ?? 0,
-                            hardcopy: subject.practicals?.hardcopy ?? false
-                        };
-                        const assignments = {
-                            total: subject.assignments?.total ?? 4,
-                            completed: subject.assignments?.completed ?? 0,
-                            hardcopy: subject.assignments?.hardcopy ?? false
-                        };
+                        let total = 0; let done = 0;
+                        if (hasPracticals) { total += p.total; done += p.completed; }
+                        if (hasAssignments) { total += a.total; done += a.completed; }
+                        const progress = total > 0 ? (done / total) * 100 : 0;
 
-                        // Calculate combined progress only for active tracks
-                        let totalItems = 0;
-                        let completedItems = 0;
-                        if (hasPracticals) { totalItems += practicals.total; completedItems += practicals.completed; }
-                        if (hasAssignments) { totalItems += assignments.total; completedItems += assignments.completed; }
-
-                        const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-
-
-
-                        const subId = (subject._id as any)?.$oid || subject._id;
                         return (
-                            <motion.div
-                                key={subId}
-                                layout
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ delay: index * 0.05 }}
-                            >
-                                <GlassCard className="h-full p-4 md:p-6 pt-6 md:pt-8 flex flex-col relative overflow-hidden group">
-                                    {/* Progress Background */}
-                                    <div className="absolute top-0 left-0 h-1 bg-primary/20 w-full">
-                                        <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
-                                    </div>
+                            <motion.div key={subject._id as any} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ delay: index * 0.05 }} className="group">
+                                <div className="h-full rounded-3xl border border-white/[0.06] bg-[#0a0a0a] p-6 relative overflow-hidden transition-all hover:bg-[#0c0c0c] hover:border-white/[0.1] shadow-xl" style={{ boxShadow: '0 20px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                                    <div className="absolute top-0 left-0 h-1 bg-white/[0.03] w-full"><motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} className="h-full bg-blue-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" /></div>
 
-                                    <div className="flex justify-between items-start mb-4 md:mb-6 mt-2 md:mt-4">
-                                        <div>
-                                            <h3 className="text-lg md:text-xl font-bold text-on-surface line-clamp-1" title={subject.name}>
-                                                {subject.name}
-                                            </h3>
-                                            <div className="flex flex-wrap gap-2 mt-1.5">
+                                    <div className="flex justify-between items-start mb-6 pt-4">
+                                        <div className="min-w-0">
+                                            <h3 className="text-lg font-black text-white/90 truncate pr-2 group-hover:text-blue-400 transition-colors uppercase tracking-tight">{subject.name}</h3>
+                                            <div className="flex gap-2 mt-2">
                                                 {cats.filter(c => c !== 'Theory').map(c => (
-                                                    <span key={c} className="px-1.5 py-0.5 rounded-md bg-secondary/10 text-secondary text-[10px] font-bold uppercase">
-                                                        {c}
-                                                    </span>
+                                                    <span key={c} className="px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[9px] font-black text-blue-400 uppercase tracking-widest">{c}</span>
                                                 ))}
                                             </div>
                                         </div>
-                                        <Button
-                                            variant="text"
-                                            onClick={() => setEditingSubject(subject)}
-                                            className="!p-1.5 md:!p-2 -mr-2 -mt-2 text-on-surface-variant/50 hover:text-primary"
-                                        >
-                                            <Edit2 size={16} />
-                                        </Button>
+                                        <button onClick={() => setEditingSubject(subject)} className="w-8 h-8 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center text-white/20 hover:text-white hover:bg-white/5 transition-all"><Edit2 size={14} /></button>
                                     </div>
 
-                                    <div className="space-y-4 md:space-y-6 flex-1">
-
-                                        {/* PRACTICALS SECTION */}
+                                    <div className="space-y-6">
                                         {hasPracticals && (
-                                            <div className="space-y-2 md:space-y-3">
-                                                <div className="flex justify-between items-center text-xs md:text-sm font-bold text-on-surface-variant/80 uppercase tracking-wide">
-                                                    <span>Practicals</span>
-                                                    <span className="text-primary">{practicals.completed}/{practicals.total}</span>
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Practicals</span><span className="text-[10px] font-black text-blue-400 font-mono tracking-widest">{p.completed}/{p.total}</span></div>
+                                                <div className="flex gap-2">
+                                                    <Button variant="secondary" className="flex-1 h-9 rounded-xl border-white/[0.04]" disabled={p.completed <= 0} onClick={() => handleUpdate(subject._id, { completed: p.completed - 1 })}><Minus size={14} /></Button>
+                                                    <Button variant="primary" className="flex-1 h-9 rounded-xl bg-blue-500 shadow-lg shadow-blue-500/20" disabled={p.completed >= p.total} onClick={() => handleUpdate(subject._id, { completed: p.completed + 1 })}><Plus size={14} /></Button>
                                                 </div>
-                                                <div className="flex items-center justify-between gap-2 md:gap-3">
-                                                    <Button
-                                                        variant="outlined"
-                                                        className="flex-1 h-8 md:h-10"
-                                                        disabled={practicals.completed <= 0}
-                                                        onClick={() => handleUpdate(subject._id, { completed: Math.max(0, practicals.completed - 1) })}
-                                                    >
-                                                        <Minus size={14} className="md:w-4 md:h-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="primary"
-                                                        className="flex-1 h-8 md:h-10"
-                                                        disabled={practicals.completed >= practicals.total}
-                                                        onClick={() => handleUpdate(subject._id, { completed: Math.min(practicals.total, practicals.completed + 1) })}
-                                                    >
-                                                        <Plus size={14} className="md:w-4 md:h-4" />
-                                                    </Button>
-                                                </div>
-                                                {/* Hardcopy */}
-
-                                                <Button
-                                                    variant={practicals.hardcopy ? "filled" : "outlined"}
-                                                    className={`w-full justify-center h-8 md:h-10 text-[10px] md:text-xs font-bold tracking-wide transition-all
-                                                        ${practicals.hardcopy
-                                                            ? '!bg-emerald-500 hover:!bg-emerald-600 !text-white border-transparent shadow-md shadow-emerald-500/20'
-                                                            : 'border-outline-variant/40 text-on-surface-variant/80 hover:border-primary hover:text-primary hover:bg-primary/5'
-                                                        }
-                                                    `}
-                                                    onClick={() => handleUpdate(subject._id, { hardcopy: !practicals.hardcopy })}
-                                                >
-                                                    <div className="flex items-center gap-1.5 md:gap-2">
-                                                        {practicals.hardcopy ? <><CheckCircle size={12} className="md:w-[14px] md:h-[14px]" strokeWidth={2.5} /> SUBMITTED</> : <><CheckCircle size={12} className="md:w-[14px] md:h-[14px] opacity-50" /> MARK SUBMITTED</>}
-                                                    </div>
-                                                </Button>
+                                                <button onClick={() => handleUpdate(subject._id, { hardcopy: !p.hardcopy })} className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${p.hardcopy ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[inset_0_1px_20px_rgba(16,185,129,0.05)]' : 'bg-white/[0.02] border border-white/[0.04] text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{p.hardcopy ? <><CheckCircle size={14} /> Submitted</> : <><Target size={14} /> Mark Submitted</>}</button>
                                             </div>
                                         )}
 
-                                        {hasPracticals && hasAssignments && <div className="h-px bg-outline-variant/10 w-full" />}
+                                        {hasPracticals && hasAssignments && <div className="h-px bg-white/[0.03]" />}
 
-                                        {/* ASSIGNMENTS SECTION */}
                                         {hasAssignments && (
-                                            <div className="space-y-2 md:space-y-3">
-                                                <div className="flex justify-between items-center text-xs md:text-sm font-bold text-on-surface-variant/80 uppercase tracking-wide">
-                                                    <span>Assignments</span>
-                                                    <span className="text-tertiary">{assignments.completed}/{assignments.total}</span>
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Assignments</span><span className="text-[10px] font-black text-blue-400 font-mono tracking-widest">{a.completed}/{a.total}</span></div>
+                                                <div className="flex gap-2">
+                                                    <Button variant="secondary" className="flex-1 h-9 rounded-xl border-white/[0.04]" disabled={a.completed <= 0} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed - 1 })}><Minus size={14} /></Button>
+                                                    <Button variant="primary" className="flex-1 h-9 rounded-xl bg-blue-500 shadow-lg shadow-blue-500/20" disabled={a.completed >= a.total} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed + 1 })}><Plus size={14} /></Button>
                                                 </div>
-                                                <div className="flex items-center justify-between gap-2 md:gap-3">
-                                                    <Button
-                                                        variant="outlined"
-                                                        className="flex-1 h-8 md:h-10"
-                                                        disabled={assignments.completed <= 0}
-                                                        onClick={() => handleAssignmentUpdate(subject._id, { completed: Math.max(0, assignments.completed - 1) })}
-                                                    >
-                                                        <Minus size={14} className="md:w-4 md:h-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="filled" // Use different variant for visual distinction
-                                                        className="flex-1 h-8 md:h-10 !bg-tertiary text-on-tertiary"
-                                                        disabled={assignments.completed >= assignments.total}
-                                                        onClick={() => handleAssignmentUpdate(subject._id, { completed: Math.min(assignments.total, assignments.completed + 1) })}
-                                                    >
-                                                        <Plus size={14} className="md:w-4 md:h-4" />
-                                                    </Button>
-                                                </div>
-                                                {/* Hardcopy for Assignments */}
-                                                <Button
-                                                    variant={assignments.hardcopy ? "filled" : "outlined"}
-                                                    className={`w-full justify-center h-8 md:h-10 text-[10px] md:text-xs font-bold tracking-wide transition-all
-                                                        ${assignments.hardcopy
-                                                            ? '!bg-emerald-500 hover:!bg-emerald-600 !text-white border-transparent shadow-md shadow-emerald-500/20'
-                                                            : 'border-outline-variant/40 text-on-surface-variant/80 hover:border-primary hover:text-primary hover:bg-primary/5'
-                                                        }
-                                                    `}
-                                                    onClick={() => handleAssignmentUpdate(subject._id, { hardcopy: !assignments.hardcopy })}
-                                                >
-                                                    <div className="flex items-center gap-1.5 md:gap-2">
-                                                        {assignments.hardcopy ? <><CheckCircle size={12} className="md:w-[14px] md:h-[14px]" strokeWidth={2.5} /> SUBMITTED</> : <><CheckCircle size={12} className="md:w-[14px] md:h-[14px] opacity-50" /> MARK SUBMITTED</>}
-                                                    </div>
-                                                </Button>
+                                                <button onClick={() => handleAssignmentUpdate(subject._id, { hardcopy: !a.hardcopy })} className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${a.hardcopy ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[inset_0_1px_20px_rgba(16,185,129,0.05)]' : 'bg-white/[0.02] border border-white/[0.04] text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{a.hardcopy ? <><CheckCircle size={14} /> Submitted</> : <><Target size={14} /> Mark Submitted</>}</button>
                                             </div>
                                         )}
                                     </div>
-                                </GlassCard>
+                                </div>
                             </motion.div>
                         );
                     })}
                 </AnimatePresence>
             </div>
 
-            {/* Edit Modal */}
-            {editingSubject && (
-                <EditSubjectModal
-                    isOpen={!!editingSubject}
-                    onClose={() => setEditingSubject(null)}
-                    subject={editingSubject}
-                    onSuccess={loadData}
-                />
-            )}
-        </div>
+            {editingSubject && <EditSubjectModal isOpen={!!editingSubject} onClose={() => setEditingSubject(null)} subject={editingSubject} onSuccess={loadData} />}
+        </motion.div>
     );
 };
 

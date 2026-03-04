@@ -48,16 +48,11 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
             const strId = (typeof subId === 'object' && subId !== null) ? (subId.$oid || subId.toString()) : subId;
             return String(strId) === String(id);
         });
-        console.log('🔍 Looking for subject ID:', id, 'Found:', subject?.name, 'Available subjects:', subjects.map(s => ({ id: s.id, _id: s._id, name: s.name })));
+
         return subject?.name || 'Unknown';
     };
 
-    console.log('🎯 ScheduleGrid received:', {
-        timetable,
-        totalSlots: Object.values(timetable).flat().length,
-        subjects: subjects.length,
-        periods: periods.length
-    });
+
 
     return (
         <GlassCard className="p-0 overflow-hidden">
@@ -100,9 +95,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                                         // Find if there is a slot in this day for this period
                                         const slot = daySlots.find(s => isSlotInPeriod(s, period));
 
-                                        if (slot) {
-                                            console.log(`✅ Found slot for ${day} ${period.name}:`, slot);
-                                        }
+
 
                                         return (
                                             <div
@@ -148,7 +141,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
                                                             {/* Delete Overlay */}
                                                             <div className="absolute top-1 right-1 opacity-0 group-hover/slot:opacity-100 transition-opacity">
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); if (slot._id) onDelete(slot._id); }}
+                                                                    onClick={(e) => { e.stopPropagation(); const deleteId = slot._id || slot.id; if (deleteId) onDelete(deleteId); }}
                                                                     className="p-1 rounded bg-error/10 text-error hover:bg-error hover:text-white transition-colors"
                                                                 >
                                                                     <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>

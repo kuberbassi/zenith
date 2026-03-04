@@ -6,7 +6,8 @@
 import axios from 'axios';
 import { STORAGE_KEYS, saveData, getData, getDataAge, addToSyncQueue } from './offlineStorage';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+import { API_URL } from '../services/api';
+const API_BASE_URL = API_URL;
 const CACHE_TTL = {
   SHORT: 60000,        // 1 minute
   MEDIUM: 300000,      // 5 minutes
@@ -89,13 +90,13 @@ class APIService {
 
       if (cachedData && age < ttl) {
         console.log(`[APIService] Storage cache hit: ${endpoint} (age: ${Math.round(age / 1000)}s)`);
-        
+
         // Update memory cache
         this.requestCache.set(cacheKey, {
           data: cachedData,
           timestamp: Date.now(),
         });
-        
+
         return { ...cachedData, _cached: true, _source: 'storage' };
       }
     }
@@ -133,7 +134,7 @@ class APIService {
       if (method === 'GET') {
         const storageKey = `api_cache_${cacheKey}`;
         const cachedData = getData(storageKey);
-        
+
         if (cachedData) {
           console.warn(`[APIService] Using stale cache for ${endpoint}`);
           return { ...cachedData, _cached: true, _source: 'stale', _error: error.message };
@@ -165,14 +166,14 @@ class APIService {
    */
   async prefetchCriticalData() {
     const criticalEndpoints = [
-      { endpoint: '/current_user', options: { ttl: CACHE_TTL.LONG } },
-      { endpoint: '/preferences', options: { ttl: CACHE_TTL.LONG } },
-      { endpoint: '/dashboard_data', options: { ttl: CACHE_TTL.MEDIUM } },
-      { endpoint: '/notifications', options: { ttl: CACHE_TTL.SHORT } },
+      { endpoint: '/api/auth/me', options: { ttl: CACHE_TTL.LONG } },
+      { endpoint: '/api/profile/preferences', options: { ttl: CACHE_TTL.LONG } },
+      { endpoint: '/api/dashboard/data', options: { ttl: CACHE_TTL.MEDIUM } },
+      { endpoint: '/api/dashboard/notifications', options: { ttl: CACHE_TTL.SHORT } },
     ];
 
     console.log('[APIService] Starting prefetch of critical data...');
-    
+
     return Promise.allSettled(
       criticalEndpoints.map((req) =>
         this.fetch(req.endpoint, req.options).catch(console.error)

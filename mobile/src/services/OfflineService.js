@@ -114,9 +114,9 @@ class OfflineService {
                 // Determine API Call based on action type
                 // We use the passed 'apiClient' to handle headers/auth
                 if (action.type === 'MARK_ATTENDANCE') {
-                    await apiClient.post('/api/mark_attendance', action.payload);
+                    await apiClient.post('/api/attendance/mark', action.payload);
                 } else if (action.type === 'UPDATE_PROFILE') {
-                    await apiClient.put('/api/update_profile', action.payload);
+                    await apiClient.put('/api/profile', action.payload);
                 }
                 // Success: item removed (not added to remaining)
             } catch (error) {

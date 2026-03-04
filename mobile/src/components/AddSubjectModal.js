@@ -40,6 +40,8 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
     const [total, setTotal] = useState('');
     const [practicalTotal, setPracticalTotal] = useState('');
     const [assignmentTotal, setAssignmentTotal] = useState('');
+    const [target, setTarget] = useState('75');
+    const [credits, setCredits] = useState('');
 
     // Animation State
     const scaleAnim = React.useRef(new Animated.Value(0.9)).current;
@@ -68,6 +70,8 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
                 setPracticalTotal(String(pTotal));
                 const aTotal = initialData.assignments?.total || 4;
                 setAssignmentTotal(String(aTotal));
+                setTarget(String(initialData.target || '75'));
+                setCredits(String(initialData.credits || ''));
             } else {
                 resetForm();
             }
@@ -78,6 +82,7 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
         setName(''); setCode(''); setProfessor(''); setClassroom('');
         setSemester(String(selectedSemester || '1')); setSyllabus(''); setCategories(['Theory']);
         setAttended('0'); setTotal('0'); setPracticalTotal('10'); setAssignmentTotal('4');
+        setTarget('75'); setCredits('');
     };
 
     const handleSave = () => {
@@ -90,6 +95,8 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
             total: parseInt(total) || 0,
             practical_total: parseInt(practicalTotal) || 0,
             assignment_total: parseInt(assignmentTotal) || 0,
+            target: parseInt(target) || 75,
+            credits: parseInt(credits) || 0,
             isOverride: true
         };
         if (initialData) data.subject_id = initialData._id;
@@ -158,7 +165,13 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
                                         value={code} onChangeText={setCode}
                                     />
                                 </View>
-                                <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                                <View style={[styles.inputGroup, { flex: 0.6, marginLeft: 8 }]}>
+                                    <TextInput
+                                        style={styles.input} placeholder="Credits" keyboardType='numeric' placeholderTextColor={c.subtext}
+                                        value={credits} onChangeText={setCredits}
+                                    />
+                                </View>
+                                <View style={[styles.inputGroup, { flex: 0.4, marginLeft: 8 }]}>
                                     <TextInput
                                         style={styles.input} placeholder="Sem" keyboardType='numeric' placeholderTextColor={c.subtext}
                                         value={semester} onChangeText={setSemester}
@@ -216,10 +229,34 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
                             </View>
 
                             {/* Section: Targets */}
+                            <View style={[styles.overrideCard, { marginTop: 16 }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+                                    <Target size={16} color={c.primary} />
+                                    <Text style={[styles.overrideTitle, { color: c.primary }]}>Attendance Goal</Text>
+                                </View>
+                                <View style={styles.row}>
+                                    <View style={{ flex: 1, alignItems: 'center' }}>
+                                        <Text style={styles.statLabel}>TARGET %</Text>
+                                        <TextInput style={styles.statInput} value={target} onChangeText={setTarget} keyboardType='numeric' placeholder="75" placeholderTextColor={c.subtext} />
+                                    </View>
+                                    <View style={{ width: 1, height: 40, backgroundColor: c.glassBorder }} />
+                                    <View style={{ flex: 1, alignItems: 'center' }}>
+                                        <Text style={styles.statLabel}>ATTENDED</Text>
+                                        <TextInput style={styles.statInput} value={attended} onChangeText={setAttended} keyboardType='numeric' placeholder="0" placeholderTextColor={c.subtext} />
+                                    </View>
+                                    <View style={{ width: 1, height: 40, backgroundColor: c.glassBorder }} />
+                                    <View style={{ flex: 1, alignItems: 'center' }}>
+                                        <Text style={styles.statLabel}>TOTAL</Text>
+                                        <TextInput style={styles.statInput} value={total} onChangeText={setTotal} keyboardType='numeric' placeholder="0" placeholderTextColor={c.subtext} />
+                                    </View>
+                                </View>
+                            </View>
+
+                            {/* Component Targets (Practicals/Assignments) */}
                             {(categories.includes('Practical') || categories.includes('Assignment')) && (
                                 <View style={[styles.overrideCard, { marginTop: 16 }]}>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
-                                        <Target size={16} color={c.primary} />
+                                        <BookOpen size={16} color={c.primary} />
                                         <Text style={[styles.overrideTitle, { color: c.primary }]}>Component Targets</Text>
                                     </View>
                                     <View style={styles.row}>
@@ -241,26 +278,6 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
                                     </View>
                                 </View>
                             )}
-
-                            {/* Section: Override */}
-                            <LinearGradient colors={[isDark ? '#1a1a1a' : '#f9f9f9', isDark ? '#111' : '#f0f0f0']} style={styles.overrideCard}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
-                                    <AlertTriangle size={16} color="#F59E0B" />
-                                    <Text style={styles.overrideTitle}>Manual Override</Text>
-                                </View>
-
-                                <View style={styles.row}>
-                                    <View style={{ flex: 1, alignItems: 'center' }}>
-                                        <Text style={styles.statLabel}>ATTENDED</Text>
-                                        <TextInput style={styles.statInput} value={attended} onChangeText={setAttended} keyboardType='numeric' placeholder="0" placeholderTextColor={c.subtext} />
-                                    </View>
-                                    <View style={{ width: 1, height: 40, backgroundColor: c.glassBorder }} />
-                                    <View style={{ flex: 1, alignItems: 'center' }}>
-                                        <Text style={styles.statLabel}>TOTAL</Text>
-                                        <TextInput style={styles.statInput} value={total} onChangeText={setTotal} keyboardType='numeric' placeholder="0" placeholderTextColor={c.subtext} />
-                                    </View>
-                                </View>
-                            </LinearGradient>
                             <View style={{ height: 60 }} />
                         </ScrollView>
                     </View>

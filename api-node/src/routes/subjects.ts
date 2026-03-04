@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { Subject } from '../models/Subject.js'
+import { ok, created, fail } from '../utils/response.js'
 import { uf, ownership } from '../utils/userFilter.js'
 
 const router = Router()
@@ -23,10 +24,10 @@ router.get('/', async (req: AuthRequest, res) => {
     const subjects = await Subject.find({ ...uf(req) })
       .sort({ name: 1 })
       .lean()
-    res.json(subjects)
+    ok(res, subjects)
   } catch (err) {
     console.error('[subjects/GET]', err)
-    res.status(500).json({ error: 'Failed to fetch subjects' })
+    fail(res, 'Failed to fetch subjects', 'FETCH_FAILED', 500)
   }
 })
 
@@ -35,14 +36,14 @@ router.post('/', async (req: AuthRequest, res) => {
   try {
     const body = CreateSubjectSchema.parse(req.body)
     const subject = await Subject.create({ ...body, ...ownership(req) })
-    res.status(201).json(subject)
+    created(res, subject)
   } catch (err) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation failed', details: err.errors })
+      fail(res, 'Validation failed', 'VALIDATION_ERROR')
       return
     }
     console.error('[subjects/POST]', err)
-    res.status(500).json({ error: 'Failed to create subject' })
+    fail(res, 'Failed to create subject', 'CREATE_FAILED', 500)
   }
 })
 
@@ -56,17 +57,17 @@ router.put('/:id', async (req: AuthRequest, res) => {
       { new: true },
     )
     if (!subject) {
-      res.status(404).json({ error: 'Subject not found' })
+      fail(res, 'Subject not found', 'NOT_FOUND', 404)
       return
     }
-    res.json(subject)
+    ok(res, subject)
   } catch (err) {
     if (err instanceof z.ZodError) {
-      res.status(400).json({ error: 'Validation failed', details: err.errors })
+      fail(res, 'Validation failed', 'VALIDATION_ERROR')
       return
     }
     console.error('[subjects/PUT]', err)
-    res.status(500).json({ error: 'Failed to update subject' })
+    fail(res, 'Failed to update subject', 'UPDATE_FAILED', 500)
   }
 })
 
@@ -78,13 +79,13 @@ router.delete('/:id', async (req: AuthRequest, res) => {
       ...uf(req),
     })
     if (!subject) {
-      res.status(404).json({ error: 'Subject not found' })
+      fail(res, 'Subject not found', 'NOT_FOUND', 404)
       return
     }
-    res.json({ message: 'Subject deleted' })
+    ok(res, { message: 'Subject deleted' })
   } catch (err) {
     console.error('[subjects/DELETE]', err)
-    res.status(500).json({ error: 'Failed to delete subject' })
+    fail(res, 'Failed to delete subject', 'DELETE_FAILED', 500)
   }
 })
 

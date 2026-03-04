@@ -31,13 +31,15 @@ const limiter = rateLimit({
 app.use(limiter)
 
 /* ── Compression ─────────────────────────────────────────── */
-app.use(compression())
+app.use(compression({ threshold: 1024 })) // skip tiny responses
 
 /* ── Body Parsing ────────────────────────────────────────── */
-app.use(express.json({ limit: '5mb' }))
+app.use(express.json({ limit: '2mb' }))
 app.use(express.urlencoded({ extended: true }))
-if (ENV.NODE_ENV !== 'test') {
+if (ENV.NODE_ENV === 'development') {
   app.use(morgan('dev'))
+} else if (ENV.NODE_ENV !== 'test') {
+  app.use(morgan('short'))
 }
 
 /* ── Platform Detection ──────────────────────────────────── */

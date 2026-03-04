@@ -18,7 +18,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { Types } from 'mongoose'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { Subject } from '../models/Subject.js'
-import { AttendanceLog } from '../models/AttendanceLog.js'
+import { AttendanceLog, ATTENDED_STATUSES, COUNTED_STATUSES } from '../models/AttendanceLog.js'
 import { ok, fail } from '../utils/response.js'
 import { uf, ownership } from '../utils/userFilter.js'
 
@@ -206,7 +206,7 @@ compatHandlers.post('/mark_all_attendance', requireAuth, async (req: AuthRequest
     let marked = 0
 
     for (const sid of subject_ids) {
-      const subject = await Subject.findById(sid).lean()
+      const subject = await Subject.findOne({ _id: sid, ...uf(req) }).lean()
       if (!subject) continue
 
       await AttendanceLog.create({
@@ -215,18 +215,19 @@ compatHandlers.post('/mark_all_attendance', requireAuth, async (req: AuthRequest
         status,
         date,
         subject_name: subject.name,
+        semester: subject.semester,
       })
 
-      // Recompute counts
+      // Recompute counts using canonical status lists
       const present = await AttendanceLog.countDocuments({
         subject_id: new Types.ObjectId(sid),
         user_id: userId,
-        status: { $in: ['present', 'late'] },
+        status: { $in: ATTENDED_STATUSES },
       })
       const total = await AttendanceLog.countDocuments({
         subject_id: new Types.ObjectId(sid),
         user_id: userId,
-        status: { $in: ['present', 'absent', 'late'] },
+        status: { $in: COUNTED_STATUSES },
       })
       await Subject.updateOne({ _id: sid }, { $set: { attended: present, total } })
       marked++

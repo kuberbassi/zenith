@@ -12,9 +12,9 @@ export const useDashboard = () => {
     const query = useQuery({
         queryKey: ['dashboard', currentSemester],
         queryFn: () => attendanceService.getDashboardData(currentSemester),
-        staleTime: 5 * 60 * 1000, // 5 minutes fresh
-        gcTime: 30 * 60 * 1000, // 30 minutes cache
-        refetchOnWindowFocus: false,
+        staleTime: 30 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: true,
     });
 
     const prefetchDashboard = (semester: number) => {
@@ -36,13 +36,10 @@ export const useMarkAttendance = () => {
             await attendanceService.markAttendance(subjectId, status, new Date().toISOString().split('T')[0]);
         },
         onMutate: async ({ subjectId, status }) => {
-            // Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: ['dashboard', currentSemester] });
 
-            // Snapshot previous data
             const previousData = queryClient.getQueryData<DashboardData>(['dashboard', currentSemester]);
 
-            // Optimistically update
             if (previousData) {
                 queryClient.setQueryData<DashboardData>(['dashboard', currentSemester], (old) => {
                     if (!old) return old;
@@ -52,11 +49,8 @@ export const useMarkAttendance = () => {
                             const newAttended = status === 'present' ? (sub.attended || 0) + 1 : (sub.attended || 0);
                             const newTotal = (sub.total || 0) + 1;
                             const newPercentage = newTotal > 0 ? (newAttended / newTotal) * 100 : 0;
-
-                            // Estimate new status message (Simple guard)
-                            let newStatusMsg = sub.status_message;
-                            if (newPercentage < 75) newStatusMsg = "Low Attendance";
-                            else newStatusMsg = "On Track";
+                            const target = sub.target || (queryClient.getQueryData<any>(['user'])?.attendance_threshold || 75);
+                            const newStatusMsg = newPercentage < target ? "Low Attendance" : "On Track";
 
                             return {
                                 ...sub,
@@ -69,9 +63,6 @@ export const useMarkAttendance = () => {
                         return sub;
                     });
 
-                    // Recalculate Overall (Simple Average for instant feedback)
-                    // Note: Backend might use weighted, but simple avg is close enough for 1-second delay
-                    // Actually, backend usually does Total Attended / Total Classes across all subjects
                     let totalAtt = 0;
                     let totalClasses = 0;
                     updatedSubjects.forEach(s => {
@@ -96,8 +87,11 @@ export const useMarkAttendance = () => {
             }
         },
         onSettled: () => {
-            // Always refetch to ensure data consistency with server
-            queryClient.invalidateQueries({ queryKey: ['dashboard', currentSemester] });
+            // Invalidate ALL attendance-related queries across every page
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+            queryClient.invalidateQueries({ queryKey: ['analytics'] });
+            queryClient.invalidateQueries({ queryKey: ['calendar'] });
+            queryClient.invalidateQueries({ queryKey: ['subjects'] });
         },
     });
 };

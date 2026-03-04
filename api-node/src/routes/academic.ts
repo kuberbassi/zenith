@@ -91,8 +91,13 @@ router.get('/full_subjects_data', async (req: AuthRequest, res) => {
 router.post('/subjects', async (req: AuthRequest, res) => {
   try {
     const body = CreateSubjectSchema.parse(req.body)
-    const subject = await Subject.create({ ...body, ...ownership(req) })
-    await sysLog(req.userId!, 'Subject Added', `Added '${body.name}' to semester ${body.semester}`)
+
+    // Inherit target from user's attendance_threshold if not explicitly set
+    const userThreshold = req.user?.attendance_threshold ?? 75
+    const target = body.target === 75 ? userThreshold : body.target // 75 is the Zod default, so override it
+
+    const subject = await Subject.create({ ...body, target, ...ownership(req) })
+    sysLog(req.userId!, 'Subject Added', `Added '${body.name}' to semester ${body.semester}`).catch(() => { })
     created(res, { id: String(subject._id), ...subject.toObject() })
   } catch (err) {
     if (err instanceof z.ZodError) { fail(res, 'Validation failed', 'INVALID_PARAMS'); return }
@@ -122,7 +127,7 @@ router.put('/subjects/:id', async (req: AuthRequest, res) => {
     const existing = await Subject.findOne({ _id: req.params.id, ...uf(req) })
     if (!existing) { fail(res, 'Subject not found', 'NOT_FOUND', 404); return }
 
-    const allowedFields = ['name','semester','categories','type','code','professor','classroom','credits','syllabus','target']
+    const allowedFields = ['name', 'semester', 'categories', 'type', 'code', 'professor', 'classroom', 'credits', 'syllabus', 'target']
     const updateData: Record<string, unknown> = {}
 
     for (const k of allowedFields) {
@@ -169,17 +174,21 @@ router.put('/subjects/:id', async (req: AuthRequest, res) => {
 
 // PATCH is an alias for PUT
 router.patch('/subjects/:id', async (req: AuthRequest, res) => {
-  req.method = 'PUT'
-  // Re-run through the router by forwarding – handled inline
-  const data = UpdateSubjectSchema.safeParse(req.body)
-  if (!data.success) { fail(res, 'Validation failed', 'INVALID_PARAMS'); return }
-  const existing = await Subject.findOne({ _id: req.params.id, ...uf(req) })
-  if (!existing) { fail(res, 'Subject not found', 'NOT_FOUND', 404); return }
-  const allowed = ['name','semester','categories','type','code','professor','classroom','credits','syllabus','target']
-  const updateData: Record<string, unknown> = {}
-  for (const k of allowed) { if (k in data.data) updateData[k] = (data.data as Record<string, unknown>)[k] }
-  await Subject.updateOne({ _id: req.params.id, ...uf(req) }, { $set: updateData })
-  ok(res, { message: 'Subject updated' })
+  try {
+    req.method = 'PUT'
+    const data = UpdateSubjectSchema.safeParse(req.body)
+    if (!data.success) { fail(res, 'Validation failed', 'INVALID_PARAMS'); return }
+    const existing = await Subject.findOne({ _id: req.params.id, ...uf(req) })
+    if (!existing) { fail(res, 'Subject not found', 'NOT_FOUND', 404); return }
+    const allowed = ['name', 'semester', 'categories', 'type', 'code', 'professor', 'classroom', 'credits', 'syllabus', 'target']
+    const updateData: Record<string, unknown> = {}
+    for (const k of allowed) { if (k in data.data) updateData[k] = (data.data as Record<string, unknown>)[k] }
+    await Subject.updateOne({ _id: req.params.id, ...uf(req) }, { $set: updateData })
+    ok(res, { message: 'Subject updated' })
+  } catch (err) {
+    console.error('[academic/subjects/:id PATCH]', err)
+    fail(res, 'Failed to update subject', 'UPDATE_FAILED', 500)
+  }
 })
 
 /* DELETE /api/academic/subjects/:id */
@@ -190,7 +199,7 @@ router.delete('/subjects/:id', async (req: AuthRequest, res) => {
     if (!subject) { fail(res, 'Subject not found', 'NOT_FOUND', 404); return }
 
     await AttendanceLog.deleteMany({ subject_id: subject._id, ...uf(req) })
-    await sysLog(userId, 'Subject Deleted', `Deleted subject '${subject.name}'`)
+    sysLog(userId, 'Subject Deleted', `Deleted subject '${subject.name}'`).catch(() => { })
     ok(res, { message: 'Subject deleted' })
   } catch (err) {
     console.error('[academic/subjects/:id DELETE]', err)
@@ -223,7 +232,7 @@ router.get('/results', async (req: AuthRequest, res) => {
       const semesters = results.map((r) => r.subjects as Array<Record<string, unknown>>)
       const cgpaCalc = GradeCalculator.calculateCGPA(semesters)
       for (const r of results) {
-        ;(r as Record<string, unknown>).cgpa = cgpaCalc.cgpa
+        ; (r as Record<string, unknown>).cgpa = cgpaCalc.cgpa
       }
     }
 
@@ -266,7 +275,7 @@ router.post('/results', async (req: AuthRequest, res) => {
       { upsert: true },
     )
 
-    await sysLog(userId, 'Result Updated', `Semester ${semester} result saved. SGPA: ${sgpaCalc.sgpa}`)
+    sysLog(userId, 'Result Updated', `Semester ${semester} result saved. SGPA: ${sgpaCalc.sgpa}`).catch(() => { })
     ok(res, { sgpa: sgpaCalc.sgpa })
   } catch (err) {
     console.error('[academic/results POST]', err)
@@ -279,7 +288,7 @@ router.delete('/results/:semester', async (req: AuthRequest, res) => {
     const userId = req.userId!
     const semester = parseInt(req.params.semester as string)
     await SemesterResult.deleteOne({ ...uf(req), semester })
-    await sysLog(userId, 'Result Deleted', `Deleted results for Semester ${semester}`)
+    sysLog(userId, 'Result Deleted', `Deleted results for Semester ${semester}`).catch(() => { })
     ok(res, { message: `Semester ${semester} results deleted` })
   } catch (err) {
     console.error('[academic/results DELETE]', err)

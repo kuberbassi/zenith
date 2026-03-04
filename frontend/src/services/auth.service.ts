@@ -14,14 +14,17 @@ export const authService = {
             // Send the Google ID token to our Node backend for verification
             const response = await api.post('/api/auth/google', { credential });
 
-            const { token, user } = response.data;
+            // Backend wraps response in { success, data: { token, user } }
+            const payload = response.data?.data ?? response.data;
+            const token = payload?.token;
+            const user = payload?.user;
 
             // Store the JWT token from our backend
             if (token) {
                 localStorage.setItem('auth_token', token);
             }
 
-            return user;
+            return user || null;
         } catch (error) {
             console.error('Google login error:', error);
             throw error;

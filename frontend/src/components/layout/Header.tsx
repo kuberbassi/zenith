@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Bell, Search, X,
+    Bell, Search, X, ChevronDown,
     LayoutDashboard, PieChart, CalendarDays, CalendarClock,
     GraduationCap, Trophy, Beaker, Settings, Target
 } from 'lucide-react';
+import { useSemester } from '@/contexts/SemesterContext';
 
 interface HeaderProps {
     notificationCount?: number;
 }
 
-// Route to title mapping
 const routeTitles: Record<string, { title: string; icon: React.ElementType }> = {
     '/': { title: 'Dashboard', icon: LayoutDashboard },
     '/analytics': { title: 'Analytics', icon: PieChart },
@@ -25,7 +25,6 @@ const routeTitles: Record<string, { title: string; icon: React.ElementType }> = 
     '/notifications': { title: 'Notifications', icon: Bell },
 };
 
-// Quick navigation items for search
 const quickNavItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Analytics', href: '/analytics', icon: PieChart },
@@ -42,126 +41,165 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
     const location = useLocation();
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [semDropOpen, setSemDropOpen] = useState(false);
+    const { currentSemester, setCurrentSemester } = useSemester();
 
-    // Get current page info
     const currentPage = routeTitles[location.pathname] || { title: 'Page', icon: LayoutDashboard };
     const PageIcon = currentPage.icon;
 
-    // Filter search results
     const filteredNav = quickNavItems.filter(item =>
         item.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Close search on route change
-    useEffect(() => {
-        setSearchOpen(false);
-        setSearchQuery('');
-    }, [location.pathname]);
+    useEffect(() => { setSearchOpen(false); setSearchQuery(''); }, [location.pathname]);
 
-    // Keyboard shortcut for search
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                e.preventDefault();
-                setSearchOpen(true);
-            }
-            if (e.key === 'Escape') {
-                setSearchOpen(false);
-            }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setSearchOpen(true); }
+            if (e.key === 'Escape') { setSearchOpen(false); setSemDropOpen(false); }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
+    // Close semester dropdown on outside click
+    useEffect(() => {
+        if (!semDropOpen) return;
+        const close = () => setSemDropOpen(false);
+        document.addEventListener('click', close);
+        return () => document.removeEventListener('click', close);
+    }, [semDropOpen]);
+
     return (
         <>
-            <header className="hidden lg:flex sticky top-0 z-30 h-16 bg-surface/80 backdrop-blur-md border-b border-outline-variant/10 px-6 items-center justify-between">
-                {/* Page Title */}
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                        <PageIcon className="w-5 h-5" />
+            {/* ── Floating Pill Header — fixed to viewport ─────────── */}
+            <div className="hidden lg:flex fixed top-4 left-1/2 -translate-x-1/2 z-40 w-auto">
+                <div className="flex items-center h-14 px-3 rounded-full bg-[#111]/85 backdrop-blur-2xl border border-white/[0.1]" style={{ boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 4px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+                    {/* Page icon + title */}
+                    <div className="flex items-center gap-3 px-4">
+                        <PageIcon size={18} className="text-white/40" />
+                        <span className="text-[15px] font-medium text-white/70">{currentPage.title}</span>
                     </div>
-                    <h1 className="text-xl font-display font-bold text-on-surface">
-                        {currentPage.title}
-                    </h1>
-                </div>
 
-                {/* Right Side Actions */}
-                <div className="flex items-center gap-2">
-                    {/* Search Button */}
+                    {/* Divider */}
+                    <div className="w-px h-8 bg-white/[0.08]" />
+
+                    {/* Semester Selector */}
+                    <div className="relative px-2">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setSemDropOpen(!semDropOpen); }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-white/[0.06] transition-colors text-sm font-medium text-white/50 hover:text-white/70"
+                        >
+                            Sem {currentSemester}
+                            <ChevronDown size={14} className={`transition-transform ${semDropOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        <AnimatePresence>
+                            {semDropOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -4 }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-[#111] border border-white/[0.08] rounded-2xl p-1.5 shadow-xl shadow-black/50 min-w-[130px]"
+                                >
+                                    {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
+                                        <button
+                                            key={s}
+                                            onClick={() => { setCurrentSemester(s); setSemDropOpen(false); }}
+                                            className={`w-full text-left px-3 py-2 rounded-lg text-[12px] font-medium transition-colors ${s === currentSemester
+                                                ? 'bg-blue-500/15 text-blue-400'
+                                                : 'text-white/50 hover:bg-white/[0.05] hover:text-white/70'
+                                                }`}
+                                        >
+                                            Semester {s}
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-px h-8 bg-white/[0.08]" />
+
+                    {/* Search */}
                     <button
                         onClick={() => setSearchOpen(true)}
-                        className="flex items-center gap-2 h-10 px-4 rounded-full bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface-variant text-sm"
+                        className="flex items-center gap-3 px-4 py-2 rounded-full hover:bg-white/[0.06] transition-colors"
                     >
-                        <Search size={16} />
-                        <span className="hidden xl:inline">Search...</span>
-                        <kbd className="hidden xl:inline ml-2 px-1.5 py-0.5 rounded bg-surface-container-high text-[10px] font-mono">
-                            ⌘K
-                        </kbd>
+                        <Search size={16} className="text-white/35" />
+                        <span className="text-xs text-white/20">⌘K</span>
                     </button>
 
-                    {/* Notifications */}
-                    <Link
-                        to="/notifications"
-                        className="relative w-10 h-10 rounded-full flex items-center justify-center bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface-variant"
-                    >
-                        <Bell size={18} />
-                        {notificationCount > 0 && (
-                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-on-primary text-[10px] font-bold rounded-full flex items-center justify-center">
-                                {notificationCount > 9 ? '9+' : notificationCount}
-                            </span>
-                        )}
-                    </Link>
-                </div>
-            </header>
+                    {/* Divider */}
+                    <div className="w-px h-8 bg-white/[0.08]" />
 
-            {/* Search Modal */}
+                    {/* Notifications — dynamic, no hardcoded badge */}
+                    <div className="px-2 flex items-center gap-2">
+                        <Link
+                            to="/notifications"
+                            className="relative flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/[0.06] transition-colors text-white/35 hover:text-white/60"
+                        >
+                            <Bell size={18} />
+                            {notificationCount > 0 && (
+                                <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full" />
+                            )}
+                        </Link>
+
+                        {/* Settings */}
+                        <Link
+                            to="/settings"
+                            className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/[0.06] transition-colors text-white/35 hover:text-white/60 mr-1"
+                        >
+                            <Settings size={18} />
+                        </Link>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Command Palette ───────────────────────────────────── */}
             <AnimatePresence>
                 {searchOpen && (
                     <>
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
                             onClick={() => setSearchOpen(false)}
                         />
                         <motion.div
-                            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                            initial={{ opacity: 0, y: -8, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                            className="fixed top-20 left-1/2 -translate-x-1/2 w-full max-w-lg bg-surface-container rounded-2xl shadow-2xl border border-outline-variant/20 z-50 overflow-hidden"
+                            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                            className="fixed top-24 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0a0a0a] rounded-[2rem] border border-white/[0.06] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.04)] z-50 overflow-hidden"
                         >
-                            <div className="flex items-center gap-3 p-4 border-b border-outline-variant/10">
-                                <Search size={20} className="text-on-surface-variant" />
+                            <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06]">
+                                <Search size={18} className="text-blue-500/50" />
                                 <input
                                     type="text"
                                     placeholder="Search pages..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="flex-1 bg-transparent text-on-surface placeholder:text-on-surface-variant outline-none text-lg"
+                                    className="flex-1 bg-transparent text-white placeholder:text-white/30 outline-none text-sm font-medium"
                                     autoFocus
                                 />
-                                <button
-                                    onClick={() => setSearchOpen(false)}
-                                    className="p-1 rounded-lg hover:bg-surface-container-high text-on-surface-variant"
-                                >
-                                    <X size={18} />
+                                <button onClick={() => setSearchOpen(false)} className="p-1.5 rounded-xl hover:bg-white/[0.06] text-white/30 hover:text-white/70 transition-colors">
+                                    <X size={16} />
                                 </button>
                             </div>
-                            <div className="p-2 max-h-80 overflow-y-auto">
+                            <div className="p-2 max-h-72 overflow-y-auto custom-scrollbar">
                                 {filteredNav.length === 0 ? (
-                                    <p className="text-center text-on-surface-variant py-8">No results found</p>
+                                    <p className="text-center text-white/20 py-8 text-sm italic">No results found...</p>
                                 ) : (
                                     filteredNav.map(item => (
                                         <Link
-                                            key={item.href}
-                                            to={item.href}
+                                            key={item.href} to={item.href}
                                             onClick={() => setSearchOpen(false)}
-                                            className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-surface-container-high text-on-surface transition-colors"
+                                            className="flex items-center gap-4 px-4 py-3 rounded-2xl hover:bg-white/[0.04] text-white/50 hover:text-white transition-colors group"
                                         >
-                                            <item.icon size={20} className="text-primary" />
-                                            <span className="font-medium">{item.name}</span>
+                                            <div className="p-2 rounded-xl bg-white/[0.02] group-hover:bg-blue-500/10 transition-colors">
+                                                <item.icon size={18} className="text-white/40 group-hover:text-blue-400 transition-colors" />
+                                            </div>
+                                            <span className="text-sm font-bold tracking-wide">{item.name}</span>
                                         </Link>
                                     ))
                                 )}

@@ -50,15 +50,17 @@ export const AttendanceCalculator = {
     }
   },
 
-  getRiskLevel(percentage: number): { level: string; color: string } {
-    if (percentage >= 75) return { level: 'Safe', color: 'green' }
-    if (percentage >= 60) return { level: 'Warning', color: 'orange' }
+  getRiskLevel(percentage: number, target = 75, warning = 60): { level: string; color: string } {
+    if (percentage >= target) return { level: 'Safe', color: 'green' }
+    if (percentage >= warning) return { level: 'Warning', color: 'orange' }
     if (percentage >= 50) return { level: 'Critical', color: 'red' }
     return { level: 'Danger', color: 'darkred' }
   },
 
   getAttendanceSummary(
     subjects: Array<{ attended: number; total: number }>,
+    target = 75,
+    warning = 60
   ): AttendanceSummary {
     if (!subjects.length) {
       return {
@@ -76,7 +78,7 @@ export const AttendanceCalculator = {
       totalAttended,
       totalClasses,
     )
-    const { level, color } = AttendanceCalculator.getRiskLevel(pct)
+    const { level, color } = AttendanceCalculator.getRiskLevel(pct, target, warning)
     return {
       overall_percentage: pct,
       total_attended: totalAttended,

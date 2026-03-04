@@ -14,6 +14,8 @@ import AnimatedHeader from '../components/AnimatedHeader';
 import { useSemester } from '../contexts/SemesterContext';
 import PressableScale from '../components/PressableScale';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import SlotModal from '../components/SlotModal';
+import StructureModal from '../components/StructureModal';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -95,10 +97,6 @@ const TimetableScreen = ({ navigation }) => {
         time: '', classroom: '', type: 'Lecture'
     });
     const [addingSlot, setAddingSlot] = useState(false);
-    // Time Picker State
-    const [timePickerVisible, setTimePickerVisible] = useState(false);
-    const [timePickerTarget, setTimePickerTarget] = useState('start');
-    const [tempTime, setTempTime] = useState({ hour: 9, minute: 0, period: 'AM' });
 
     // Animation Refs
     const modalScale = useRef(new Animated.Value(0.9)).current;
@@ -131,35 +129,8 @@ const TimetableScreen = ({ navigation }) => {
         if (timePickerVisible) animateModal(true, pickerScale, pickerOpacity);
     }, [timePickerVisible]);
 
-    const openTimePicker = (target) => {
-        setTimePickerTarget(target);
-        const timeStr = target === 'start' ? newSlot.startTime : newSlot.endTime;
-        if (timeStr) {
-            const [time, period] = timeStr.split(' ');
-            const [h, m] = time.split(':');
-            setTempTime({ hour: parseInt(h), minute: parseInt(m), period: period });
-        }
-        setTimePickerVisible(true);
-    };
-
-    const handleTimeConfirm = () => {
-        const h = tempTime.hour.toString().padStart(2, '0');
-        const m = tempTime.minute.toString().padStart(2, '0');
-        const timeStr = `${h}:${m} ${tempTime.period}`;
-
-        if (timePickerTarget === 'start') {
-            setNewSlot(prev => ({ ...prev, startTime: timeStr }));
-        } else {
-            setNewSlot(prev => ({ ...prev, endTime: timeStr }));
-        }
-        setTimePickerVisible(false);
-    };
-
     const [editingSlot, setEditingSlot] = useState(null);
 
-    // ... existing Time Picker logic ...
-
-    // Helper to normalize IDs for comparison
     const safeId = (id) => {
         if (!id) return '';
         return typeof id === 'object' ? (id.$oid || id.toString()) : String(id);
@@ -178,17 +149,15 @@ const TimetableScreen = ({ navigation }) => {
         setModalVisible(true);
     };
 
-    const handleSaveStructure = async () => {
+    const handleSaveStructure = async (newPeriods) => {
         try {
-            await attendanceService.saveTimetableStructure(tempPeriods, selectedSemester);
+            await attendanceService.saveTimetableStructure(newPeriods, selectedSemester);
             setStructureModalVisible(false);
             queryClient.invalidateQueries({ queryKey: ['timetable', selectedSemester] });
         } catch (error) {
             Alert.alert('Error', 'Failed to save structure');
         }
     };
-
-    // ... existing Time Picker logic ...
 
     const handleMarkAttendance = async (subjectId, status) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -244,19 +213,15 @@ const TimetableScreen = ({ navigation }) => {
         onError: () => Alert.alert("Error", "Failed to save changes.")
     });
 
-    const handleSaveSlot = async () => {
-        if (!newSlot.subject_id && !['Break', 'Free'].includes(newSlot.type)) {
-            return Alert.alert("Missing Fields", "Please select a subject.");
-        }
-
-        const slotData = {
+    const handleSaveSlot = async (slotData) => {
+        const payload = {
             day: selectedDay,
             semester: selectedSemester,
-            ...newSlot,
-            time: `${newSlot.startTime} - ${newSlot.endTime}`
+            ...slotData,
+            time: `${slotData.startTime} - ${slotData.endTime}`
         };
 
-        saveMutation.mutate(slotData);
+        saveMutation.mutate(payload);
     };
 
 
@@ -577,209 +542,24 @@ const TimetableScreen = ({ navigation }) => {
                 </View>
             </AnimatedHeader>
 
-            {/* ADD SLOT MODAL */}
-            <Modal animationType="fade" transparent visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 20 }}>
-                    <TouchableOpacity noTexture style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} activeOpacity={1} />
-                    <Animated.View style={[styles.modalContent, { transform: [{ scale: modalScale }], opacity: modalOpacity }]}>
-                        <Text style={styles.modalTitle}>{editingSlot ? 'Edit Class' : 'Add Class'} ({selectedDay})</Text>
+            {/* MODALS */}
+            <SlotModal
+                visible={modalVisible}
+                onClose={() => setModalVisible(false)}
+                onSave={handleSaveSlot}
+                initialSlot={editingSlot}
+                subjects={subjects}
+                isDark={isDark}
+                periods={periods}
+            />
 
-                        <View style={{ flexShrink: 1 }}>
-                            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 4 }} style={{ flexGrow: 0 }}>
-                                <Text style={styles.label}>Subject</Text>
-                                <View style={styles.subjectGrid}>
-                                    {(subjects || []).map(sub => {
-                                        const subId = safeId(sub._id || sub.id);
-                                        const isSelected = safeId(newSlot.subject_id) === subId;
-                                        return (
-                                            <PressableScale
-                                                key={subId}
-                                                style={[styles.subjectChip, isSelected && { backgroundColor: c.primary, borderColor: c.primary }]}
-                                                onPress={() => setNewSlot({ ...newSlot, subject_id: subId, name: sub.name })}
-                                            >
-                                                <Text style={[styles.subjectChipText, isSelected && { color: '#FFF' }]}>{sub.name}</Text>
-                                            </PressableScale>
-                                        );
-                                    })}
-                                </View>
-
-                                {periods.length === 0 && (
-                                    <>
-                                        <Text style={styles.label}>Time Duration</Text>
-                                        <View style={styles.timeRangeGrid}>
-                                            <PressableScale style={styles.timeInputBox} onPress={() => openTimePicker('start')}>
-                                                <Text style={styles.timeLabel}>START</Text>
-                                                <Text style={styles.timeVal}>{newSlot.startTime}</Text>
-                                            </PressableScale>
-                                            <View style={styles.timeDash} />
-                                            <PressableScale style={styles.timeInputBox} onPress={() => openTimePicker('end')}>
-                                                <Text style={styles.timeLabel}>END</Text>
-                                                <Text style={styles.timeVal}>{newSlot.endTime}</Text>
-                                            </PressableScale>
-                                        </View>
-                                    </>
-                                )}
-
-                                <Text style={styles.label}>Classroom / Venue</Text>
-                                <TextInput
-                                    style={styles.inputField}
-                                    placeholder="Room 101, Lab A..."
-                                    placeholderTextColor={c.subtext}
-                                    value={newSlot.classroom}
-                                    onChangeText={t => setNewSlot({ ...newSlot, classroom: t })}
-                                />
-                            </ScrollView>
-
-                            <View style={styles.stickyFooter}>
-                                {editingSlot && (
-                                    <PressableScale style={[styles.secondaryBtn, { backgroundColor: c.danger + '15' }]} onPress={() => { setModalVisible(false); handleDeleteSlot(editingSlot.id || editingSlot._id); }}>
-                                        <Trash2 size={20} color={c.danger} />
-                                    </PressableScale>
-                                )}
-                                <PressableScale style={styles.secondaryBtn} onPress={() => setModalVisible(false)}>
-                                    <Text style={{ color: c.text, fontWeight: '700' }}>Cancel</Text>
-                                </PressableScale>
-                                <PressableScale onPress={handleSaveSlot} disabled={addingSlot} style={{ flex: 1, borderRadius: 18, overflow: 'hidden' }}>
-                                    <LinearGradient
-                                        colors={c.gradients.primary}
-                                        style={styles.primaryBtn}
-                                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                                    >
-                                        {addingSlot ? <ActivityIndicator color="white" /> : <Text style={styles.primaryBtnText}>{editingSlot ? 'Update' : 'Add Class'}</Text>}
-                                    </LinearGradient>
-                                </PressableScale>
-                            </View>
-                        </View>
-                    </Animated.View>
-                </View>
-            </Modal>
-
-            {/* TIME PICKER MODAL */}
-            <Modal transparent visible={timePickerVisible} animationType="fade" onRequestClose={() => setTimePickerVisible(false)}>
-                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setTimePickerVisible(false)}>
-                    <Animated.View style={[styles.pickerContainer, { transform: [{ scale: pickerScale }], opacity: pickerOpacity }]}>
-                        <LinearGradient colors={isDark ? theme.gradients.cardDark : theme.gradients.cardLight} style={{ padding: 24, borderRadius: 32, borderWidth: 1, borderColor: c.glassBorder }}>
-                            <Text style={styles.pickerTitle}>Select Time</Text>
-                            <View style={styles.pickerRow}>
-                                <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
-                                        <PressableScale key={`h_${h}`} style={[styles.pickerItem, tempTime.hour === h && styles.pickerSelected]} onPress={() => setTempTime(prev => ({ ...prev, hour: h }))}>
-                                            <Text style={[styles.pickerText, tempTime.hour === h && styles.pickerSelectedText]}>{h.toString().padStart(2, '0')}</Text>
-                                        </PressableScale>
-                                    ))}
-                                </ScrollView>
-                                <Text style={styles.colon}>:</Text>
-                                <ScrollView style={styles.columnScroll} showsVerticalScrollIndicator={false} nestedScrollEnabled>
-                                    {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
-                                        <PressableScale key={`m_${m}`} style={[styles.pickerItem, tempTime.minute === m && styles.pickerSelected]} onPress={() => setTempTime(prev => ({ ...prev, minute: m }))}>
-                                            <Text style={[styles.pickerText, tempTime.minute === m && styles.pickerSelectedText]}>{m.toString().padStart(2, '0')}</Text>
-                                        </PressableScale>
-                                    ))}
-                                </ScrollView>
-                                <View style={styles.ampmColumn}>
-                                    {['AM', 'PM'].map(p => (
-                                        <PressableScale key={p} style={[styles.pickerItem, tempTime.period === p && styles.pickerSelected]} onPress={() => setTempTime(prev => ({ ...prev, period: p }))}>
-                                            <Text style={[styles.pickerText, tempTime.period === p && styles.pickerSelectedText]}>{p}</Text>
-                                        </PressableScale>
-                                    ))}
-                                </View>
-                            </View>
-                            <PressableScale style={{ borderRadius: 14, overflow: 'hidden', marginTop: 12 }} onPress={handleTimeConfirm}>
-                                <LinearGradient
-                                    colors={c.gradients.primary}
-                                    style={styles.confirmBtn}
-                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                                >
-                                    <Text style={styles.confirmText}>Confirm</Text>
-                                </LinearGradient>
-                            </PressableScale>
-                        </LinearGradient>
-                    </Animated.View>
-                </TouchableOpacity>
-            </Modal>
-
-            {/* STRUCTURE MODAL */}
-            <Modal animationType="fade" transparent visible={structureModalVisible} onRequestClose={() => setStructureModalVisible(false)}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <TouchableOpacity noTexture style={StyleSheet.absoluteFill} onPress={() => setStructureModalVisible(false)} activeOpacity={1} />
-                    <Animated.View style={[styles.modalContent, { transform: [{ scale: structureScale }], opacity: structureOpacity }]}>
-                        <View style={styles.modalHeader}>
-                            <View>
-                                <Text style={styles.modalTitle}>Daily Grid</Text>
-                                <Text style={styles.modalSub}>Semester Structure</Text>
-                            </View>
-                            <PressableScale onPress={() => setStructureModalVisible(false)} style={styles.closeBtn}>
-                                <X size={20} color={c.text} />
-                            </PressableScale>
-                        </View>
-
-                        <View style={{ flexShrink: 1 }}>
-                            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 4 }} style={{ flexGrow: 0 }}>
-                                {tempPeriods.map((p, idx) => (
-                                    <LinearGradient
-                                        key={idx}
-                                        colors={[c.glassBgStart, c.glassBgEnd]}
-                                        style={[styles.structureCard, { backgroundColor: 'transparent', borderWidth: 1, borderColor: c.glassBorder }]}
-                                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                                    >
-                                        <View style={{ width: 4, height: '60%', backgroundColor: c.primary, borderRadius: 2, marginRight: 8 }} />
-                                        <View style={{ flex: 1, flexDirection: 'row', gap: 10 }}>
-                                            <TextInput
-                                                style={styles.miniInput}
-                                                value={p.startTime}
-                                                onChangeText={t => {
-                                                    const newP = [...tempPeriods];
-                                                    newP[idx].startTime = t;
-                                                    setTempPeriods(newP);
-                                                }}
-                                                placeholder="Start"
-                                                placeholderTextColor={c.subtext}
-                                            />
-                                            <TextInput
-                                                style={styles.miniInput}
-                                                value={p.endTime}
-                                                onChangeText={t => {
-                                                    const newP = [...tempPeriods];
-                                                    newP[idx].endTime = t;
-                                                    setTempPeriods(newP);
-                                                }}
-                                                placeholder="End"
-                                                placeholderTextColor={c.subtext}
-                                            />
-                                        </View>
-                                        <PressableScale onPress={() => setTempPeriods(tempPeriods.filter((_, i) => i !== idx))} style={styles.deleteIconBox}>
-                                            <Trash2 size={16} color={c.danger} />
-                                        </PressableScale>
-                                    </LinearGradient>
-                                ))}
-
-                                <PressableScale
-                                    style={styles.addPeriodGhostBtn}
-                                    onPress={() => setTempPeriods([...tempPeriods, { startTime: '09:00 AM', endTime: '10:00 AM', type: 'Lecture' }])}
-                                >
-                                    <Plus size={20} color={c.primary} />
-                                    <Text style={{ color: c.primary, fontWeight: '700', fontSize: 14 }}>Add Period</Text>
-                                </PressableScale>
-                            </ScrollView>
-                        </View>
-
-                        <View style={styles.stickyFooter}>
-                            <PressableScale style={styles.cancelActionBtn} onPress={() => setStructureModalVisible(false)}>
-                                <Text style={{ color: c.text, fontWeight: '700' }}>Cancel</Text>
-                            </PressableScale>
-                            <PressableScale style={{ flex: 1, borderRadius: 18, overflow: 'hidden' }} onPress={handleSaveStructure}>
-                                <LinearGradient
-                                    colors={c.gradients.primary}
-                                    style={styles.saveActionBtn}
-                                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                                >
-                                    <Text style={styles.saveActionText}>Save Configuration</Text>
-                                </LinearGradient>
-                            </PressableScale>
-                        </View>
-                    </Animated.View>
-                </View>
-            </Modal>
+            <StructureModal
+                visible={structureModalVisible}
+                onClose={() => setStructureModalVisible(false)}
+                onSave={handleSaveStructure}
+                initialPeriods={periods}
+                isDark={isDark}
+            />
 
 
         </View >

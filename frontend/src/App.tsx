@@ -221,9 +221,11 @@ const AppContent: React.FC = () => {
   );
 };
 
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+
 const App: React.FC = () => {
   return (
-    <GoogleOAuthProvider clientId="86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <ThemeProvider>
