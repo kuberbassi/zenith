@@ -77,6 +77,8 @@ function getSession(userId: string): IpuSession {
         .join('; ')
 
     _sessions.set(userId, { client, getCookies })
+  }
+  return _sessions.get(userId)!
 }
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
