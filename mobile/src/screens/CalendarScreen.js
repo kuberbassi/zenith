@@ -80,7 +80,7 @@ const CalendarScreen = ({ navigation }) => {
         try {
             const key = `${year}-${String(month).padStart(2, '0')}`;
             const safeSemester = selectedSemester || 1;
-            const data = await attendanceService.getCalendarData(year, month, safeSemester);
+            const data = await attendanceService.getCalendarData({ year, month, semester: safeSemester });
 
             setCalendarData(prev => ({
                 ...prev,

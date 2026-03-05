@@ -36,38 +36,44 @@ const AppLayout: React.FC = () => {
                 {/* Desktop Header */}
                 <Header notificationCount={notificationCount} />
 
-                {/* Optimized Mobile Nav Bar */}
-                <div className="lg:hidden sticky top-0 z-50 bg-[#050508]/80 backdrop-blur-2xl border-b border-white/[0.05] px-4 py-3 flex justify-between items-center shadow-2xl">
-                    <Link to="/" className="flex items-center gap-3 active:scale-95 transition-transform">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-500/5 border border-blue-500/20 flex items-center justify-center p-1.5 overflow-hidden">
-                            <img src="/icon-trans.png" alt="AcadHub" className="w-full h-full object-contain" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="font-black text-sm tracking-tight text-white uppercase leading-none">AcadHub</span>
-                            <span className="text-[10px] font-bold text-blue-400/80 tracking-widest uppercase mt-0.5">Strategic Flight</span>
-                        </div>
-                    </Link>
-                    <div className="flex items-center gap-1">
-                        <Link
-                            to="/notifications"
-                            className="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors text-white/40"
-                        >
-                            <Bell size={20} />
-                            {notificationCount > 0 && (
-                                <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
-                            )}
+                {/* Mobile Header — floating capsule pill */}
+                <div className="lg:hidden fixed top-4 left-1/2 -translate-x-1/2 z-50">
+                    <div
+                        className="flex items-center h-12 px-2.5 rounded-full bg-[#111]/90 backdrop-blur-2xl border border-white/[0.09]"
+                        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)' }}
+                    >
+                        <Link to="/" className="flex items-center gap-2.5 px-2 active:opacity-70 transition-opacity select-none">
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500/25 to-blue-600/10 border border-blue-500/20 flex items-center justify-center p-1 overflow-hidden flex-shrink-0">
+                                <img src="/icon-trans.png" alt="AcadHub" className="w-full h-full object-contain" />
+                            </div>
+                            <div className="flex flex-col leading-none">
+                                <span className="font-black text-[11px] tracking-tight text-white uppercase leading-none">AcadHub</span>
+                                <span className="text-[8px] font-bold text-blue-400/70 tracking-widest uppercase mt-[3px]">Strategic Flight</span>
+                            </div>
                         </Link>
-                        <Link
-                            to="/settings"
-                            className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/5 active:bg-white/10 transition-colors text-white/40"
-                        >
-                            <Settings size={20} />
-                        </Link>
+                        <div className="w-px h-6 bg-white/[0.08] mx-1.5" />
+                        <div className="flex items-center">
+                            <Link
+                                to="/notifications"
+                                className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/[0.06] active:bg-white/10 transition-colors text-white/40"
+                            >
+                                <Bell size={15} />
+                                {notificationCount > 0 && (
+                                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                )}
+                            </Link>
+                            <Link
+                                to="/settings"
+                                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/[0.06] active:bg-white/10 transition-colors text-white/40"
+                            >
+                                <Settings size={15} />
+                            </Link>
+                        </div>
                     </div>
                 </div>
 
                 {/* Content Container - Ensure bottom padding accounts for the Dock */}
-                <div className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full animate-fade-in pb-32">
+                <div className="flex-1 px-4 pb-32 pt-20 md:px-6 md:pb-32 md:pt-20 lg:p-8 lg:pb-32 max-w-7xl mx-auto w-full animate-fade-in">
                     <Outlet />
                 </div>
             </main>

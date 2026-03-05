@@ -37,7 +37,10 @@ export const attendanceService = {
   getAttendanceLogs: () => AttendanceService.getAttendanceLogs(),
   editAttendance: (id, u) => AttendanceService.editAttendance(id, u),
   deleteAttendance: (id) => AttendanceService.deleteAttendance(id),
-  getCalendarData: (p) => AttendanceService.getCalendarData(p),
+  getCalendarData: (p, m, s) => {
+    if (typeof p === 'object') return AttendanceService.getCalendarData(p);
+    return AttendanceService.getCalendarData({ year: p, month: m, semester: s });
+  },
   getClassesForDate: (d, s) => AttendanceService.getClassesForDate(d, s),
   getLogsForDate: (d) => AttendanceService.getLogsForDate(d),
 

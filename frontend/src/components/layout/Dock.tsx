@@ -201,46 +201,140 @@ function DesktopDock() {
 
 /* ══════════════════════════════════════════════════════
    MOBILE: Bubble FAB + radial fan menu
-   8 nav items fanned in a semicircle (150° → 30°, r=110px)
+   8 nav items fanned in a semicircle (160° → 20°, r=120px)
+   Long-press FAB 2s → profile/logout menu
    ══════════════════════════════════════════════════════ */
-const BUBBLE_R = 110;
-// FAB: bottom-6 (24px), h-14 (56px) → center at 52px from bottom
-// Items: h-11 (44px), centered at FAB center → bottom = 52-22 = 30px
-const ITEM_BOTTOM = 30;
+const BUBBLE_R = 120;
+const ITEM_BOTTOM = 28;
+const HOLD_DURATION = 2000;
+const CIRCUMFERENCE = 2 * Math.PI * 25;
 
 const NAV_ARC = navItems.map((item, i) => {
-    const deg = 150 - (i / (navItems.length - 1)) * 120; // 150°→30°
+    const deg = 160 - (i / (navItems.length - 1)) * 140; // 160°→20°, wider spread
     const rad = (deg * Math.PI) / 180;
     return {
         ...item,
         tx: parseFloat((Math.cos(rad) * BUBBLE_R).toFixed(1)),
-        ty: parseFloat((-Math.sin(rad) * BUBBLE_R).toFixed(1)), // negative = up
+        ty: parseFloat((-Math.sin(rad) * BUBBLE_R).toFixed(1)),
     };
 });
 
 function MobileBubble() {
     const [isOpen, setIsOpen] = useState(false);
+    const [pfpMenuOpen, setPfpMenuOpen] = useState(false);
+    const [holding, setHolding] = useState(false);
     const location = useLocation();
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const didHold = useRef(false);
+    const pfpMenuRef = useRef<HTMLDivElement>(null);
 
-    // Close on route change
-    useEffect(() => { setIsOpen(false); }, [location.pathname]);
+    useEffect(() => { setIsOpen(false); setPfpMenuOpen(false); }, [location.pathname]);
+
+    useEffect(() => {
+        if (!pfpMenuOpen) return;
+        const close = (e: PointerEvent) => {
+            if (pfpMenuRef.current?.contains(e.target as Node)) return;
+            setPfpMenuOpen(false);
+        };
+        document.addEventListener('pointerdown', close);
+        return () => document.removeEventListener('pointerdown', close);
+    }, [pfpMenuOpen]);
+
+    const startHold = () => {
+        didHold.current = false;
+        setHolding(true);
+        holdTimer.current = setTimeout(() => {
+            didHold.current = true;
+            setHolding(false);
+            setIsOpen(false);
+            setPfpMenuOpen(true);
+            navigator.vibrate?.(12);
+        }, HOLD_DURATION);
+    };
+
+    const endHold = () => {
+        setHolding(false);
+        if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = null; }
+    };
+
+    const handleClick = () => {
+        if (didHold.current) { didHold.current = false; return; }
+        setPfpMenuOpen(false);
+        setIsOpen(p => !p);
+    };
 
     return createPortal(
         <>
             {/* Backdrop */}
             <AnimatePresence>
-                {isOpen && (
+                {(isOpen || pfpMenuOpen) && (
                     <motion.div
                         key="bubble-backdrop"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.18 }}
+                        transition={{ duration: 0.2 }}
                         className="fixed inset-0 z-40"
-                        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(3px)' }}
-                        onClick={() => setIsOpen(false)}
+                        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
+                        onClick={() => { setIsOpen(false); setPfpMenuOpen(false); }}
                     />
+                )}
+            </AnimatePresence>
+
+            {/* PFP menu — appears above FAB on 2s hold */}
+            <AnimatePresence>
+                {pfpMenuOpen && (
+                    <motion.div
+                        ref={pfpMenuRef}
+                        initial={{ opacity: 0, scale: 0.88, y: 16 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.88, y: 16 }}
+                        transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+                        style={{
+                            position: 'fixed',
+                            bottom: 104,
+                            left: '50%',
+                            zIndex: 60,
+                            width: 220,
+                            marginLeft: -110,
+                            boxShadow: '0 -8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07), inset 0 1px 0 rgba(255,255,255,0.05)',
+                        }}
+                        className="rounded-3xl bg-[#0c0c0f]/98 backdrop-blur-2xl overflow-visible"
+                    >
+                        <div className="p-4 flex items-center gap-3">
+                            <img
+                                src={user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'U')}&background=000&color=fff&size=64`}
+                                alt=""
+                                referrerPolicy="no-referrer"
+                                className="w-10 h-10 rounded-full object-cover border border-white/10 flex-shrink-0"
+                            />
+                            <div className="min-w-0">
+                                <p className="text-[13px] font-bold text-white truncate">{user?.name || 'User'}</p>
+                                <p className="text-[10px] text-white/30 truncate">{user?.email || ''}</p>
+                            </div>
+                        </div>
+                        <div className="h-px bg-white/[0.06]" />
+                        <div className="py-1.5 px-1.5 flex flex-col gap-0.5">
+                            <button
+                                onClick={() => { setPfpMenuOpen(false); navigate('/settings'); }}
+                                className="w-full px-3 py-2.5 text-left text-[13px] font-medium text-white/60 hover:bg-white/[0.06] rounded-2xl transition-colors flex items-center gap-3"
+                            >
+                                <Settings size={15} className="text-white/30" />
+                                Profile & Settings
+                            </button>
+                            <button
+                                onClick={() => { setPfpMenuOpen(false); logout(); }}
+                                className="w-full px-3 py-2.5 text-left text-[13px] font-medium text-red-400/70 hover:bg-red-500/[0.08] rounded-2xl transition-colors flex items-center gap-3"
+                            >
+                                <LogOut size={15} className="text-red-400/50" />
+                                Log Out
+                            </button>
+                        </div>
+                        {/* Caret pointing down toward FAB */}
+                        <div className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-[#0c0c0f] rotate-45 border-r border-b border-white/[0.07]" />
+                    </motion.div>
                 )}
             </AnimatePresence>
 
@@ -251,32 +345,41 @@ function MobileBubble() {
                     return (
                         <motion.div
                             key={item.href}
-                            initial={{ opacity: 0, x: 0, y: 0, scale: 0.3 }}
+                            initial={{ opacity: 0, x: 0, y: 0, scale: 0.2 }}
                             animate={{ opacity: 1, x: item.tx, y: item.ty, scale: 1 }}
-                            exit={{ opacity: 0, x: 0, y: 0, scale: 0.3 }}
-                            transition={{ type: 'spring', stiffness: 380, damping: 26, delay: i * 0.03 }}
+                            exit={{ opacity: 0, x: 0, y: 0, scale: 0.2 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 28, delay: i * 0.025 }}
                             style={{
                                 position: 'fixed',
                                 bottom: ITEM_BOTTOM,
                                 left: '50%',
-                                marginLeft: -22,
+                                marginLeft: -24,
                                 zIndex: 50,
                             }}
                         >
                             <Link
                                 to={item.href}
                                 onClick={() => setIsOpen(false)}
-                                className="flex flex-col items-center gap-[3px] select-none"
+                                className="flex flex-col items-center gap-1 select-none"
+                                style={{ WebkitTapHighlightColor: 'transparent' }}
                             >
-                                <div className={`w-11 h-11 rounded-[16px] flex items-center justify-center border shadow-xl transition-colors ${
-                                    isActive
-                                        ? 'bg-blue-500/25 border-blue-500/40 text-blue-400 shadow-blue-500/20'
-                                        : 'bg-[#0e0e0e]/95 border-white/10 text-white/60'
-                                }`}>
-                                    <item.icon size={19} />
+                                <div
+                                    className={`w-12 h-12 rounded-[18px] flex items-center justify-center border transition-all ${
+                                        isActive
+                                            ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                                            : 'bg-[#111]/95 border-white/[0.09] text-white/55'
+                                    }`}
+                                    style={{
+                                        boxShadow: isActive
+                                            ? '0 4px 20px rgba(59,130,246,0.3), 0 0 0 1px rgba(59,130,246,0.1)'
+                                            : '0 4px 20px rgba(0,0,0,0.55)',
+                                        backdropFilter: 'blur(20px)',
+                                    }}
+                                >
+                                    <item.icon size={20} strokeWidth={1.75} />
                                 </div>
-                                <span className={`text-[8px] font-bold tracking-wide leading-none ${
-                                    isActive ? 'text-blue-400' : 'text-white/35'
+                                <span className={`text-[8.5px] font-semibold tracking-wide leading-none ${
+                                    isActive ? 'text-blue-400' : 'text-white/40'
                                 }`}>{item.name}</span>
                             </Link>
                         </motion.div>
@@ -286,26 +389,29 @@ function MobileBubble() {
 
             {/* FAB trigger */}
             <motion.div
-                style={{
-                    position: 'fixed',
-                    bottom: 24,
-                    left: '50%',
-                    marginLeft: -28,
-                    zIndex: 52,
-                }}
-                whileTap={{ scale: 0.88 }}
+                style={{ position: 'fixed', bottom: 24, left: '50%', marginLeft: -28, zIndex: 52 }}
+                animate={holding ? { scale: 0.94 } : { scale: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
             >
                 <button
-                    onClick={() => setIsOpen(p => !p)}
-                    className={`w-14 h-14 rounded-full overflow-hidden relative transition-all ${
-                        isOpen
-                            ? 'ring-2 ring-blue-500/50 ring-offset-2 ring-offset-black'
-                            : 'border-2 border-white/15'
-                    }`}
+                    onClick={handleClick}
+                    onPointerDown={startHold}
+                    onPointerUp={endHold}
+                    onPointerLeave={endHold}
+                    onPointerCancel={endHold}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className="w-14 h-14 rounded-full overflow-hidden relative select-none outline-none"
                     style={{
                         boxShadow: isOpen
-                            ? '0 0 32px rgba(59,130,246,0.4), 0 4px 20px rgba(0,0,0,0.6)'
-                            : '0 4px 20px rgba(0,0,0,0.5)',
+                            ? '0 0 32px rgba(59,130,246,0.45), 0 4px 20px rgba(0,0,0,0.6)'
+                            : pfpMenuOpen
+                            ? '0 0 28px rgba(139,92,246,0.45), 0 4px 20px rgba(0,0,0,0.6)'
+                            : '0 4px 24px rgba(0,0,0,0.5)',
+                        border: isOpen
+                            ? '2px solid rgba(59,130,246,0.5)'
+                            : pfpMenuOpen
+                            ? '2px solid rgba(139,92,246,0.5)'
+                            : '2px solid rgba(255,255,255,0.12)',
                     }}
                 >
                     <img
@@ -314,17 +420,37 @@ function MobileBubble() {
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
                     />
+                    {/* 2s hold progress ring */}
+                    {holding && (
+                        <svg
+                            className="absolute inset-0 w-full h-full pointer-events-none"
+                            style={{ transform: 'rotate(-90deg)' }}
+                            viewBox="0 0 56 56"
+                        >
+                            <motion.circle
+                                cx="28" cy="28" r="25"
+                                fill="none"
+                                stroke="rgba(139,92,246,0.85)"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeDasharray={CIRCUMFERENCE}
+                                initial={{ strokeDashoffset: CIRCUMFERENCE }}
+                                animate={{ strokeDashoffset: 0 }}
+                                transition={{ duration: HOLD_DURATION / 1000, ease: 'linear' }}
+                            />
+                        </svg>
+                    )}
                     {/* Close overlay */}
                     <AnimatePresence>
                         {isOpen && (
                             <motion.div
-                                initial={{ opacity: 0, scale: 0.7 }}
+                                initial={{ opacity: 0, scale: 0.6 }}
                                 animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.7 }}
+                                exit={{ opacity: 0, scale: 0.6 }}
                                 className="absolute inset-0 flex items-center justify-center rounded-full"
-                                style={{ background: 'rgba(0,0,0,0.55)' }}
+                                style={{ background: 'rgba(0,0,0,0.6)' }}
                             >
-                                <span className="text-white text-base font-black leading-none">✕</span>
+                                <span className="text-white text-[15px] font-black leading-none">✕</span>
                             </motion.div>
                         )}
                     </AnimatePresence>
