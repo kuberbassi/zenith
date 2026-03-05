@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useDashboard, useMarkAttendance } from '@/hooks/useDashboard';
+import { useDashboard } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence, motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
 import {
     AlertTriangle, TrendingUp, Trash2, Edit2,
     Plus, Zap, Target,
-    Activity, ShieldCheck, Check, X
+    Activity, ShieldCheck
 } from 'lucide-react';
 
 import AddSubjectModal from '@/components/modals/AddSubjectModal';
@@ -114,7 +114,6 @@ const Dashboard: React.FC = () => {
     const { showToast } = useToast();
     const { user } = useAuth();
     const { data: dashboardData, isLoading: loading, refetch: loadDashboard } = useDashboard();
-    const { mutate: markAttendance } = useMarkAttendance();
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingSubject, setEditingSubject] = useState<any | null>(null);
@@ -336,21 +335,7 @@ const Dashboard: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); markAttendance({ subjectId: subject._id, status: 'present' }); }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-500/10 border border-green-500/20 text-[9px] font-black text-green-400 uppercase tracking-widest hover:bg-green-500/20 transition-all group/btn"
-                                                >
-                                                    <Check size={12} className="group-hover/btn:scale-110 transition-transform" /> Present
-                                                </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); markAttendance({ subjectId: subject._id, status: 'absent' }); }}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[9px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/20 transition-all group/btn"
-                                                >
-                                                    <X size={12} className="group-hover/btn:scale-110 transition-transform" /> Absent
-                                                </button>
-                                            </div>
+                                        <div className="flex items-center justify-end">
                                             <div className="flex gap-1">
                                                 <button onClick={() => setEditingSubject(subject)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/10 hover:text-white/40 transition-colors">
                                                     <Edit2 size={12} />

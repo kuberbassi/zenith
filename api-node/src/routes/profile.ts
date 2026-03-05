@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { Types } from 'mongoose'
 import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middleware/auth.js'
 import { User } from '../models/User.js'
 import { UserPreference } from '../models/UserPreference.js'
@@ -83,12 +84,12 @@ router.put('/', async (req: AuthRequest, res) => {
     if ('attendance_threshold' in data) thresholdMirror.attendance_threshold = data.attendance_threshold
     if ('warning_threshold' in data) thresholdMirror.warning_threshold = data.warning_threshold
     if (Object.keys(thresholdMirror).length) {
-      const existing = await UserPreference.findOne({ user_id: userId }).lean()
+      const existing = await UserPreference.findOne({ ...uf(req) }).lean()
       const existingPrefs = (existing?.preferences ?? {}) as Record<string, unknown>
       const merged = { ...existingPrefs, ...thresholdMirror }
       await UserPreference.findOneAndUpdate(
-        existing ? { _id: existing._id } : { user_id: userId },
-        { $set: { user_id: userId, preferences: merged, updated_at: new Date() } },
+        existing ? { _id: existing._id } : { user_id: new Types.ObjectId(userId) },
+        { $set: { user_id: new Types.ObjectId(userId), preferences: merged, updated_at: new Date() } },
         { upsert: true },
       )
     }
