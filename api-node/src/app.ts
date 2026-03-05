@@ -11,6 +11,11 @@ import v1Router from './routes/v1.js'
 
 const app = express()
 
+/* ── Trust Proxy ──────────────────────────────────────────── */
+// Required behind reverse proxies (Vercel, Render, etc.) so rate
+// limiting keys on the real client IP, not the proxy's IP.
+app.set('trust proxy', 1)
+
 /* ── Security ─────────────────────────────────────────────── */
 app.use(helmet())
 app.use(
@@ -21,30 +26,34 @@ app.use(
   }),
 )
 
-/* ── Rate limiting ────────────────────────────────────────── */
-/** Standard limiter for data fetching */
-const standardLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 300,
-  message: { error: 'Too many requests, please try again later.', code: 'RATE_LIMIT_EXCEEDED' },
+/* ── Rate Limiting ────────────────────────────────────────── */
+
+/** Global API limiter — 100 req / 1 min per IP */
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  message: { success: false, error: 'Too many requests, please try again later.', code: 'RATE_LIMIT_EXCEEDED' },
   standardHeaders: true,
   legacyHeaders: false,
 })
 
-/** Strict limiter for authentication routes (login/register/token) */
-const authLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20, // 20 attempts per hour
-  message: { error: 'Too many login attempts, please try again after an hour.', code: 'AUTH_RATE_LIMIT' },
+/** Strict limiter for heavy / sensitive operations — 10 req / 1 min per IP */
+const strictLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { success: false, error: 'Rate limit exceeded for heavy operations. Please wait.', code: 'STRICT_RATE_LIMIT_EXCEEDED' },
   standardHeaders: true,
   legacyHeaders: false,
 })
 
-// Apply global protection
-app.use(standardLimiter)
-// Apply strict protection to auth paths
-app.use('/api/v1/auth', authLimiter)
-app.use('/api/auth', authLimiter)
+// Apply global protection to all /api/* routes
+app.use('/api', apiLimiter)
+
+// Aggressively protect scraper + auth (applied before route mounts)
+app.use('/api/v1/ipu', strictLimiter)
+app.use('/api/ipu', strictLimiter)
+app.use('/api/v1/auth', strictLimiter)
+app.use('/api/auth', strictLimiter)
 
 /* ── Compression ─────────────────────────────────────────── */
 app.use(compression({ threshold: 1024 })) // skip tiny responses
