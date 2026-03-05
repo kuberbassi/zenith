@@ -109,9 +109,9 @@ const Practicals: React.FC = () => {
                         </div>
                         <p className="text-white/40 font-medium max-w-md">Track your project submissions, practical records, and assignment milestones in ultra-stealth mode.</p>
                     </div>
-                    <div className="flex gap-4 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+                    <div className="flex gap-1.5 md:gap-4 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.04] overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
                         {categories.map(cat => (
-                            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedCategory === cat ? 'bg-blue-500 text-white shadow-xl shadow-blue-500/20' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{cat}</button>
+                            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 md:px-5 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex-shrink-0 ${selectedCategory === cat ? 'bg-blue-500 text-white shadow-xl shadow-blue-500/20' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{cat}</button>
                         ))}
                     </div>
                 </div>

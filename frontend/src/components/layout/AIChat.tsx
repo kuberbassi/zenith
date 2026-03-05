@@ -50,6 +50,7 @@ const AIChat: React.FC = () => {
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -64,6 +65,18 @@ const AIChat: React.FC = () => {
         const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
         setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 100);
     };
+
+    // Close panel on outside click
+    useEffect(() => {
+        if (!isOpen) return;
+        const handler = (e: MouseEvent) => {
+            if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [isOpen]);
 
     const handleSend = async (text?: string) => {
         const msg = (text || input).trim();
@@ -147,6 +160,7 @@ const AIChat: React.FC = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                        ref={panelRef}
                         className="fixed bottom-24 right-3 lg:bottom-8 lg:right-8 z-50 w-[calc(100vw-24px)] max-w-[380px] h-[520px] max-h-[80vh] flex flex-col overflow-hidden rounded-2xl"
                         style={{
                             background: '#0c0c0f',
