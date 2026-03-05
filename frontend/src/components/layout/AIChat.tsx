@@ -141,7 +141,7 @@ const AIChat: React.FC = () => {
                         whileHover={{ scale: 1.08, y: -2 }}
                         whileTap={{ scale: 0.92 }}
                         onClick={() => setIsOpen(true)}
-                        className="fixed bottom-6 md:bottom-[112px] right-6 lg:right-8 z-50 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center overflow-hidden group"
+                        className="fixed bottom-6 right-6 lg:right-8 z-50 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center overflow-hidden group"
                         style={{
                             background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #6366f1 100%)',
                             boxShadow: '0 4px 24px rgba(99, 102, 241, 0.4), 0 2px 8px rgba(0,0,0,0.3)',
@@ -161,7 +161,7 @@ const AIChat: React.FC = () => {
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
                         ref={panelRef}
-                        className="fixed bottom-[80px] md:bottom-[112px] right-6 lg:right-8 z-50 w-[calc(100vw-24px)] max-w-[380px] h-[520px] max-h-[calc(100vh-104px)] flex flex-col overflow-hidden rounded-2xl"
+                        className="fixed bottom-[80px] right-6 lg:right-8 z-50 w-[calc(100vw-24px)] max-w-[380px] h-[520px] max-h-[calc(100vh-104px)] flex flex-col overflow-hidden rounded-2xl"
                         style={{
                             background: '#0c0c0f',
                             border: '1px solid rgba(255,255,255,0.06)',

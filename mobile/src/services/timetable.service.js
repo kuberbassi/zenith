@@ -29,17 +29,22 @@ export const saveTimetableStructure = async (structure) => {
 // ────────────── Slots ──────────────────────────────────────
 
 export const addSlot = async (slot) => {
-  const { data } = await api.post('/api/timetable/slot', slot);
+  const { semester, ...body } = slot;
+  const params = semester ? { semester } : {};
+  const { data } = await api.post('/api/timetable/slot', body, { params });
   return data;
 };
 
-export const updateSlot = async (slot) => {
-  const { data } = await api.put('/api/timetable/slot', slot);
+export const updateSlot = async (slotId, updates) => {
+  const { semester, ...body } = updates;
+  const params = semester ? { semester } : {};
+  const { data } = await api.put(`/api/timetable/slot/${slotId}`, body, { params });
   return data;
 };
 
-export const deleteSlot = async (slotData) => {
-  const { data } = await api.delete('/api/timetable/slot', { data: slotData });
+export const deleteSlot = async (slotId, semester) => {
+  const params = semester ? { semester } : {};
+  const { data } = await api.delete(`/api/timetable/slot/${slotId}`, { params });
   return data;
 };
 

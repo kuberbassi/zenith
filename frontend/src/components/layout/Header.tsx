@@ -72,26 +72,26 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
 
     return (
         <>
-            {/* ── Floating Pill Header — fixed to viewport ─────────── */}
-            <div className="hidden lg:flex fixed top-4 left-1/2 -translate-x-1/2 z-40 w-auto">
-                <div className="flex items-center h-14 px-3 rounded-full bg-[#111]/85 backdrop-blur-2xl border border-white/[0.1]" style={{ boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 4px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+            {/* ── Floating Pill Header — fixed to viewport (all screen sizes) ── */}
+            <div className="flex fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-24px)]">
+                <div className="flex items-center h-11 md:h-14 px-2 md:px-3 rounded-full bg-[#111]/90 backdrop-blur-2xl border border-white/[0.1]" style={{ boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 4px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
                     {/* Page icon + title */}
-                    <div className="flex items-center gap-3 px-4">
-                        <PageIcon size={18} className="text-white/40" />
-                        <span className="text-[15px] font-medium text-white/70">{currentPage.title}</span>
+                    <div className="flex items-center gap-1.5 md:gap-3 px-2 md:px-4">
+                        <PageIcon size={16} className="text-white/40 shrink-0" />
+                        <span className="text-[13px] md:text-[15px] font-medium text-white/70 truncate max-w-[62px] sm:max-w-[90px] md:max-w-none">{currentPage.title}</span>
                     </div>
 
                     {/* Divider */}
-                    <div className="w-px h-8 bg-white/[0.08]" />
+                    <div className="w-px h-6 md:h-8 bg-white/[0.08]" />
 
                     {/* Semester Selector */}
-                    <div className="relative px-2">
+                    <div className="relative px-0.5 md:px-2">
                         <button
                             onClick={(e) => { e.stopPropagation(); setSemDropOpen(!semDropOpen); }}
-                            className="flex items-center gap-2 px-4 py-2 rounded-full hover:bg-white/[0.06] transition-colors text-sm font-medium text-white/50 hover:text-white/70"
+                            className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-full hover:bg-white/[0.06] transition-colors text-xs md:text-sm font-medium text-white/50 hover:text-white/70 whitespace-nowrap"
                         >
                             Sem {currentSemester}
-                            <ChevronDown size={14} className={`transition-transform ${semDropOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown size={12} className={`transition-transform ${semDropOpen ? 'rotate-180' : ''}`} />
                         </button>
                         <AnimatePresence>
                             {semDropOpen && (
@@ -120,38 +120,38 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
                     </div>
 
                     {/* Divider */}
-                    <div className="w-px h-8 bg-white/[0.08]" />
+                    <div className="w-px h-6 md:h-8 bg-white/[0.08]" />
 
                     {/* Search */}
                     <button
                         onClick={() => setSearchOpen(true)}
-                        className="flex items-center gap-3 px-4 py-2 rounded-full hover:bg-white/[0.06] transition-colors"
+                        className="flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2 rounded-full hover:bg-white/[0.06] transition-colors"
                     >
-                        <Search size={16} className="text-white/35" />
-                        <span className="text-xs text-white/20">⌘K</span>
+                        <Search size={15} className="text-white/35" />
+                        <span className="hidden md:block text-xs text-white/20">⌘K</span>
                     </button>
 
                     {/* Divider */}
-                    <div className="w-px h-8 bg-white/[0.08]" />
+                    <div className="w-px h-6 md:h-8 bg-white/[0.08]" />
 
-                    {/* Notifications — dynamic, no hardcoded badge */}
-                    <div className="px-2 flex items-center gap-2">
+                    {/* Notifications */}
+                    <div className="px-1 md:px-2 flex items-center gap-0.5 md:gap-2">
                         <Link
                             to="/notifications"
-                            className="relative flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/[0.06] transition-colors text-white/35 hover:text-white/60"
+                            className="relative flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full hover:bg-white/[0.06] transition-colors text-white/35 hover:text-white/60"
                         >
-                            <Bell size={18} />
+                            <Bell size={16} />
                             {notificationCount > 0 && (
-                                <span className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full" />
+                                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
                             )}
                         </Link>
 
                         {/* Settings */}
                         <Link
                             to="/settings"
-                            className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-white/[0.06] transition-colors text-white/35 hover:text-white/60 mr-1"
+                            className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full hover:bg-white/[0.06] transition-colors text-white/35 hover:text-white/60 mr-0.5 md:mr-1"
                         >
-                            <Settings size={18} />
+                            <Settings size={16} />
                         </Link>
                     </div>
                 </div>

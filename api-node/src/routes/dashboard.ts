@@ -17,7 +17,7 @@ router.get('/data', async (req: AuthRequest, res) => {
 
     const [subjects, recentLogs] = await Promise.all([
       Subject.find({ ...uf(req), semester })
-        .select('name code attended total target semester type professor')
+        .select('name code attended total target semester type professor categories practicals assignments')
         .sort({ name: 1 })
         .lean(),
       AttendanceLog.find({ ...uf(req), semester })

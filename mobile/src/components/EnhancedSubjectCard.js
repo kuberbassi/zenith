@@ -103,21 +103,6 @@ const EnhancedSubjectCard = ({ subject, onPress, isDark, threshold: propThreshol
                     </View>
                 </View>
 
-                {/* Quick Actions */}
-                <View style={styles.actionRow}>
-                    <TouchableOpacity
-                        onPress={() => onMark?.(subject._id, 'present')}
-                        style={[styles.actionBtn, { backgroundColor: c.success + '15', borderColor: c.success + '30' }]}
-                    >
-                        <Text style={[styles.actionBtnText, { color: c.success }]}>PRESENT</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => onMark?.(subject._id, 'absent')}
-                        style={[styles.actionBtn, { backgroundColor: c.danger + '15', borderColor: c.danger + '30' }]}
-                    >
-                        <Text style={[styles.actionBtnText, { color: c.danger }]}>ABSENT</Text>
-                    </TouchableOpacity>
-                </View>
             </LinearGradient>
         </PressableScale>
     );
@@ -235,24 +220,6 @@ const getStyles = (c, isDark) => StyleSheet.create({
         textAlign: 'center',
         letterSpacing: -0.2
     },
-    actionRow: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 16
-    },
-    actionBtn: {
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 14,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    actionBtnText: {
-        fontSize: 12,
-        fontWeight: '900',
-        letterSpacing: 1
-    }
 });
 
 export default React.memo(EnhancedSubjectCard);

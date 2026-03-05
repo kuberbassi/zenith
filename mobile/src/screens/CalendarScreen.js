@@ -84,7 +84,7 @@ const CalendarScreen = ({ navigation }) => {
 
             setCalendarData(prev => ({
                 ...prev,
-                [key]: data || {}
+                [key]: data?.calendar || {}
             }));
         } catch (e) {
             console.error(`Failed to fetch month ${year}-${month}`, e);

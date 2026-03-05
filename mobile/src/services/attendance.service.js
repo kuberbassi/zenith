@@ -62,22 +62,22 @@ export const getLogsForDate = async (date) => {
 
 // ── IPU Results ────────────────────────────────────────────
 export const getSavedIPUResults = async () => {
-  const { data } = await api.get('/api/attendance/ipu-results/saved');
+  const { data } = await api.get('/api/ipu/saved-results');
   return data;
 };
 
 export const autoFetchIPUResults = async (credentials) => {
-  const { data } = await api.post('/api/attendance/ipu-results/auto-fetch', credentials);
+  const { data } = await api.post('/api/ipu/auto-fetch', credentials);
   return data;
 };
 
 export const fetchIPUResults = async (payload) => {
-  const { data } = await api.post('/api/attendance/ipu-results/fetch', payload);
+  const { data } = await api.post('/api/ipu/fetch-results', payload);
   return data;
 };
 
 export const getIPUCaptcha = async () => {
-  const { data } = await api.get('/api/attendance/ipu-results/captcha');
+  const { data } = await api.get('/api/ipu/captcha');
   return data;
 };
 

@@ -375,7 +375,6 @@ const DashboardScreen = ({ navigation }) => {
                                 setEditingSubject(subject);
                                 setModalVisible(true);
                             }}
-                            onMark={handleMarkAttendance}
                         />
                     ))}
 

@@ -582,7 +582,7 @@ const ResultsScreen = ({ navigation }) => {
                             </TouchableOpacity>
                             <TouchableOpacity onPress={handleFetchResultsWithCaptcha} disabled={fetching} style={{ flex: 1 }}>
                                 <LinearGradient colors={theme.gradients.primary} style={styles.syncBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                                    {fetching ? <ActivityIndicator color="#FFF" /> : <Text style={styles.syncBtnText}>VERIFY</Text>}
+                                    {fetching ? <ActivityIndicator color="#FFF" /> : <Text style={styles.syncBtnText}>CONFIRM SYNC</Text>}
                                 </LinearGradient>
                             </TouchableOpacity>
                         </View>
