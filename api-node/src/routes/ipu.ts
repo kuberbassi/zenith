@@ -10,7 +10,7 @@ import { SemesterResult } from '../models/SemesterResult.js'
 import { User } from '../models/User.js'
 import { ok, fail } from '../utils/response.js'
 import { uf, ownership } from '../utils/userFilter.js'
-import { fetchIpuResults, fetchAllIpuResults } from '../services/ipuResultsFetcher.service.js'
+import { fetchIpuResults, fetchAllIpuResults, type FetchedSemesterResult } from '../services/ipuResultsFetcher.service.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -33,13 +33,18 @@ const HEADERS = {
 
 /* ── Per-user axios session store (keeps cookies across requests) ────── */
 
-const _sessions = new LRUCache<string, AxiosInstance>({ max: 100, ttl: 30 * 60 * 1000 })
+interface IpuSession {
+  client: AxiosInstance
+  getCookies: () => string
+}
 
-function getSession(userId: string): AxiosInstance {
+const _sessions = new LRUCache<string, IpuSession>({ max: 100, ttl: 30 * 60 * 1000 })
+
+function getSession(userId: string): IpuSession {
   if (!_sessions.has(userId)) {
     const jar: Record<string, string> = {}
 
-    const instance = axios.create({
+    const client = axios.create({
       headers: HEADERS,
       timeout: 20_000,
       maxRedirects: 5,
@@ -47,18 +52,18 @@ function getSession(userId: string): AxiosInstance {
     })
 
     // ── cookie interceptors (lightweight cookie-jar) ──
-    instance.interceptors.response.use((resp) => {
+    client.interceptors.response.use((resp) => {
       const setCookies = resp.headers['set-cookie']
       if (setCookies) {
         for (const raw of setCookies) {
-          const m = raw.match(/^([^=]+)=([^;]*)/)
+          const m = raw.match(/^([^=]+)=([^;]*)/) 
           if (m) jar[m[1]] = m[2]
         }
       }
       return resp
     })
 
-    instance.interceptors.request.use((cfg) => {
+    client.interceptors.request.use((cfg) => {
       const cookieStr = Object.entries(jar)
         .map(([k, v]) => `${k}=${v}`)
         .join('; ')
@@ -66,9 +71,12 @@ function getSession(userId: string): AxiosInstance {
       return cfg
     })
 
-    _sessions.set(userId, instance)
-  }
-  return _sessions.get(userId)!
+    const getCookies = () =>
+      Object.entries(jar)
+        .map(([k, v]) => `${k}=${v}`)
+        .join('; ')
+
+    _sessions.set(userId, { client, getCookies })
 }
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
@@ -80,169 +88,6 @@ function detectField($form: cheerio.Cheerio<any>, $: cheerio.CheerioAPI, candida
     if (inp.length) return inp.attr('name') || null
   }
   return null
-}
-
-/** Roman-numeral-aware semester label → number */
-function semLabelToNumber(label: string, value: string): string {
-  const roman: Record<string, number> = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8 }
-  const lc = label.trim().toLowerCase()
-  for (const [rom, num] of Object.entries(roman)) {
-    if (lc.endsWith(`-${rom}`) || lc.endsWith(` ${rom}`) || lc === rom) return String(num)
-  }
-  const labDigits = label.match(/\d+/)
-  if (labDigits) return labDigits[0]
-  const valDigits = value.match(/\d+/)
-  if (valDigits) return valDigits[0]
-  return label
-}
-
-/** Extract student info (name, programme, institution, batch) from any IPU page */
-function extractStudentInfo($: cheerio.CheerioAPI): Record<string, string> {
-  const info: Record<string, string> = {}
-  const patterns: Record<string, string[]> = {
-    name: ['student name', 'name'],
-    programme: ['programme', 'program', 'course', 'branch'],
-    institution: ['institution', 'college', 'school', 'institute'],
-    batch: ['batch', 'year'],
-  }
-
-  for (const [key, labels] of Object.entries(patterns)) {
-    for (const label of labels) {
-      // look for text nodes containing the label
-      let found = false
-      $('td, th, div, span, label, p').each((_i, el) => {
-        if (found) return
-        const txt = $(el).text().trim().toLowerCase()
-        if (!txt.includes(label)) return
-
-        // try sibling
-        const sib = $(el).next('td, div, span')
-        if (sib.length && sib.text().trim()) {
-          info[key] = sib.text().trim()
-          found = true
-          return
-        }
-        // try next td in same tr
-        const tr = $(el).closest('tr')
-        if (tr.length) {
-          const tds = tr.find('td')
-          tds.each((idx, td) => {
-            if (found) return
-            if ($(td).text().trim().toLowerCase().includes(label) && idx + 1 < tds.length) {
-              const val = $(tds[idx + 1]).text().trim()
-              if (val) { info[key] = val; found = true }
-            }
-          })
-        }
-      })
-      if (found) break
-    }
-  }
-  return info
-}
-
-interface SubjectResult {
-  code?: string
-  name?: string
-  internal?: string
-  external?: string
-  marks?: string
-  max_marks?: string
-  grade?: string
-  grade_points?: string
-  credits?: string
-  status?: string
-}
-
-interface SemesterData {
-  semester: string
-  semester_num: number
-  semester_label: string
-  subjects: SubjectResult[]
-  sgpa: string | null
-  total_marks: string | null
-  max_marks: string | null
-}
-
-/** Parse a single semester's result page */
-function parseSemesterResultPage($: cheerio.CheerioAPI, semNum: string, semLabel: string): SemesterData {
-  const sem: SemesterData = {
-    semester: semNum,
-    semester_num: parseInt(semNum.replace(/\D/g, '') || '0', 10) || 0,
-    semester_label: semLabel,
-    subjects: [],
-    sgpa: null,
-    total_marks: null,
-    max_marks: null,
-  }
-
-  // Find SGPA
-  $('td, th, div, span, p').each((_i, el) => {
-    const t = $(el).text().trim().toLowerCase()
-    if (/(sgpa|s\.g\.p\.a)/.test(t)) {
-      const sib = $(el).next('td, div, span')
-      if (sib.length) {
-        const m = sib.text().match(/[\d.]+/)
-        if (m) sem.sgpa = m[0]
-      }
-    }
-  })
-
-  // Find subject table
-  $('table').each((_ti, tbl) => {
-    if (sem.subjects.length) return // already found
-
-    const rows = $(tbl).find('tr')
-    if (rows.length < 2) return
-
-    const headerCells = $(rows[0]).find('th, td')
-    const headers = headerCells.map((_i, c) => $(c).text().trim().toLowerCase()).get()
-    if (!headers.length) return
-
-    const hasSubject = headers.some((h) => /paper|subject|title|course/.test(h))
-    const hasMarks = headers.some((h) => /mark|grade|score|total|credit/.test(h))
-    if (!hasSubject && !hasMarks) return
-
-    const subjects: SubjectResult[] = []
-    rows.slice(1).each((_ri, row) => {
-      const cells = $(row).find('td, th')
-      if (cells.length < 2) return
-      const texts = cells.map((_i, c) => $(c).text().trim()).get()
-
-      if (texts.every((t) => !t)) return
-      const first = texts[0].toLowerCase()
-      if (/^(total|sgpa|cgpa|result|grand)/.test(first)) {
-        // extract total/max from summary row
-        headers.forEach((h, idx) => {
-          if (idx >= texts.length) return
-          if (/total/.test(h) && texts[idx].match(/[\d.]+/) && !sem.total_marks) sem.total_marks = texts[idx]
-          if (/max/.test(h) && texts[idx].match(/[\d.]+/) && !sem.max_marks) sem.max_marks = texts[idx]
-        })
-        return
-      }
-
-      const subj: SubjectResult = {}
-      headers.forEach((h, idx) => {
-        if (idx >= texts.length || !texts[idx]) return
-        const v = texts[idx]
-        if (/paper/.test(h) && !/title|name/.test(h)) subj.code = v
-        else if (/title|subject|paper name|paper title|course/.test(h)) subj.name = v
-        else if (/internal|sessional|minor|\bia\b/.test(h)) subj.internal = v
-        else if (/external|theory|major|\bea\b/.test(h)) subj.external = v
-        else if (/total|marks obtained|marks/.test(h)) subj.marks = v
-        else if (/max|maximum/.test(h)) subj.max_marks = v
-        else if (/grade point|gp/.test(h)) subj.grade_points = v
-        else if (/grade/.test(h)) subj.grade = v
-        else if (/credit|cr/.test(h)) subj.credits = v
-        else if (/status|result|pass|fail/.test(h)) subj.status = v
-      })
-      if (subj.name || subj.code) subjects.push(subj)
-    })
-
-    if (subjects.length) sem.subjects = subjects
-  })
-
-  return sem
 }
 
 /** Detect if the account is locked/blocked */
@@ -264,219 +109,6 @@ function detectAccountLockout(html: string): string | null {
     }
   }
   return null
-}
-
-/** After login, iterate all semesters and scrape results */
-async function scrapeAllSemesters(sess: AxiosInstance, enrollment: string, loginPageHtml?: string) {
-  const result: { enrollment_number: string; student_info: Record<string, string>; semesters: SemesterData[] } = {
-    enrollment_number: enrollment,
-    student_info: {},
-    semesters: [],
-  }
-
-  // Candidate dashboard URLs (known portal paths)
-  const candidateUrls = [
-    IPU_HOME_URL,
-    `${IPU_BASE}/web/studenthome.jsp`,
-    `${IPU_BASE}/web/student/dashboard.jsp`,
-    `${IPU_BASE}/web/newStudentDashboard.jsp`,
-    `${IPU_BASE}/web/student/result.jsp`,
-    `${IPU_BASE}/web/result.jsp`,
-    `${IPU_BASE}/web/student/viewresult.jsp`,
-    `${IPU_BASE}/web/viewResult.jsp`,
-    `${IPU_BASE}/web/student/home.jsp`,
-    `${IPU_BASE}/web/home.jsp`,
-    `${IPU_BASE}/web/Student/StudentHome.jsp`,
-    `${IPU_BASE}/web/Student/Home.jsp`,
-    `${IPU_BASE}/web/Student/Result.jsp`,
-  ]
-
-  let $home: cheerio.CheerioAPI | null = null
-  let dashboardUrl: string | null = null
-
-  // 1) Check the login response itself — it might already be the dashboard
-  if (loginPageHtml) {
-    const $try = cheerio.load(loginPageHtml)
-
-    // Check for selects (semester, exam type, etc.)
-    const sel = $try('select')
-    if (sel.length) {
-      console.log(`[IPU] Login response contains ${sel.length} select element(s)`)
-      $home = $try
-    }
-
-    // If no select, look for links to result/dashboard pages and follow them
-    if (!$home) {
-      const links: string[] = []
-      $try('a[href]').each((_i, el) => {
-        const href = $try(el).attr('href')?.trim()
-        if (href && !href.startsWith('#') && !href.startsWith('javascript')) {
-          links.push(resolveIpuUrl(href))
-        }
-      })
-      // Also check frames/iframes
-      $try('frame[src], iframe[src]').each((_i, el) => {
-        const src = $try(el).attr('src')?.trim()
-        if (src) links.push(resolveIpuUrl(src))
-      })
-
-      console.log(`[IPU] Post-login page has ${links.length} links. Checking for result pages...`)
-
-      // Prioritize links with result/semester/exam keywords
-      const resultLinks = links.filter(l => /result|semester|exam|marks|grade|student|home|dashboard/i.test(l))
-      const allToTry = [...new Set([...resultLinks, ...links])]
-
-      for (const link of allToTry.slice(0, 15)) {
-        try {
-          const resp = await sess.get(link, { validateStatus: (s) => s < 500, timeout: 10_000 })
-          if (resp.status === 200 && typeof resp.data === 'string' && resp.data.length > 200) {
-            const $try2 = cheerio.load(resp.data)
-            if ($try2('select').length || $try2('table').filter((_i, t) => {
-              const text = $try2(t).text().toLowerCase()
-              return /paper|subject|grade|credit|marks/.test(text)
-            }).length) {
-              console.log(`[IPU] Found dashboard/results at link: ${link}`)
-              $home = $try2
-              dashboardUrl = link
-              break
-            }
-          }
-        } catch { /* next */ }
-      }
-
-      // If still nothing, check if the page itself has result tables
-      if (!$home) {
-        const tables = $try('table')
-        tables.each((_i, tbl) => {
-          if ($home) return
-          const text = $try(tbl).text().toLowerCase()
-          if (/paper|subject|grade|credit|marks|internal|external/.test(text)) {
-            console.log('[IPU] Login response itself contains result tables')
-            $home = $try
-          }
-        })
-      }
-    }
-  }
-
-  // 2) Try candidate dashboard URLs
-  if (!$home) {
-    for (const url of candidateUrls) {
-      try {
-        const resp = await sess.get(url, { validateStatus: (s) => s < 500, timeout: 10_000 })
-        if (resp.status === 200 && typeof resp.data === 'string' && resp.data.length > 200) {
-          const $try = cheerio.load(resp.data)
-          if ($try('select').length || $try('table').filter((_i, t) => {
-            return /paper|subject|grade|credit|marks/.test($try(t).text().toLowerCase())
-          }).length) {
-            console.log(`[IPU] Found dashboard at candidate URL: ${url}`)
-            $home = $try
-            dashboardUrl = url
-            break
-          }
-        }
-      } catch { /* next */ }
-    }
-  }
-
-  if (!$home) {
-    // Log what we actually got for debugging
-    if (loginPageHtml) {
-      const $debug = cheerio.load(loginPageHtml)
-      const title = $debug('title').text().trim()
-      const bodyText = $debug('body').text().trim().substring(0, 300)
-      console.warn(`[IPU] Could not find results page. Post-login page title: "${title}", body preview: "${bodyText}"`)
-    } else {
-      console.warn('[IPU] Could not find any page with results')
-    }
-    return result
-  }
-
-  result.student_info = extractStudentInfo($home)
-
-  // Strategy A: Find semester <select> and iterate options
-  let semSelect = $home('select[name*="sem" i], select[name*="term" i], select[name*="annual" i], select[name*="extype" i]')
-  if (!semSelect.length) semSelect = $home('select').first()
-
-  if (semSelect.length) {
-    const selectName = semSelect.attr('name') || 'semester'
-    const options: { value: string; label: string }[] = []
-    semSelect.find('option').each((_i, opt) => {
-      const val = $home!(opt).attr('value')?.trim() || ''
-      const label = $home!(opt).text().trim()
-      if (!val || val === '0' || val === '-1' || label.includes('--')) return
-      options.push({ value: val, label })
-    })
-    console.log(`[IPU] Found ${options.length} semester options via select`)
-
-    const semForm = semSelect.closest('form')
-    let action = semForm.attr('action')?.trim() || ''
-    if (action && !action.startsWith('http')) action = resolveIpuUrl(action)
-    if (!action) action = dashboardUrl || IPU_HOME_URL
-    const method = (semForm.attr('method') || 'post').toLowerCase()
-
-    const homeHidden: Record<string, string> = {}
-    semForm.find('input[type="hidden"]').each((_i, inp) => {
-      const nm = $home!(inp).attr('name')
-      if (nm) homeHidden[nm] = $home!(inp).attr('value') || ''
-    })
-
-    for (const opt of options) {
-      const semNum = semLabelToNumber(opt.label, opt.value)
-      try {
-        const payload: Record<string, string> = { ...homeHidden, [selectName]: opt.value }
-        let semResp
-        if (method === 'get') {
-          semResp = await sess.get(action, { params: payload })
-        } else {
-          semResp = await sess.post(action, new URLSearchParams(payload).toString(), {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          })
-        }
-
-        if (semResp.status !== 200 || (typeof semResp.data === 'string' && semResp.data.length < 200)) {
-          console.warn(`[IPU] Skipping ${opt.label}: bad response`)
-          continue
-        }
-
-        const $sem = cheerio.load(semResp.data)
-        const semData = parseSemesterResultPage($sem, semNum, opt.label)
-
-        if (semData.subjects.length || semData.total_marks) {
-          result.semesters.push(semData)
-          if (!Object.keys(result.student_info).length) {
-            result.student_info = extractStudentInfo($sem)
-          }
-        }
-      } catch (e) {
-        console.error(`[IPU] Error fetching semester ${opt.label}:`, e)
-      }
-    }
-  }
-
-  // Strategy B: If no select found, try parsing tables directly from the page
-  if (!result.semesters.length) {
-    console.log('[IPU] No semester select found. Trying direct table parsing...')
-    const tables = $home('table')
-    let tableIdx = 0
-    tables.each((_i, tbl) => {
-      const text = $home!(tbl).text().toLowerCase()
-      if (/paper|subject|grade|credit|marks/.test(text)) {
-        tableIdx++
-        const $wrapper = cheerio.load($home!.html(tbl) || '')
-        const semData = parseSemesterResultPage($wrapper, String(tableIdx), `Semester ${tableIdx}`)
-        if (semData.subjects.length) {
-          result.semesters.push(semData)
-        }
-      }
-    })
-    if (result.semesters.length) {
-      console.log(`[IPU] Parsed ${result.semesters.length} semesters from direct tables`)
-    }
-  }
-
-  result.semesters.sort((a, b) => a.semester_num - b.semester_num)
-  return result
 }
 
 /** Resolve a relative URL against the IPU base + /web/ context */
@@ -539,47 +171,29 @@ function detectLoginAction($: cheerio.CheerioAPI): string {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   HELPERS — grade calculation & DB persistence
+   HELPERS — DB persistence (uses FetchedSemesterResult from JSON API)
    ═══════════════════════════════════════════════════════════════════════ */
 
-const GRADE_POINTS: Record<string, number> = {
-  'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C+': 5, 'C': 4, 'P': 4, 'F': 0, 'Ab': 0, 'I': 0,
-}
-
-function calcSGPA(subjects: SubjectResult[]): number {
-  const valid = subjects.filter(s => s.credits && parseFloat(s.credits) > 0)
-  if (!valid.length) return 0
-  const totalCr = valid.reduce((a, s) => a + parseFloat(s.credits!), 0)
-  const totalPt = valid.reduce((a, s) => a + (parseFloat(s.credits!) * (GRADE_POINTS[s.grade ?? ''] ?? 0)), 0)
-  return parseFloat((totalPt / totalCr).toFixed(2))
-}
-
-/** Save scraped results to semester_results collection and update user profile */
-async function saveResultsToDB(req: AuthRequest, results: { enrollment_number: string; student_info: Record<string, string>; semesters: SemesterData[] }) {
+/** Save fetched results to semester_results collection and update user profile */
+async function saveResultsToDB(req: AuthRequest, results: { enrollment_number: string; student_info: Record<string, unknown>; semesters: FetchedSemesterResult[] }) {
   const userId = req.userId!
   const own = ownership(req)
 
   for (const sem of results.semesters) {
-    const semNum = sem.semester_num || parseInt(sem.semester.replace(/\D/g, '') || '0', 10)
-    if (!semNum) continue
-
-    const sgpa = sem.sgpa ? parseFloat(sem.sgpa) : calcSGPA(sem.subjects)
-    const totalCredits = sem.subjects.reduce((a, s) => a + (parseFloat(s.credits ?? '0') || 0), 0)
+    if (!sem.semester) continue
 
     await SemesterResult.findOneAndUpdate(
-      { user_id: new Types.ObjectId(userId), semester: semNum },
+      { user_id: new Types.ObjectId(userId), semester: sem.semester },
       {
         $set: {
           ...own,
-          enrollment_number: results.enrollment_number,
-          semester: semNum,
-          semester_label: sem.semester_label || `Semester ${semNum}`,
+          enrollment_number: sem.enrollment_number,
+          semester: sem.semester,
+          semester_label: `Semester ${sem.semester}`,
           subjects: sem.subjects,
-          sgpa,
-          total_credits: totalCredits,
-          total_marks: sem.total_marks || undefined,
-          max_marks: sem.max_marks || undefined,
-          student_info: results.student_info,
+          sgpa: sem.sgpa,
+          total_credits: sem.total_credits,
+          student_info: sem.student_info,
           source: 'ipu_scraper',
           updated_at: new Date(),
         },
@@ -588,17 +202,22 @@ async function saveResultsToDB(req: AuthRequest, results: { enrollment_number: s
     )
   }
 
-  // Update user profile with student info
-  const profileUpdate: Record<string, unknown> = {}
-  if (results.enrollment_number) profileUpdate.enrollment_number = results.enrollment_number
-  if (results.student_info?.institution) profileUpdate.college = results.student_info.institution
-  if (results.student_info?.programme) profileUpdate.course = results.student_info.programme
-  if (results.student_info?.programme) profileUpdate.branch = results.student_info.programme
-  if (results.student_info?.batch) profileUpdate.batch = results.student_info.batch
-  if (results.student_info?.name) profileUpdate.name = results.student_info.name
+  // Update user profile with student info from first semester
+  if (results.semesters.length) {
+    const info = results.semesters[0].student_info
+    const profileUpdate: Record<string, unknown> = {}
+    if (results.enrollment_number) profileUpdate.enrollment_number = results.enrollment_number
+    if (info.institution) profileUpdate.college = info.institution
+    if (info.programme) {
+      profileUpdate.course = info.programme
+      profileUpdate.branch = info.programme
+    }
+    if (info.batch) profileUpdate.batch = info.batch
+    if (info.name) profileUpdate.name = info.name
 
-  if (Object.keys(profileUpdate).length) {
-    await User.updateOne({ _id: userId }, { $set: profileUpdate })
+    if (Object.keys(profileUpdate).length) {
+      await User.updateOne({ _id: userId }, { $set: profileUpdate })
+    }
   }
 
   console.log(`[IPU] Saved ${results.semesters.length} semesters to DB for user ${userId}`)
@@ -610,7 +229,7 @@ async function saveResultsToDB(req: AuthRequest, results: { enrollment_number: s
 
 /* ── GET /api/ipu/captcha ─────────────────────────────────────────────── */
 router.get('/captcha', async (req: AuthRequest, res) => {
-  const sess = getSession(req.userId!)
+  const { client: sess } = getSession(req.userId!)
   try {
     const resp = await sess.get(IPU_LOGIN_URL)
     const $ = cheerio.load(resp.data)
@@ -640,7 +259,7 @@ router.get('/captcha', async (req: AuthRequest, res) => {
 
 /* ── POST /api/ipu/auto-fetch ─────────────────────────────────────────── */
 router.post('/auto-fetch', async (req: AuthRequest, res) => {
-  const sess = getSession(req.userId!)
+  const { client: sess } = getSession(req.userId!)
   const { enrollment_number = '', password = '' } = req.body || {}
   const enrollment = enrollment_number.trim()
   const pwd = password.trim()
@@ -685,7 +304,8 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
 
 /* ── POST /api/ipu/fetch-results ──────────────────────────────────────── */
 router.post('/fetch-results', async (req: AuthRequest, res) => {
-  const sess = getSession(req.userId!)
+  const session = getSession(req.userId!)
+  const sess = session.client
   const { enrollment_number = '', password = '', captcha = '', hidden_fields = {}, field_names = {}, login_action = '' } = req.body || {}
   const enrollment = enrollment_number.trim()
   const pwd = password.trim()
@@ -756,9 +376,16 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
       return fail(res, 'Login failed — incorrect credentials or CAPTCHA. Please try again.', 'LOGIN_FAILED', 401)
     }
 
-    // Successful login — scrape results
-    console.log('[IPU] Login successful, scraping semesters...')
-    const results = await scrapeAllSemesters(sess, enrollment, pageText)
+    // Successful login — fetch results via direct JSON API
+    console.log('[IPU] Login successful, fetching results via JSON API...')
+    const cookieString = session.getCookies()
+    const rawSemesters = await fetchAllIpuResults(cookieString)
+
+    const results = {
+      enrollment_number: enrollment,
+      student_info: rawSemesters.length > 0 ? rawSemesters[0].student_info : {},
+      semesters: rawSemesters,
+    }
 
     // Save to DB for persistent access
     if (results.semesters.length) {
@@ -768,7 +395,7 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
         console.error('[IPU] Failed to save results to DB:', dbErr)
       }
     } else {
-      console.warn('[IPU] Login succeeded but no semester data found. Returning debug info.')
+      console.warn('[IPU] Login succeeded but no semester data found.')
     }
 
     ok(res, results)
