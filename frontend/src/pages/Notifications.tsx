@@ -28,7 +28,14 @@ const Notifications: React.FC = () => {
             setLoading(true);
             setError(false);
             const data = await attendanceService.getNotices();
-            setNotices(data || []);
+            const parseDate = (d: string) => {
+                if (!d) return 0;
+                const p = d.split('-');
+                if (p.length === 3) return new Date(`${p[2]}-${p[1]}-${p[0]}`).getTime();
+                return new Date(d).getTime() || 0;
+            };
+            const sorted = (data || []).slice().sort((a: Notice, b: Notice) => parseDate(b.date) - parseDate(a.date));
+            setNotices(sorted);
         } catch (error) {
             console.error('Failed to load notices', error);
             setError(true);
