@@ -8,7 +8,7 @@
  *   • __DEV__ request timing logs
  */
 
-import { Platform } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
@@ -72,16 +72,12 @@ api.interceptors.response.use(
       } catch (_) { }
     }
 
-    // 429 → exponential backoff (max 3 retries)
-    if (status === 429 && config) {
-      const attempt = (config._retryCount || 0) + 1;
-      if (attempt <= 3) {
-        config._retryCount = attempt;
-        const delay = Math.pow(2, attempt - 1) * 1000 + Math.random() * 500;
-        if (__DEV__) console.warn(`⏳ 429 retry ${attempt}/3 in ${Math.round(delay)}ms`);
-        await new Promise((r) => setTimeout(r, delay));
-        return api.request(config);
-      }
+    // 429 → alert user, do not retry
+    if (status === 429) {
+      const msg = err.response?.data?.error
+        || 'You are making requests too quickly. Please wait a minute.';
+      Alert.alert('Rate Limited', msg);
+      return Promise.reject(err);
     }
 
     return Promise.reject(err);
