@@ -22,20 +22,36 @@ app.use(
 )
 
 /* ── Rate limiting ────────────────────────────────────────── */
-const limiter = rateLimit({
+/** Standard limiter for data fetching */
+const standardLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 300,
+  message: { error: 'Too many requests, please try again later.', code: 'RATE_LIMIT_EXCEEDED' },
   standardHeaders: true,
   legacyHeaders: false,
 })
-app.use(limiter)
+
+/** Strict limiter for authentication routes (login/register/token) */
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // 20 attempts per hour
+  message: { error: 'Too many login attempts, please try again after an hour.', code: 'AUTH_RATE_LIMIT' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// Apply global protection
+app.use(standardLimiter)
+// Apply strict protection to auth paths
+app.use('/api/v1/auth', authLimiter)
+app.use('/api/auth', authLimiter)
 
 /* ── Compression ─────────────────────────────────────────── */
 app.use(compression({ threshold: 1024 })) // skip tiny responses
 
 /* ── Body Parsing ────────────────────────────────────────── */
-app.use(express.json({ limit: '2mb' }))
-app.use(express.urlencoded({ extended: true }))
+app.use(express.json({ limit: '1mb' })) // Reduced limit for security
+app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 if (ENV.NODE_ENV === 'development') {
   app.use(morgan('dev'))
 } else if (ENV.NODE_ENV !== 'test') {

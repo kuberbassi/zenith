@@ -170,7 +170,8 @@ const CalendarScreen = ({ navigation }) => {
 
             setCalendarData(prev => {
                 const monthData = { ...(prev[monthKey] || {}) };
-                const dayLogs = [...(monthData[dateKey] || [])];
+                const dayData = monthData[dateKey] || {};
+                const dayLogs = Array.isArray(dayData.logs) ? [...dayData.logs] : (Array.isArray(dayData) ? [...dayData] : []);
 
                 // Remove existing log for this subject or specific log_id
                 const filteredLogs = dayLogs.filter(l => {
@@ -363,7 +364,8 @@ const CalendarScreen = ({ navigation }) => {
                         dayComponent={({ date, state }) => {
                             const dateStr = date.dateString;
                             const monthKey = dateStr.substring(0, 7);
-                            const dayLogs = calendarData[monthKey]?.[dateStr] || [];
+                            const dayData = calendarData[monthKey]?.[dateStr];
+                            const dayLogs = dayData?.logs || (Array.isArray(dayData) ? dayData : []);
 
                             return (
                                 <CalendarDay

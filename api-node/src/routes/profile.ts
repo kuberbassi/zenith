@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { Types } from 'mongoose'
+import { z } from 'zod'
 import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middleware/auth.js'
 import { User } from '../models/User.js'
 import { UserPreference } from '../models/UserPreference.js'
@@ -8,12 +9,52 @@ import { SystemLog } from '../models/SystemLog.js'
 import { ok, fail } from '../utils/response.js'
 import { uf } from '../utils/userFilter.js'
 import multer from 'multer'
+import sharp from 'sharp'
 
 const router = Router()
 router.use(requireAuth)
 
 // Multer: memory storage for base64 conversion
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
+
+const MAX_PFP_SIZE = 50 * 1024 // 50 KB
+
+// ─── Zod Schemas ─────────────────────────────────────────────────────────────
+
+const ProfileUpdateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  branch: z.string().max(200).optional(),
+  college: z.string().max(200).optional(),
+  semester: z.union([z.number().int().min(1).max(12), z.string()]).optional(),
+  batch: z.string().max(20).optional(),
+  course: z.string().max(200).optional(),
+  attendance_threshold: z.number().min(0).max(100).optional(),
+  warning_threshold: z.number().min(0).max(100).optional(),
+  enrollment_number: z.string().max(50).optional(),
+  phone_number: z.string().max(20).optional(),
+  headline: z.string().max(200).optional(),
+  linkedin_url: z.string().url().max(500).optional().or(z.literal('')),
+  github_url: z.string().url().max(500).optional().or(z.literal('')),
+  portfolio_url: z.string().url().max(500).optional().or(z.literal('')),
+}).strict()
+
+const ProfilePostSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  branch: z.string().max(200).optional(),
+  course: z.string().max(200).optional(),
+  college: z.string().max(200).optional(),
+  batch: z.string().max(20).optional(),
+  enrollment_number: z.string().max(50).optional(),
+  current_semester: z.union([z.number().int().min(1).max(12), z.string()]).optional(),
+  attendance_threshold: z.number().min(0).max(100).optional(),
+  warning_threshold: z.number().min(0).max(100).optional(),
+  target_attendance: z.number().min(0).max(100).optional(),
+  phone_number: z.string().max(20).optional(),
+  headline: z.string().max(200).optional(),
+  linkedin_url: z.string().url().max(500).optional().or(z.literal('')),
+  github_url: z.string().url().max(500).optional().or(z.literal('')),
+  portfolio_url: z.string().url().max(500).optional().or(z.literal('')),
+}).strict()
 
 async function sysLog(user_id: string, action: string, description: string) {
   await SystemLog.create({ user_id, action, description }).catch(() => null)
@@ -50,16 +91,17 @@ router.get('/', async (req: AuthRequest, res) => {
 router.put('/', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const data = req.body as Record<string, unknown>
-    const allowedFields = ['name', 'branch', 'college', 'semester', 'batch', 'course', 'attendance_threshold', 'warning_threshold', 'enrollment_number', 'phone_number', 'headline', 'linkedin_url', 'github_url', 'portfolio_url']
-    const updateData: Record<string, unknown> = {}
+    const parsed = ProfileUpdateSchema.safeParse(req.body)
+    if (!parsed.success) { fail(res, parsed.error.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
+    const data = parsed.data
+    const updateData: Record<string, unknown> = { ...data }
 
-    for (const k of allowedFields) {
-      if (k in data) updateData[k] = data[k]
-    }
     // Map 'semester' → 'current_semester' for schema compatibility
     if ('semester' in updateData) {
-      updateData.current_semester = parseInt(String(updateData.semester))
+      const semVal = parseInt(String(updateData.semester))
+      if (!isNaN(semVal) && semVal >= 1 && semVal <= 12) {
+        updateData.current_semester = semVal
+      }
       delete updateData.semester
     }
 
@@ -116,11 +158,20 @@ router.put('/', async (req: AuthRequest, res) => {
 router.post('/', async (req: AuthRequest, res) => {
   const userId = req.userId!
   try {
-    const body = req.body as Record<string, unknown>
-    const allowed = ['name', 'branch', 'course', 'college', 'batch', 'enrollment_number', 'current_semester',
-      'attendance_threshold', 'warning_threshold', 'target_attendance', 'phone_number', 'headline', 'linkedin_url', 'github_url', 'portfolio_url']
-    const updateData: Record<string, unknown> = {}
-    for (const k of allowed) { if (k in body) updateData[k] = body[k] }
+    const parsed = ProfilePostSchema.safeParse(req.body)
+    if (!parsed.success) { fail(res, parsed.error.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
+    const updateData: Record<string, unknown> = { ...parsed.data }
+
+    // Guard against NaN for current_semester
+    if ('current_semester' in updateData) {
+      const semVal = parseInt(String(updateData.current_semester))
+      if (isNaN(semVal) || semVal < 1 || semVal > 12) {
+        delete updateData.current_semester
+      } else {
+        updateData.current_semester = semVal
+      }
+    }
+
     if (Object.keys(updateData).length === 0) { ok(res, { message: 'No changes' }); return }
 
     console.log(`[profile POST] Updating user ${userId}:`, updateData)
@@ -142,11 +193,28 @@ router.post('/upload_pfp', upload.single('file'), async (req: AuthRequest, res) 
     const userId = req.userId!
     if (!req.file) { fail(res, 'No file uploaded', 'MISSING_FILE'); return }
 
-    const b64 = req.file.buffer.toString('base64')
-    const mime = req.file.mimetype || 'image/jpeg'
+    // Compress the image to WebP, 256x256 max, under 50KB
+    let quality = 80
+    let compressedBuffer: Buffer
+    do {
+      compressedBuffer = await sharp(req.file.buffer)
+        .resize(256, 256, { fit: 'cover' })
+        .webp({ quality })
+        .toBuffer()
+      quality -= 10
+    } while (compressedBuffer.length > MAX_PFP_SIZE && quality > 10)
+
+    if (compressedBuffer.length > MAX_PFP_SIZE) {
+      fail(res, 'Image too large even after compression', 'IMAGE_TOO_LARGE', 413)
+      return
+    }
+
+    const b64 = compressedBuffer.toString('base64')
+    const mime = 'image/webp'
     const pfpUrl = `data:${mime};base64,${b64}`
 
     await User.updateOne({ _id: userId }, { $set: { picture: pfpUrl } })
+    invalidateAuthCache(req.headers.authorization?.slice(7))
     sysLog(userId, 'PFP Updated', 'User uploaded a new profile picture.').catch(() => { })
     ok(res, { url: pfpUrl })
   } catch (err) {

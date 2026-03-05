@@ -38,21 +38,32 @@ async function recomputeSubjectStats(
 // ─── schemas ──────────────────────────────────────────────────────────────────
 
 const MarkSchema = z.object({
-  subject_id: z.string().min(1),
+  subject_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid Subject ID'),
   status: z.enum(['present', 'absent', 'late', 'approved_medical', 'medical', 'duty', 'substituted', 'cancelled']),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  type: z.string().optional(),
-  notes: z.string().optional(),
-  semester: z.number().int().optional(),
-  substituted_by: z.string().optional(),
+  type: z.string().max(50).optional(),
+  notes: z.string().max(500).optional(),
+  semester: z.number().int().min(1).max(12).optional(),
+  substituted_by: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
 })
 
 const EditLogSchema = z.object({
   status: z.enum(['present', 'absent', 'late', 'approved_medical', 'medical', 'duty', 'substituted', 'cancelled']).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  type: z.string().optional(),
-  notes: z.string().optional(),
-  substituted_by: z.string().optional(),
+  type: z.string().max(50).optional(),
+  notes: z.string().max(500).optional(),
+  substituted_by: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+})
+
+const LogsQuerySchema = z.object({
+  limit: z.string().optional().transform(v => Math.min(parseInt(v ?? '50', 10), 500)),
+  page: z.string().optional().transform(v => Math.max(parseInt(v ?? '1', 10), 1)),
+  subject_id: z.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  semester: z.string().regex(/^\d+$/).optional().transform(v => v ? parseInt(v, 10) : undefined),
+  status: z.enum(['present', 'absent', 'late', 'approved_medical', 'medical', 'duty', 'substituted', 'cancelled']).optional(),
 })
 
 // ─── POST /mark ───────────────────────────────────────────────────────────────
@@ -65,27 +76,13 @@ router.post('/mark', async (req: AuthRequest, res) => {
     const markDate = body.date ?? today()
     const logType = body.type ?? 'Lecture'
 
-    const subject = await Subject.findOne({ _id: subjectId, ...uf(req) })
+    // Verify subject ownership FIRST
+    const subject = await Subject.findOne({ _id: subjectId, ...uf(req) }).lean()
     if (!subject) { fail(res, 'Subject not found', 'NOT_FOUND', 404); return }
 
-    // Resolve semester: explicit > subject > user profile > 1
     const semester = body.semester ?? subject.semester ?? (req as any).user?.current_semester ?? 1
 
-    // ── Idempotency guard (MUST run before any writes) ──
-    const dedupQuery: Record<string, unknown> = {
-      ...uf(req),
-      subject_id: subjectId,
-      date: markDate,
-      type: logType,
-    }
-    const existingLog = await AttendanceLog.findOne(dedupQuery).lean()
-    if (existingLog) {
-      const updatedSubject = await Subject.findById(subjectId).lean()
-      created(res, { log: existingLog, subject: updatedSubject, duplicate: true })
-      return
-    }
-
-    const logData: Record<string, unknown> = {
+    const logData = {
       ...ownership(req),
       subject_id: subjectId,
       subject_name: subject.name,
@@ -93,43 +90,70 @@ router.post('/mark', async (req: AuthRequest, res) => {
       status: body.status,
       type: logType,
       semester,
+      notes: body.notes ?? '',
     }
-    if (body.notes) logData.notes = body.notes
 
-    // Substitution companion: when a class is substituted, mark presence for the filling subject
+    // Attempt ATOMIC creation using findOneAndUpdate with upsert
+    // This combined with the unique index {user_id, subject_id, date, type} prevents race conditions
+    const filter = {
+      user_id: userId,
+      subject_id: subjectId,
+      date: markDate,
+      type: logType
+    }
+
+    // Use findOne to check existence first for better type safety and clarity, 
+    // but the atomic findOneAndUpdate is safer against race conditions.
+    // We'll use a try-catch for the unique index violation if we used .create()
+    // OR just use findOneAndUpdate and handle the result.
+    const result = (await AttendanceLog.findOneAndUpdate(
+      filter,
+      { $setOnInsert: logData },
+      { upsert: true, new: true, includeResultMetadata: true }
+    )) as any
+
+    const isDuplicate = !result.lastErrorObject?.upserted
+
+    if (isDuplicate) {
+      const updatedSubject = await Subject.findById(subjectId).lean()
+      created(res, { log: result.value, subject: updatedSubject, duplicate: true })
+      return
+    }
+
+    // Substitution companion logic (only if not a duplicate)
     let substituteLog = null
     if (body.status === 'substituted' && body.substituted_by) {
       const subById = new Types.ObjectId(body.substituted_by)
-      logData.substituted_by = subById
-      const subSubject = await Subject.findOne({ _id: subById, ...uf(req) })
+      const subSubject = await Subject.findOne({ _id: subById, ...uf(req) }).lean()
       if (subSubject) {
-        substituteLog = await AttendanceLog.create({
-          ...ownership(req),
-          subject_id: subById,
-          subject_name: subSubject.name,
-          date: markDate,
-          status: 'present',
-          type: 'substitution_class',
-          notes: `Substitution for ${subject.name}`,
-          semester: semester,
-        })
+        substituteLog = await AttendanceLog.findOneAndUpdate(
+          { user_id: userId, subject_id: subById, date: markDate, type: 'substitution_class' },
+          {
+            $setOnInsert: {
+              ...ownership(req),
+              subject_id: subById,
+              subject_name: subSubject.name,
+              date: markDate,
+              status: 'present',
+              type: 'substitution_class',
+              notes: `Substitution for ${subject.name}`,
+              semester: semester,
+            }
+          },
+          { upsert: true, new: true }
+        )
         await recomputeSubjectStats(subById, userId)
       }
     }
 
-    const log = await AttendanceLog.create(logData)
     await recomputeSubjectStats(subjectId, userId)
     const updatedSubject = await Subject.findById(subjectId).lean()
 
-    // System log (fire-and-forget)
-    const statusLabel = body.status === 'substituted' && body.substituted_by
-      ? `substituted (by ${substituteLog?.subject_name || 'another subject'})`
-      : body.status
-    sysLog(req.userId!, 'Attendance Marked', `Marked ${subject.name} as ${statusLabel} on ${markDate}`).catch(() => { })
+    sysLog(req.userId!, 'Attendance Marked', `Marked ${subject.name} as ${body.status} on ${markDate}`).catch(() => { })
 
-    created(res, { log, substitute_log: substituteLog, subject: updatedSubject })
+    created(res, { log: result.value, substitute_log: substituteLog, subject: updatedSubject })
   } catch (err) {
-    if (err instanceof z.ZodError) { fail(res, 'Validation failed', 'VALIDATION_ERROR', 400); return }
+    if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[attendance/mark]', err)
     fail(res, 'Failed to mark attendance', 'SERVER_ERROR', 500)
   }
@@ -139,17 +163,13 @@ router.post('/mark', async (req: AuthRequest, res) => {
 
 router.get('/logs', async (req: AuthRequest, res) => {
   try {
-    const limit = Math.min(parseInt((req.query.limit as string) ?? '50', 10), 500)
-    const page = Math.max(parseInt((req.query.page as string) ?? '1', 10), 1)
-    const subject_id = req.query.subject_id as string | undefined
-    const date = req.query.date as string | undefined
-    const start_date = req.query.start_date as string | undefined
-    const end_date = req.query.end_date as string | undefined
-    const semester = req.query.semester as string | undefined
-    const status = req.query.status as string | undefined
+    const query = LogsQuerySchema.parse(req.query)
+    const { limit, page, subject_id, date, start_date, end_date, semester, status } = query
 
     const match: Record<string, unknown> = { ...uf(req) }
+
     if (subject_id) match.subject_id = new Types.ObjectId(subject_id)
+
     if (date) {
       match.date = date
     } else if (start_date || end_date) {
@@ -158,12 +178,12 @@ router.get('/logs', async (req: AuthRequest, res) => {
       if (end_date) range.$lte = end_date
       match.date = range
     }
-    if (semester) {
-      const semNum = parseInt(semester, 10)
-      // Use $and to avoid overwriting uf(req)'s $or
-      const semFilter = { $or: [{ semester: semNum }, { semester: { $exists: false } }, { semester: null }] }
+
+    if (semester !== undefined) { // Check for undefined, as 0 could be a valid semester
+      const semFilter = { $or: [{ semester }, { semester: { $exists: false } }, { semester: null }] }
       match.$and = match.$and ? [...(match.$and as unknown[]), semFilter] : [semFilter]
     }
+
     if (status) match.status = status
 
     const [logs, total] = await Promise.all([
@@ -186,6 +206,7 @@ router.get('/logs', async (req: AuthRequest, res) => {
 
     ok(res, { logs, total, page, limit, pages: Math.ceil(total / limit) })
   } catch (err) {
+    if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[attendance/logs]', err)
     fail(res, 'Failed to fetch logs', 'FETCH_FAILED', 500)
   }
@@ -193,12 +214,16 @@ router.get('/logs', async (req: AuthRequest, res) => {
 
 // ─── GET /classes-for-date ────────────────────────────────────────────────────
 
+const ClassesQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  semester: z.string().regex(/^\d+$/).optional().transform(v => v ? parseInt(v, 10) : undefined),
+})
+
 router.get('/classes-for-date', async (req: AuthRequest, res) => {
   try {
-    const date = (req.query.date as string | undefined) ?? today()
-    // Default semester from user profile when not explicitly provided
-    const semesterStr = req.query.semester as string | undefined
-    const semester = semesterStr ? parseInt(semesterStr, 10) : (req.user?.current_semester ?? 1)
+    const query = ClassesQuerySchema.parse(req.query)
+    const date = query.date ?? today()
+    const semester = query.semester ?? (req.user?.current_semester ?? 1)
 
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const dayName = dayNames[new Date(date + 'T00:00:00').getDay()]
@@ -316,10 +341,15 @@ router.get('/classes-for-date', async (req: AuthRequest, res) => {
 
 // ─── PUT /logs/:logId ─────────────────────────────────────────────────────────
 
+const LogIdParamSchema = z.object({
+  logId: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid Log ID'),
+})
+
 router.put('/logs/:logId', async (req: AuthRequest, res) => {
   try {
+    const { logId: logIdStr } = LogIdParamSchema.parse(req.params)
     const userId = new Types.ObjectId(req.userId!)
-    const logId = new Types.ObjectId(req.params.logId as string)
+    const logId = new Types.ObjectId(logIdStr)
     const body = EditLogSchema.parse(req.body)
 
     const log = await AttendanceLog.findOne({ _id: logId, ...uf(req) })
@@ -339,7 +369,7 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
     // Switching to substituted with a new substituted_by → update companion
     if (body.status === 'substituted' && body.substituted_by) {
       const newSubById = new Types.ObjectId(body.substituted_by)
-      const subSubject = await Subject.findOne({ _id: newSubById, ...uf(req) })
+      const subSubject = await Subject.findOne({ _id: newSubById, ...uf(req) }).lean()
       if (subSubject) {
         if (wasSubstituted && log.substituted_by) {
           await AttendanceLog.findOneAndDelete({
@@ -375,7 +405,7 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
 
     ok(res, { log, subject: updatedSubject })
   } catch (err) {
-    if (err instanceof z.ZodError) { fail(res, 'Validation failed', 'VALIDATION_ERROR', 400); return }
+    if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[attendance/edit-log]', err)
     fail(res, 'Failed to edit log', 'SERVER_ERROR', 500)
   }
@@ -385,8 +415,9 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
 
 router.delete('/logs/:logId', async (req: AuthRequest, res) => {
   try {
+    const { logId: logIdStr } = LogIdParamSchema.parse(req.params)
     const userId = new Types.ObjectId(req.userId!)
-    const logId = new Types.ObjectId(req.params.logId as string)
+    const logId = new Types.ObjectId(logIdStr)
 
     const log = await AttendanceLog.findOne({ _id: logId, ...uf(req) })
     if (!log) { fail(res, 'Log not found', 'NOT_FOUND', 404); return }
@@ -411,6 +442,7 @@ router.delete('/logs/:logId', async (req: AuthRequest, res) => {
 
     ok(res, { message: 'Log deleted', subject: updatedSubject })
   } catch (err) {
+    if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[attendance/delete-log]', err)
     fail(res, 'Failed to delete log', 'SERVER_ERROR', 500)
   }
@@ -418,12 +450,17 @@ router.delete('/logs/:logId', async (req: AuthRequest, res) => {
 
 // ─── GET /calendar_data ───────────────────────────────────────────────────────
 
+const CalendarQuerySchema = z.object({
+  month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  semester: z.string().regex(/^\d+$/).optional().transform(v => v ? parseInt(v, 10) : undefined),
+})
+
 router.get('/calendar_data', async (req: AuthRequest, res) => {
   try {
-    const month = req.query.month as string | undefined   // YYYY-MM
-    const start = req.query.start as string | undefined   // YYYY-MM-DD
-    const end = req.query.end as string | undefined       // YYYY-MM-DD
-    const semester = req.query.semester as string | undefined
+    const query = CalendarQuerySchema.parse(req.query)
+    const { month, start, end, semester } = query
 
     let startDate: string, endDate: string
     if (start && end) {
@@ -443,9 +480,8 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
     }
 
     const match: Record<string, unknown> = { ...uf(req), date: { $gte: startDate, $lte: endDate } }
-    if (semester) {
-      const semNum = parseInt(semester, 10)
-      const semFilter = { $or: [{ semester: semNum }, { semester: { $exists: false } }, { semester: null }] }
+    if (semester !== undefined) {
+      const semFilter = { $or: [{ semester }, { semester: { $exists: false } }, { semester: null }] }
       match.$and = match.$and ? [...(match.$and as unknown[]), semFilter] : [semFilter]
     }
 
@@ -475,6 +511,7 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
 
     ok(res, { calendar, start_date: startDate, end_date: endDate, total_logs: logs.length })
   } catch (err) {
+    if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[attendance/calendar_data]', err)
     fail(res, 'Failed to fetch calendar data', 'FETCH_FAILED', 500)
   }
@@ -482,12 +519,17 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
 
 // ─── GET /dashboard (legacy compat) ──────────────────────────────────────────
 
+const DashboardQuerySchema = z.object({
+  semester: z.string().regex(/^\d+$/).optional().transform(v => v ? parseInt(v, 10) : undefined),
+})
+
 router.get('/dashboard', async (req: AuthRequest, res) => {
   try {
-    const semester = req.query.semester as string | undefined
+    const query = DashboardQuerySchema.parse(req.query)
+    const semester = query.semester
 
     const subjectFilter: Record<string, unknown> = { ...uf(req) }
-    if (semester) subjectFilter.semester = parseInt(semester, 10)
+    if (semester !== undefined) subjectFilter.semester = semester
 
     const [subjects, recentLogs] = await Promise.all([
       Subject.find(subjectFilter).sort({ name: 1 }).lean(),
@@ -507,6 +549,7 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
       user: { name: req.user?.name, email: req.user?.email, picture: req.user?.picture },
     })
   } catch (err) {
+    if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[attendance/dashboard]', err)
     fail(res, 'Failed to fetch dashboard', 'FETCH_FAILED', 500)
   }

@@ -25,6 +25,20 @@ export const AttendanceCalculator = {
   calculateBunkGuard(attended: number, total: number, target = 75): BunkGuard {
     const pct = AttendanceCalculator.calculatePercentage(attended, total)
 
+    // Edge case: target is 100% — cannot divide by (100 - target)
+    if (target >= 100) {
+      const missed = total - attended
+      return {
+        percentage: pct,
+        can_bunk: missed === 0,
+        count: missed === 0 ? 0 : missed,
+        status_message:
+          missed === 0
+            ? 'Perfect attendance! Cannot bunk any class.'
+            : `You have missed ${missed} class${missed > 1 ? 'es' : ''}. 100% attendance is no longer achievable.`,
+      }
+    }
+
     if (pct >= target) {
       const canBunk = Math.floor((attended * 100 - target * total) / target)
       return {
@@ -100,6 +114,7 @@ const IPU_GRADE_SCALE: Record<string, number> = {
   B: 6,
   'C+': 5,
   C: 4,
+  P: 4,
   F: 0,
 }
 

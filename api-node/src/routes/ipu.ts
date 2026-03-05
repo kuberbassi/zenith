@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import https from 'https'
 import { Types } from 'mongoose'
+import { z } from 'zod'
 import axios, { type AxiosInstance } from 'axios'
 import * as cheerio from 'cheerio'
 import { LRUCache } from 'lru-cache'
@@ -9,6 +10,7 @@ import { SemesterResult } from '../models/SemesterResult.js'
 import { User } from '../models/User.js'
 import { ok, fail } from '../utils/response.js'
 import { uf, ownership } from '../utils/userFilter.js'
+import { fetchIpuResults, fetchAllIpuResults } from '../services/ipuResultsFetcher.service.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -541,7 +543,7 @@ function detectLoginAction($: cheerio.CheerioAPI): string {
    ═══════════════════════════════════════════════════════════════════════ */
 
 const GRADE_POINTS: Record<string, number> = {
-  'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C': 5, 'P': 4, 'F': 0, 'Ab': 0, 'I': 0,
+  'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C+': 5, 'C': 4, 'P': 4, 'F': 0, 'Ab': 0, 'I': 0,
 }
 
 function calcSGPA(subjects: SubjectResult[]): number {
@@ -825,6 +827,94 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('[IPU saved-results]', err)
     fail(res, 'Failed to fetch saved results', 'FETCH_FAILED', 500)
+  }
+})
+
+/* ── POST /api/ipu/sync-results ── Direct JSON API sync ────────────────── */
+
+const SyncResultsSchema = z.object({
+  sessionCookie: z.string().min(1, 'Session cookie is required'),
+  semester: z.number().int().min(1).max(12).optional(),
+})
+
+router.post('/sync-results', async (req: AuthRequest, res) => {
+  try {
+    const parsed = SyncResultsSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return fail(res, parsed.error.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400)
+    }
+
+    const { sessionCookie, semester } = parsed.data
+    const userId = req.userId!
+    const own = ownership(req)
+
+    // Fetch from IPU portal — single semester or all
+    let fetched
+    if (semester) {
+      fetched = [await fetchIpuResults(sessionCookie, semester)]
+    } else {
+      fetched = await fetchAllIpuResults(sessionCookie)
+    }
+
+    if (!fetched.length) {
+      return fail(res, 'No results found from the IPU portal', 'NO_RESULTS', 404)
+    }
+
+    // Upsert each semester into SemesterResult
+    const savedSemesters = []
+    for (const sem of fetched) {
+      const doc = await SemesterResult.findOneAndUpdate(
+        { user_id: new Types.ObjectId(userId), semester: sem.semester },
+        {
+          $set: {
+            ...own,
+            enrollment_number: sem.enrollment_number,
+            semester: sem.semester,
+            semester_label: `Semester ${sem.semester}`,
+            subjects: sem.subjects,
+            sgpa: sem.sgpa,
+            total_credits: sem.total_credits,
+            student_info: sem.student_info,
+            source: 'ipu_scraper' as const,
+            updated_at: new Date(),
+          },
+        },
+        { upsert: true, new: true },
+      )
+      savedSemesters.push(doc)
+    }
+
+    // Update user profile with latest student info
+    const info = fetched[0].student_info
+    const profileUpdate: Record<string, unknown> = {}
+    if (info.name) profileUpdate.name = info.name
+    if (info.institution) profileUpdate.college = info.institution
+    if (info.programme) {
+      profileUpdate.course = info.programme
+      profileUpdate.branch = info.programme
+    }
+    if (info.batch) profileUpdate.batch = info.batch
+    if (fetched[0].enrollment_number) profileUpdate.enrollment_number = fetched[0].enrollment_number
+
+    if (Object.keys(profileUpdate).length) {
+      await User.updateOne({ _id: userId }, { $set: profileUpdate })
+    }
+
+    console.log(`[IPU sync-results] Saved ${savedSemesters.length} semester(s) for user ${userId}`)
+
+    ok(res, {
+      semesters: savedSemesters,
+      synced_count: savedSemesters.length,
+    })
+  } catch (err: any) {
+    console.error('[IPU sync-results]', err)
+    if (err.code === 'SESSION_EXPIRED') {
+      return fail(res, 'IPU session expired. Please log in again.', 'SESSION_EXPIRED', 401)
+    }
+    if (err.code === 'NO_RESULTS') {
+      return fail(res, err.message, 'NO_RESULTS', 404)
+    }
+    fail(res, 'Failed to sync results from IPU portal', 'SYNC_FAILED', 500)
   }
 })
 

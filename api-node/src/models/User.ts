@@ -49,7 +49,25 @@ const UserSchema = new Schema<IUser>(
     warning_threshold: { type: Number, default: 76 },
     biometrics: { type: Schema.Types.Mixed, default: {} },
   },
-  { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } },
+  {
+    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+    toJSON: {
+      transform: (_doc, ret: any) => {
+        delete ret.google_id
+        delete ret.biometrics
+        delete ret.__v
+        return ret
+      }
+    },
+    toObject: {
+      transform: (_doc, ret: any) => {
+        delete ret.google_id
+        delete ret.biometrics
+        delete ret.__v
+        return ret
+      }
+    }
+  },
 )
 
 export const User = model<IUser>('User', UserSchema, 'users')

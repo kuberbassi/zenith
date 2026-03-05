@@ -28,7 +28,7 @@ export const attendanceService = {
                 'Content-Type': 'multipart/form-data',
             },
         });
-        return response.data;
+        return response.data.data;
     },
 
     // Dashboard
@@ -474,7 +474,12 @@ export const attendanceService = {
 
     // Get previously saved IPU results from DB (no login needed)
     getSavedIPUResults: async () => {
-        const response = await api.get('/api/ipu/saved-results');
+        const response = await api.get('/api/academic/results/analytics');
+        return response.data.data;
+    },
+
+    syncResults: async (payload: { url: string, cookies: any[], semester: number }) => {
+        const response = await api.post('/api/academic/results/sync', payload);
         return response.data.data;
     },
 };

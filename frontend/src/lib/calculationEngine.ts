@@ -17,10 +17,17 @@ export class AttendanceCalculator {
     }
 
     static calculateDaysNeeded(attended: number, total: number, target: number): number {
+        if (total === 0) return 0;
         if (attended / total >= target / 100) return 0;
+
+        // Edge case: target is 100% — division by zero guard
+        if (target >= 100) {
+            const missed = total - attended;
+            // If any class was missed, 100% is impossible; return Infinity-safe sentinel
+            return missed > 0 ? Infinity : 0;
+        }
+
         // target = (attended + x) / (total + x)
-        // target * total + target * x = attended + x
-        // x * (1 - target) = target * total - attended
         // x = (target * total - attended) / (1 - target)
         const targetDecimal = target / 100;
         return Math.ceil((targetDecimal * total - attended) / (1 - targetDecimal));
@@ -75,7 +82,7 @@ export class GradeCalculator {
 
     private static gradeToPoint(grade: string): number {
         const grades: { [key: string]: number } = {
-            'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C': 5, 'P': 4, 'F': 0
+            'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C+': 5, 'C': 4, 'P': 4, 'F': 0
         };
         return grades[grade] || 0;
     }

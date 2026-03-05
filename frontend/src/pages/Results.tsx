@@ -7,12 +7,13 @@ import {
     ArcElement, RadialLinearScale, Filler, Tooltip as ChartTooltip, Legend,
     type ChartOptions,
 } from 'chart.js';
-import { Bar, Radar } from 'react-chartjs-2';
+import { Bar, Radar, Doughnut } from 'react-chartjs-2';
 import {
     Eye, EyeOff, RefreshCw, Zap, GraduationCap, TrendingUp, BarChart3,
-    ShieldCheck, Activity, Calculator, BookOpen,
+    ShieldCheck, Activity, BookOpen, PieChart
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 import { attendanceService } from '@/services/attendance.service';
 import Button from '@/components/ui/Button';
 import CircularProgress from '@/components/ui/CircularProgress';
@@ -82,6 +83,7 @@ interface CaptchaInfo {
 /*  Component  */
 const Results: React.FC = () => {
     const { user } = useAuth();
+    const { showToast } = useToast();
 
     usePageMeta({
         title: 'Results | AcadHub',
@@ -101,9 +103,7 @@ const Results: React.FC = () => {
     const [selectedSem, setSelectedSem] = useState<string>('overall');
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
-    // CGPA Calculator
-    const [targetCGPA, setTargetCGPA] = useState('');
-    const [totalSems, setTotalSems] = useState('8');
+    // CGPA Calculator (Removed per user request)
 
     const accentColor = '#3b82f6';
     const gridColor = 'rgba(255,255,255,0.04)';
@@ -152,9 +152,9 @@ const Results: React.FC = () => {
                 setCaptchaCode(data.ocr_attempted || '');
                 setStep('captcha');
             } else if (data?.semesters !== undefined) {
-                setResults(data);
+                await loadSavedResults();
                 setLastUpdated(new Date().toISOString());
-                setStep('results');
+                showToast('success', 'Results synced successfully!');
             } else {
                 setError('Could not retrieve results.');
             }
@@ -194,9 +194,9 @@ const Results: React.FC = () => {
             };
             const data: any = await attendanceService.fetchIPUResults(payload);
             if (data?.semesters !== undefined) {
-                setResults(data);
+                await loadSavedResults();
                 setLastUpdated(new Date().toISOString());
-                setStep('results');
+                showToast('success', 'Results synced successfully!');
             } else {
                 setError('Invalid credentials or CAPTCHA. Try a new CAPTCHA.');
                 await refreshCaptcha();
@@ -258,19 +258,6 @@ const Results: React.FC = () => {
         return results.semesters.find((s: any) => s.semester === selectedSem)?.subjects || [];
     }, [results, selectedSem]);
 
-    /*  CGPA What-if Calculator  */
-    const calcResult = useMemo(() => {
-        if (!results?.semesters?.length || !targetCGPA) return null;
-        const completed = results.semesters.length;
-        const target = parseFloat(targetCGPA);
-        const total = parseInt(totalSems) || 8;
-        const currentCGPA = metrics?.cgpa || 0;
-        const remaining = total - completed;
-        if (remaining <= 0 || isNaN(target) || target < 0 || target > 10) return null;
-        const required = parseFloat(((target * total - currentCGPA * completed) / remaining).toFixed(2));
-        return { remainingSems: remaining, requiredSGPA: required, achievable: required <= 10 && required >= 0, currentCGPA };
-    }, [results, targetCGPA, totalSems, metrics]);
-
     /*  Chart data  */
     const barChartData = useMemo(() => ({
         labels: currentSubjects.slice(0, 12).map((s: any) => s.code || s.name?.substring(0, 8) || '?'),
@@ -313,6 +300,35 @@ const Results: React.FC = () => {
         }],
     }), [currentSubjects]);
 
+    /* Grade Distribution Chart (Doughnut) */
+    const gradeDistributionData = useMemo(() => {
+        const dist = results?.gradeDistribution || {};
+        const labels = Object.keys(dist).filter(k => dist[k] > 0);
+        const data = labels.map(k => dist[k]);
+        const colors = labels.map(g => {
+            if (g === 'O') return '#3b82f6'; // Blue
+            if (g === 'A+') return '#8b5cf6'; // Purple
+            if (g === 'A') return '#10b981'; // Green
+            if (g === 'B+') return '#f59e0b'; // Amber
+            if (g === 'B') return '#f97316'; // Orange
+            if (g === 'C+' || g === 'C') return '#ef4444'; // Red
+            return '#64748b'; // Gray for F/A/I
+        });
+        return { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }] };
+    }, [results]);
+
+    const doughnutOptions: ChartOptions<'doughnut'> = {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '75%',
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: '#0a0a0a', titleColor: '#fff', bodyColor: '#ffffff80',
+                borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, padding: 10,
+            }
+        }
+    };
+
     if (step === 'loading') {
         return <div className="flex items-center justify-center h-screen"><RefreshCw className="animate-spin text-blue-500/40" /></div>;
     }
@@ -346,7 +362,7 @@ const Results: React.FC = () => {
                                 onClick={() => setStep('results')}
                                 className="w-full mb-4 py-2.5 rounded-xl bg-white/5 border border-white/[0.05] text-xs text-white/30 font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
                             >
-                                 Back to Results
+                                Back to Results
                             </button>
                         )}
 
@@ -440,6 +456,10 @@ const Results: React.FC = () => {
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Institution</p>
                                         <p className="text-sm font-bold text-white/70 truncate">{results.student_info?.institution}</p>
                                     </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Father's Name</p>
+                                        <p className="text-sm font-bold text-white/70">{results.student_info?.father || '---'}</p>
+                                    </div>
                                     <div className="col-span-2 md:col-span-1 border-t md:border-t-0 md:border-l border-white/5 pt-4 md:pt-0 md:pl-6">
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1 flex items-center gap-2">
                                             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
@@ -458,13 +478,13 @@ const Results: React.FC = () => {
 
                             <div className="relative flex items-center justify-center">
                                 <CircularProgress
-                                    value={(metrics?.cgpa || 0) * 10} max={100}
+                                    value={results.overallPercentage || 0} max={100}
                                     primaryColor={accentColor} secondaryColor="rgba(255,255,255,0.02)"
                                     glowColor="rgba(59, 130, 246, 0.4)" size={160} strokeWidth={10}
                                 >
                                     <div className="text-center">
-                                        <p className="text-5xl font-black text-white tracking-tighter leading-none">{metrics?.cgpa?.toFixed(2) || '---'}</p>
-                                        <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mt-2">CGPA</p>
+                                        <p className="text-5xl font-black text-white tracking-tighter leading-none">{results.cgpa ? parseFloat(results.cgpa).toFixed(2) : (metrics?.cgpa?.toFixed(2) || '---')}</p>
+                                        <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mt-2">{results.overallPercentage ? `${results.overallPercentage.toFixed(1)}%` : 'CGPA'}</p>
                                     </div>
                                 </CircularProgress>
                             </div>
@@ -636,92 +656,61 @@ const Results: React.FC = () => {
                                 })}
                             </motion.div>
 
-                            {/* CGPA What-if Calculator */}
+                            {/* Grade Distribution Dashboard Map */}
                             <motion.section
                                 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.2 }}
                                 className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] overflow-hidden"
                             >
                                 <div className="p-6 border-b border-white/[0.05] flex items-center gap-3">
-                                    <Calculator size={16} className="text-purple-400" />
-                                    <h3 className="text-sm font-black text-white/70 uppercase tracking-widest">CGPA Calculator</h3>
-                                    <span className="ml-auto text-[10px] font-bold text-white/20 uppercase tracking-widest">What-If Planner</span>
+                                    <PieChart size={16} className="text-blue-400" />
+                                    <h3 className="text-sm font-black text-white/70 uppercase tracking-widest">Grade Distribution</h3>
+                                    <span className="ml-auto text-[10px] font-bold text-white/20 uppercase tracking-widest">Analytics</span>
                                 </div>
-                                <div className="p-6 space-y-5">
-                                    <p className="text-xs text-white/20">Set a target CGPA to calculate the average SGPA you need across your remaining semesters.</p>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Target CGPA (0–10)</label>
-                                            <input
-                                                type="number" min="0" max="10" step="0.01"
-                                                value={targetCGPA} onChange={e => setTargetCGPA(e.target.value)}
-                                                className={inputCls} placeholder="e.g. 9.00"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Total Semesters in Program</label>
-                                            <input
-                                                type="number" min="1" max="12" step="1"
-                                                value={totalSems} onChange={e => setTotalSems(e.target.value)}
-                                                className={inputCls} placeholder="e.g. 8"
-                                            />
+                                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                                    <div className="h-64 relative">
+                                        <Doughnut data={gradeDistributionData} options={doughnutOptions} />
+                                        <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
+                                            <span className="text-3xl font-black text-white">{results.totalSubjects || metrics?.totalSubjects || 0}</span>
+                                            <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Subjects</span>
                                         </div>
                                     </div>
-
-                                    {calcResult ? (
-                                        <div className={`p-5 rounded-2xl border ${calcResult.achievable ? 'border-blue-500/20 bg-blue-500/5' : 'border-red-500/20 bg-red-500/5'}`}>
-                                            <div className="grid grid-cols-3 gap-6">
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1">Current CGPA</p>
-                                                    <p className="text-3xl font-black text-white tracking-tighter">{calcResult.currentCGPA.toFixed(2)}</p>
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                                            <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Grade</span>
+                                            <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Count</span>
+                                        </div>
+                                        {gradeDistributionData.labels.map((lbl, idx) => (
+                                            <div key={lbl} className="flex justify-between items-center">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: gradeDistributionData.datasets[0].backgroundColor[idx] }} />
+                                                    <span className="text-sm font-black text-white/70">{lbl}</span>
                                                 </div>
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1">Remaining Sems</p>
-                                                    <p className="text-3xl font-black text-white tracking-tighter">{calcResult.remainingSems}</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1">Required SGPA</p>
-                                                    <p className={`text-3xl font-black tracking-tighter ${calcResult.achievable ? 'text-blue-400' : 'text-red-400'}`}>
-                                                        {calcResult.requiredSGPA < 0 ? '< 0' : calcResult.requiredSGPA > 10 ? '> 10' : calcResult.requiredSGPA.toFixed(2)}
-                                                    </p>
-                                                </div>
+                                                <span className="text-sm font-bold text-white/60 tabular-nums bg-white/5 px-3 py-1 rounded-lg">{(results.gradeDistribution || {})[lbl]}</span>
                                             </div>
-                                            {calcResult.requiredSGPA < 0 && (
-                                                <p className="mt-3 text-xs text-green-400/70">You have already exceeded this target — keep it up!</p>
-                                            )}
-                                            {calcResult.requiredSGPA > 10 && (
-                                                <p className="mt-3 text-xs text-red-400/70">Target not achievable — required SGPA exceeds the maximum of 10.0.</p>
-                                            )}
-                                        </div>
-                                    ) : targetCGPA ? (
-                                        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] text-xs text-white/30 text-center">
-                                            {parseInt(totalSems) <= results.semesters.length
-                                                ? 'All semesters for this program are already completed.'
-                                                : 'Enter a valid target CGPA between 0 and 10.'}
-                                        </div>
-                                    ) : null}
-
-                                    {/* Semester SGPA Breakdown */}
-                                    <div className="border-t border-white/[0.05] pt-5">
-                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-4">Semester GPA Breakdown</p>
-                                        <div className="space-y-3">
-                                            {results.semesters.map((sem: any) => {
-                                                const sgpa = sem.sgpa ? parseFloat(sem.sgpa) : calcSGPA(sem.subjects || []);
-                                                return (
-                                                    <div key={sem.semester} className="flex items-center gap-4">
-                                                        <span className="text-[10px] font-black text-white/20 uppercase w-24 shrink-0 truncate">{sem.semester_label || `Sem ${sem.semester}`}</span>
-                                                        <div className="flex-1 h-2 rounded-full bg-white/[0.03] overflow-hidden">
-                                                            <div className="h-full bg-blue-500/50 rounded-full" style={{ width: `${(sgpa / 10) * 100}%` }} />
-                                                        </div>
-                                                        <span className="text-sm font-black text-blue-400 w-12 text-right tabular-nums">{sgpa.toFixed(2)}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                        ))}
                                     </div>
                                 </div>
                             </motion.section>
+
+                            {/* Semester SGPA Breakdown */}
+                            <div className="pt-5 mt-6 border-t border-white/[0.05]">
+                                <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-4">Semester GPA Breakdown</p>
+                                <div className="space-y-3">
+                                    {results.semesters.map((sem: any) => {
+                                        const sgpa = sem.sgpa ? parseFloat(sem.sgpa) : calcSGPA(sem.subjects || []);
+                                        return (
+                                            <div key={sem.semester} className="flex items-center gap-4">
+                                                <span className="text-[10px] font-black text-white/20 uppercase w-24 shrink-0 truncate">{sem.semester_label || `Sem ${sem.semester}`}</span>
+                                                <div className="flex-1 h-2 rounded-full bg-white/[0.03] overflow-hidden">
+                                                    <div className="h-full bg-blue-500/50 rounded-full" style={{ width: `${(sgpa / 10) * 100}%` }} />
+                                                </div>
+                                                <span className="text-sm font-black text-blue-400 w-12 text-right tabular-nums">{sgpa.toFixed(2)}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </>
                     )}
                 </div>

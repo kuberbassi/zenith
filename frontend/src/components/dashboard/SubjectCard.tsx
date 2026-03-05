@@ -28,14 +28,14 @@ const SubjectCard: React.FC<SubjectCardProps> = ({ subject, onClick }) => {
                 <div className="p-2 bg-secondary/10 text-secondary rounded-xl">
                     <BookOpen className="w-5 h-5" />
                 </div>
-                <div className={`px-2 py-1 rounded-lg text-xs font-bold ${isLow ? 'bg-error/10 text-error' : 'bg-green-500/10 text-green-500'
+                <div className={`px-2 py-1 rounded-lg text-sm font-bold ${isLow ? 'bg-error/10 text-error' : 'bg-green-500/10 text-green-500'
                     }`}>
                     {subject.percentage}%
                 </div>
             </div>
 
-            <h4 className="font-bold text-on-surface line-clamp-1 mb-1">{subject.subject}</h4>
-            <div className="flex justify-between text-xs text-on-surface-variant">
+            <h4 className="font-bold text-xl text-on-surface line-clamp-1 mb-2">{subject.subject}</h4>
+            <div className="flex justify-between text-base font-medium text-on-surface-variant">
                 <span>{subject.present}/{subject.total_lectures} Present</span>
                 <span>{subject.code || ''}</span>
             </div>

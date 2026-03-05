@@ -141,64 +141,67 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
 
                             {/* Section: Basic Info */}
                             <Text style={styles.sectionLabel}>Basic Info</Text>
-
-                            <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                            <View style={styles.inputGroup}>
                                 <View style={styles.inputIcon}><BookOpen size={18} color={c.primary} /></View>
                                 <TextInput
-                                    style={styles.input} placeholder="Name" placeholderTextColor={c.subtext}
+                                    style={styles.input} placeholder="Subject Name" placeholderTextColor={c.subtext}
                                     value={name} onChangeText={setName}
                                 />
                             </View>
 
                             <View style={styles.row}>
-                                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                                    <Text style={styles.prefix}>#</Text>
+                                {initialData && (
+                                    <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                                        <Text style={styles.prefix}>#</Text>
+                                        <TextInput
+                                            style={styles.input} placeholder="Code" placeholderTextColor={c.subtext}
+                                            value={code} onChangeText={setCode}
+                                        />
+                                    </View>
+                                )}
+                                <View style={[styles.inputGroup, { flex: 1, marginLeft: initialData ? 8 : 0 }]}>
                                     <TextInput
-                                        style={styles.input} placeholder="Code" placeholderTextColor={c.subtext}
-                                        value={code} onChangeText={setCode}
-                                    />
-                                </View>
-                                <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                                    <TextInput
-                                        style={styles.input} placeholder="Sem" keyboardType='numeric' placeholderTextColor={c.subtext}
+                                        style={styles.input} placeholder="Semester" keyboardType='numeric' placeholderTextColor={c.subtext}
                                         value={semester} onChangeText={setSemester}
                                     />
                                 </View>
                             </View>
 
-                            {/* Section: Details */}
-                            <Text style={styles.sectionLabel}>Details</Text>
+                            {/* Section: Details (Edit Only) */}
+                            {initialData && (
+                                <>
+                                    <Text style={styles.sectionLabel}>Details</Text>
+                                    <View style={styles.row}>
+                                        <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                                            <View style={styles.inputIcon}><User size={18} color={c.subtext} /></View>
+                                            <TextInput
+                                                style={styles.input} placeholder="Professor" placeholderTextColor={c.subtext}
+                                                value={professor} onChangeText={setProfessor}
+                                            />
+                                        </View>
+                                        <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                                            <View style={styles.inputIcon}><MapPin size={18} color={c.subtext} /></View>
+                                            <TextInput
+                                                style={styles.input} placeholder="Room" placeholderTextColor={c.subtext}
+                                                value={classroom} onChangeText={setClassroom}
+                                            />
+                                        </View>
+                                    </View>
 
-                            <View style={styles.row}>
-                                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                                    <View style={styles.inputIcon}><User size={18} color={c.subtext} /></View>
-                                    <TextInput
-                                        style={styles.input} placeholder="Professor" placeholderTextColor={c.subtext}
-                                        value={professor} onChangeText={setProfessor}
-                                    />
-                                </View>
-                                <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                                    <View style={styles.inputIcon}><MapPin size={18} color={c.subtext} /></View>
-                                    <TextInput
-                                        style={styles.input} placeholder="Room" placeholderTextColor={c.subtext}
-                                        value={classroom} onChangeText={setClassroom}
-                                    />
-                                </View>
-                            </View>
-
-                            {/* Section: Syllabus */}
-                            <Text style={styles.sectionLabel}>Syllabus</Text>
-                            <View style={[styles.inputGroup, { height: 100, alignItems: 'flex-start', paddingTop: 12 }]}>
-                                <View style={[styles.inputIcon, { marginTop: 4 }]}><FileText size={18} color={c.subtext} /></View>
-                                <TextInput
-                                    style={[styles.input, { textAlignVertical: 'top' }]}
-                                    placeholder="Enter syllabus or notes..."
-                                    placeholderTextColor={c.subtext}
-                                    value={syllabus} onChangeText={setSyllabus}
-                                    multiline={true}
-                                    numberOfLines={4}
-                                />
-                            </View>
+                                    <Text style={styles.sectionLabel}>Syllabus</Text>
+                                    <View style={[styles.inputGroup, { height: 100, alignItems: 'flex-start', paddingTop: 12 }]}>
+                                        <View style={[styles.inputIcon, { marginTop: 4 }]}><FileText size={18} color={c.subtext} /></View>
+                                        <TextInput
+                                            style={[styles.input, { textAlignVertical: 'top' }]}
+                                            placeholder="Enter syllabus or notes..."
+                                            placeholderTextColor={c.subtext}
+                                            value={syllabus} onChangeText={setSyllabus}
+                                            multiline={true}
+                                            numberOfLines={4}
+                                        />
+                                    </View>
+                                </>
+                            )}
 
                             {/* Categories */}
                             <Text style={styles.sectionLabel}>Category</Text>

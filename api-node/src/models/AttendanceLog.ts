@@ -38,7 +38,7 @@ const AttendanceLogSchema = new Schema<IAttendanceLog>(
     date: { type: String, required: true },
     status: {
       type: String,
-      enum: ['present','absent','late','approved_medical','medical','duty','substituted','cancelled'],
+      enum: ['present', 'absent', 'late', 'approved_medical', 'medical', 'duty', 'substituted', 'cancelled'],
       required: true,
     },
     type: { type: String, default: 'Lecture' },
@@ -53,5 +53,7 @@ const AttendanceLogSchema = new Schema<IAttendanceLog>(
 AttendanceLogSchema.index({ user_id: 1, date: -1 })
 AttendanceLogSchema.index({ user_id: 1, subject_id: 1 })
 AttendanceLogSchema.index({ user_id: 1, semester: 1, date: 1 })
+// UNIQUE INDEX: Prevents race conditions during rapid /mark API calls
+AttendanceLogSchema.index({ user_id: 1, subject_id: 1, date: 1, type: 1 }, { unique: true })
 
 export const AttendanceLog = model<IAttendanceLog>('AttendanceLog', AttendanceLogSchema, 'attendance_logs')
