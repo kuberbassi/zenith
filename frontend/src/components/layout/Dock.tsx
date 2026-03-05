@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -23,7 +24,7 @@ const DISTANCE = 160;
 const BASE_SIZE = 56;
 const MOBILE_SIZE = 40;
 
-function DockItem({ item, mouseX, isHoveredGlobal, baseSize }: { item: typeof navItems[0], mouseX: any, isHoveredGlobal: boolean, baseSize: number }) {
+function DockItem({ item, mouseX, isHoveredGlobal, baseSize, isMobile }: { item: typeof navItems[0], mouseX: any, isHoveredGlobal: boolean, baseSize: number, isMobile: boolean }) {
     const ref = useRef<HTMLDivElement>(null);
     const location = useLocation();
     const isActive = location.pathname === item.href;
@@ -42,10 +43,13 @@ function DockItem({ item, mouseX, isHoveredGlobal, baseSize }: { item: typeof na
         <Link to={item.href} className="relative z-10 flex items-center justify-center">
             <motion.div
                 ref={ref}
-                style={{ width: isHoveredGlobal ? width : baseSize, height: isHoveredGlobal ? width : baseSize }}
-                animate={{ width: isHoveredGlobal ? undefined : baseSize, height: isHoveredGlobal ? undefined : baseSize }}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
+                style={{ width: (!isMobile && isHoveredGlobal) ? width : baseSize, height: (!isMobile && isHoveredGlobal) ? width : baseSize }}
+                animate={!isMobile
+                    ? { width: isHoveredGlobal ? undefined : baseSize, height: isHoveredGlobal ? undefined : baseSize }
+                    : { width: baseSize, height: baseSize }
+                }
+                onMouseEnter={() => !isMobile && setIsHovered(true)}
+                onMouseLeave={() => !isMobile && setIsHovered(false)}
                 className={`flex items-center justify-center rounded-2xl transition-colors duration-200 cursor-pointer ${isActive
                     ? 'bg-blue-500/15 text-blue-400'
                     : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
@@ -76,9 +80,12 @@ export default function Dock() {
     const [isHoveredGlobal, setIsHoveredGlobal] = useState(false);
     const [pfpMenuOpen, setPfpMenuOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+    const [dropdownPos, setDropdownPos] = useState({ bottom: 0, left: 0 });
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const pfpRef = useRef<HTMLDivElement>(null);
+    const pfpBtnRef = useRef<HTMLButtonElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -86,10 +93,14 @@ export default function Dock() {
         return () => window.removeEventListener('resize', onResize);
     }, []);
 
-    // Close PFP menu on outside click
+    // Close PFP menu when clicking outside both the button and the portaled dropdown
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            if (pfpRef.current && !pfpRef.current.contains(e.target as Node)) {
+            const target = e.target as Node;
+            if (
+                pfpRef.current && !pfpRef.current.contains(target) &&
+                dropdownRef.current && !dropdownRef.current.contains(target)
+            ) {
                 setPfpMenuOpen(false);
             }
         };
@@ -97,7 +108,21 @@ export default function Dock() {
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
+    const handlePfpClick = () => {
+        if (pfpBtnRef.current) {
+            const rect = pfpBtnRef.current.getBoundingClientRect();
+            const menuWidth = 224; // w-56
+            const centerX = rect.left + rect.width / 2;
+            setDropdownPos({
+                bottom: window.innerHeight - rect.top + 12,
+                left: Math.max(8, Math.min(centerX - menuWidth / 2, window.innerWidth - menuWidth - 8)),
+            });
+        }
+        setPfpMenuOpen(prev => !prev);
+    };
+
     return (
+        <>
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-16px)] overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
             <motion.div
                 onMouseMove={(e) => mouseX.set(e.pageX)}
@@ -112,7 +137,8 @@ export default function Dock() {
                 {/* Avatar with Dropdown */}
                 <div ref={pfpRef} className="relative mr-0 md:mr-2">
                     <button
-                        onClick={() => setPfpMenuOpen(!pfpMenuOpen)}
+                        ref={pfpBtnRef}
+                        onClick={handlePfpClick}
                         className={`relative flex items-center justify-center rounded-full overflow-hidden transition-all cursor-pointer ${pfpMenuOpen ? 'ring-2 ring-blue-500/50 ring-offset-2 ring-offset-[#0a0a0a] opacity-100' : 'opacity-70 hover:opacity-100 border border-white/[0.1]'}`}
                         style={{ width: isMobile ? MOBILE_SIZE : BASE_SIZE, height: isMobile ? MOBILE_SIZE : BASE_SIZE }}
                     >
@@ -124,55 +150,7 @@ export default function Dock() {
                         />
                     </button>
 
-                    {/* PFP Dropdown Menu */}
-                    <AnimatePresence>
-                        {pfpMenuOpen && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10, scale: 0.92 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 10, scale: 0.92 }}
-                                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-56 rounded-2xl border border-white/[0.08] bg-[#0d0d0d] backdrop-blur-2xl overflow-hidden"
-                                style={{ boxShadow: '0 -16px 48px rgba(0,0,0,0.7), 0 0 20px rgba(59,130,246,0.06), inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                            >
-                                {/* User Info Header */}
-                                <div className="p-4 flex items-center gap-3 bg-white/[0.02]">
-                                    <div className="w-10 h-10 rounded-full overflow-hidden border border-white/[0.1] flex-shrink-0">
-                                        <img
-                                            src={user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=000&color=fff&size=64`}
-                                            alt="Profile"
-                                            referrerPolicy="no-referrer"
-                                            className="w-full h-full object-cover"
-                                        />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="text-xs font-black text-white truncate">{user?.name || 'User'}</p>
-                                        <p className="text-[10px] text-white/25 truncate">{user?.email || ''}</p>
-                                    </div>
-                                </div>
-
-                                <div className="h-px bg-white/[0.05]" />
-
-                                {/* Menu Items */}
-                                <div className="py-1">
-                                    <button
-                                        onClick={() => { setPfpMenuOpen(false); navigate('/settings'); }}
-                                        className="w-full px-4 py-2.5 text-left text-[13px] font-medium text-white/60 hover:bg-white/[0.05] hover:text-white transition-colors flex items-center gap-3"
-                                    >
-                                        <User size={15} className="text-white/30" />
-                                        Profile
-                                    </button>
-                                    <button
-                                        onClick={() => { setPfpMenuOpen(false); logout(); }}
-                                        className="w-full px-4 py-2.5 text-left text-[13px] font-medium text-red-400/70 hover:bg-red-500/8 hover:text-red-400 transition-colors flex items-center gap-3"
-                                    >
-                                        <LogOut size={15} className="text-red-400/50" />
-                                        Log Out
-                                    </button>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                    {/* Dropdown is portaled to body — see below */}
                 </div>
 
                 {/* Separator */}
@@ -186,9 +164,68 @@ export default function Dock() {
                         mouseX={mouseX}
                         isHoveredGlobal={isHoveredGlobal}
                         baseSize={isMobile ? MOBILE_SIZE : BASE_SIZE}
+                        isMobile={isMobile}
                     />
                 ))}
             </motion.div>
         </div>
+
+        {/* PFP Dropdown — portaled to document.body so dock's overflow-x-auto doesn't clip it */}
+        {createPortal(
+            <AnimatePresence>
+                {pfpMenuOpen && (
+                    <motion.div
+                        ref={dropdownRef}
+                        initial={{ opacity: 0, y: 8, scale: 0.92 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.92 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                        style={{
+                            position: 'fixed',
+                            bottom: dropdownPos.bottom,
+                            left: dropdownPos.left,
+                            zIndex: 9999,
+                            width: 224,
+                            boxShadow: '0 -16px 48px rgba(0,0,0,0.8), 0 0 20px rgba(59,130,246,0.06), inset 0 1px 0 rgba(255,255,255,0.05)',
+                        }}
+                        className="rounded-2xl border border-white/[0.08] bg-[#0d0d0d] backdrop-blur-2xl overflow-hidden"
+                    >
+                        <div className="p-4 flex items-center gap-3 bg-white/[0.02]">
+                            <div className="w-10 h-10 rounded-full overflow-hidden border border-white/[0.1] flex-shrink-0">
+                                <img
+                                    src={user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=000&color=fff&size=64`}
+                                    alt="Profile"
+                                    referrerPolicy="no-referrer"
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs font-black text-white truncate">{user?.name || 'User'}</p>
+                                <p className="text-[10px] text-white/25 truncate">{user?.email || ''}</p>
+                            </div>
+                        </div>
+                        <div className="h-px bg-white/[0.05]" />
+                        <div className="py-1">
+                            <button
+                                onClick={() => { setPfpMenuOpen(false); navigate('/settings'); }}
+                                className="w-full px-4 py-2.5 text-left text-[13px] font-medium text-white/60 hover:bg-white/[0.05] hover:text-white transition-colors flex items-center gap-3"
+                            >
+                                <User size={15} className="text-white/30" />
+                                Profile
+                            </button>
+                            <button
+                                onClick={() => { setPfpMenuOpen(false); logout(); }}
+                                className="w-full px-4 py-2.5 text-left text-[13px] font-medium text-red-400/70 hover:bg-red-500/8 hover:text-red-400 transition-colors flex items-center gap-3"
+                            >
+                                <LogOut size={15} className="text-red-400/50" />
+                                Log Out
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>,
+            document.body
+        )}
+        </>
     );
 }
