@@ -35,7 +35,7 @@ const AppLayout: React.FC = () => {
                 <Header notificationCount={notificationCount} />
 
                 {/* Content Container */}
-                <div className="flex-1 px-4 pb-32 pt-20 md:px-6 md:pt-20 lg:px-8 lg:pt-24 max-w-7xl mx-auto w-full animate-fade-in">
+                <div className="flex-1 px-4 pb-32 pt-16 md:px-6 md:pt-16 lg:px-8 lg:pt-20 max-w-7xl mx-auto w-full animate-fade-in">
                     <Outlet />
                 </div>
             </main>
