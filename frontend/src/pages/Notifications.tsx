@@ -31,7 +31,12 @@ const Notifications: React.FC = () => {
             const parseDate = (d: string) => {
                 if (!d) return 0;
                 const p = d.split('-');
-                if (p.length === 3) return new Date(`${p[2]}-${p[1]}-${p[0]}`).getTime();
+                if (p.length === 3) {
+                    const currentYear = new Date().getFullYear();
+                    let year = parseInt(p[2], 10);
+                    if (year > currentYear + 2) year = currentYear;
+                    return new Date(`${year}-${p[1]}-${p[0]}`).getTime();
+                }
                 return new Date(d).getTime() || 0;
             };
             const sorted = (data || []).slice().sort((a: Notice, b: Notice) => parseDate(b.date) - parseDate(a.date));
