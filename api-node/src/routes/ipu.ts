@@ -10,7 +10,7 @@ import { SemesterResult } from '../models/SemesterResult.js'
 import { User } from '../models/User.js'
 import { ok, fail } from '../utils/response.js'
 import { uf, ownership } from '../utils/userFilter.js'
-import { fetchIpuResults, fetchAllIpuResults, type FetchedSemesterResult } from '../services/ipuResultsFetcher.service.js'
+import { fetchIpuResults, fetchAllIpuResults, type ProcessedSubject } from '../services/ipuResultsFetcher.service.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -35,7 +35,7 @@ const HEADERS = {
 
 interface IpuSession {
   client: AxiosInstance
-  getCookies: () => string
+  getCookieString: () => string
 }
 
 const _sessions = new LRUCache<string, IpuSession>({ max: 100, ttl: 30 * 60 * 1000 })
@@ -71,26 +71,17 @@ function getSession(userId: string): IpuSession {
       return cfg
     })
 
-    const getCookies = () =>
+    const getCookieString = () =>
       Object.entries(jar)
         .map(([k, v]) => `${k}=${v}`)
         .join('; ')
 
-    _sessions.set(userId, { client, getCookies })
+    _sessions.set(userId, { client, getCookieString })
   }
   return _sessions.get(userId)!
 }
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
-
-function detectField($form: cheerio.Cheerio<any>, $: cheerio.CheerioAPI, candidates: string[]): string | null {
-  if (!$form.length) return null
-  for (const name of candidates) {
-    const inp = $form.find(`input[name*="${name}" i]`)
-    if (inp.length) return inp.attr('name') || null
-  }
-  return null
-}
 
 /** Detect if the account is locked/blocked */
 function detectAccountLockout(html: string): string | null {
@@ -157,7 +148,14 @@ function getLoginForm($: cheerio.CheerioAPI) {
 
 function detectFieldNames($: cheerio.CheerioAPI) {
   const form = getLoginForm($)
-  const det = (candidates: string[]) => detectField(form, $, candidates)
+  const det = (candidates: string[]): string | null => {
+    if (!form.length) return null
+    for (const name of candidates) {
+      const inp = form.find(`input[name*="${name}" i]`)
+      if (inp.length) return inp.attr('name') || null
+    }
+    return null
+  }
   return {
     username: det(['username', 'j_username', 'userId', 'user_name', 'loginId']) || 'username',
     password: det(['passwd', 'password', 'j_password', 'pass']) || 'passwd',
@@ -177,25 +175,40 @@ function detectLoginAction($: cheerio.CheerioAPI): string {
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** Save fetched results to semester_results collection and update user profile */
-async function saveResultsToDB(req: AuthRequest, results: { enrollment_number: string; student_info: Record<string, unknown>; semesters: FetchedSemesterResult[] }) {
+async function saveResultsToDB(req: AuthRequest, results: {
+  enrollment_number: string
+  student_info: Record<string, unknown>
+  semesters: Array<{
+    semester: string
+    semester_num: number
+    semester_label: string
+    subjects: ProcessedSubject[]
+    sgpa: string
+    total_credits: number
+    total_marks: string
+    max_marks: string
+  }>
+}) {
   const userId = req.userId!
   const own = ownership(req)
 
   for (const sem of results.semesters) {
-    if (!sem.semester) continue
+    if (!sem.semester_num) continue
 
     await SemesterResult.findOneAndUpdate(
-      { user_id: new Types.ObjectId(userId), semester: sem.semester },
+      { user_id: new Types.ObjectId(userId), semester: sem.semester_num },
       {
         $set: {
           ...own,
-          enrollment_number: sem.enrollment_number,
-          semester: sem.semester,
-          semester_label: `Semester ${sem.semester}`,
+          enrollment_number: results.enrollment_number,
+          semester: sem.semester_num,
+          semester_label: sem.semester_label,
           subjects: sem.subjects,
-          sgpa: sem.sgpa,
+          sgpa: parseFloat(sem.sgpa) || 0,
           total_credits: sem.total_credits,
-          student_info: sem.student_info,
+          total_marks: sem.total_marks,
+          max_marks: sem.max_marks,
+          student_info: results.student_info,
           source: 'ipu_scraper',
           updated_at: new Date(),
         },
@@ -204,22 +217,20 @@ async function saveResultsToDB(req: AuthRequest, results: { enrollment_number: s
     )
   }
 
-  // Update user profile with student info from first semester
-  if (results.semesters.length) {
-    const info = results.semesters[0].student_info
-    const profileUpdate: Record<string, unknown> = {}
-    if (results.enrollment_number) profileUpdate.enrollment_number = results.enrollment_number
-    if (info.institution) profileUpdate.college = info.institution
-    if (info.programme) {
-      profileUpdate.course = info.programme
-      profileUpdate.branch = info.programme
-    }
-    if (info.batch) profileUpdate.batch = info.batch
-    if (info.name) profileUpdate.name = info.name
+  // Update user profile with student info
+  const info = results.student_info
+  const profileUpdate: Record<string, unknown> = {}
+  if (results.enrollment_number) profileUpdate.enrollment_number = results.enrollment_number
+  if (info.institution) profileUpdate.college = info.institution
+  if (info.programme) {
+    profileUpdate.course = info.programme
+    profileUpdate.branch = info.programme
+  }
+  if (info.batch) profileUpdate.batch = info.batch
+  if (info.name) profileUpdate.name = info.name
 
-    if (Object.keys(profileUpdate).length) {
-      await User.updateOne({ _id: userId }, { $set: profileUpdate })
-    }
+  if (Object.keys(profileUpdate).length) {
+    await User.updateOne({ _id: userId }, { $set: profileUpdate })
   }
 
   console.log(`[IPU] Saved ${results.semesters.length} semesters to DB for user ${userId}`)
@@ -306,8 +317,7 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
 
 /* ── POST /api/ipu/fetch-results ──────────────────────────────────────── */
 router.post('/fetch-results', async (req: AuthRequest, res) => {
-  const session = getSession(req.userId!)
-  const sess = session.client
+  const sess = getSession(req.userId!)
   const { enrollment_number = '', password = '', captcha = '', hidden_fields = {}, field_names = {}, login_action = '' } = req.body || {}
   const enrollment = enrollment_number.trim()
   const pwd = password.trim()
@@ -328,7 +338,7 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     const loginUrl = login_action || IPU_LOGIN_ACTION
     console.log('[IPU] Posting login to:', loginUrl)
 
-    const loginResp = await sess.post(loginUrl, new URLSearchParams(payload).toString(), {
+    const loginResp = await sess.client.post(loginUrl, new URLSearchParams(payload).toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       maxRedirects: 5,
     })
@@ -379,26 +389,30 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     }
 
     // Successful login — fetch results via direct JSON API
-    console.log('[IPU] Login successful, fetching results via JSON API...')
-    const cookieString = session.getCookies()
-    const rawSemesters = await fetchAllIpuResults(cookieString)
+    console.log('[IPU] Login successful, fetching JSON API data...')
+    const cookieStr = sess.getCookieString()
+    const rawSemesters = await fetchAllIpuResults(cookieStr)
+
+    if (!rawSemesters || rawSemesters.length === 0) {
+      return fail(res, 'No results found on IPU portal.', 'NO_RESULTS', 404)
+    }
 
     const results = {
       enrollment_number: enrollment,
-      student_info: rawSemesters.length > 0 ? rawSemesters[0].student_info : {},
-      semesters: rawSemesters,
+      student_info: rawSemesters[0].student_info as Record<string, unknown>,
+      semesters: rawSemesters.map(sem => ({
+        semester: String(sem.semester),
+        semester_num: sem.semester,
+        semester_label: `Semester ${sem.semester}`,
+        subjects: sem.subjects,
+        sgpa: String(sem.sgpa),
+        total_credits: sem.total_credits,
+        total_marks: String(sem.subjects.reduce((a, s) => a + (s.total_marks || 0), 0)),
+        max_marks: String(sem.subjects.reduce((a, s) => a + (s.max_marks || 100), 0)),
+      })),
     }
 
-    // Save to DB for persistent access
-    if (results.semesters.length) {
-      try {
-        await saveResultsToDB(req, results)
-      } catch (dbErr) {
-        console.error('[IPU] Failed to save results to DB:', dbErr)
-      }
-    } else {
-      console.warn('[IPU] Login succeeded but no semester data found.')
-    }
+    await saveResultsToDB(req, results)
 
     ok(res, results)
   } catch (e: any) {
