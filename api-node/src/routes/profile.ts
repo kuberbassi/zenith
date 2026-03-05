@@ -87,11 +87,20 @@ router.put('/', async (req: AuthRequest, res) => {
       const existing = await UserPreference.findOne({ ...uf(req) }).lean()
       const existingPrefs = (existing?.preferences ?? {}) as Record<string, unknown>
       const merged = { ...existingPrefs, ...thresholdMirror }
-      await UserPreference.findOneAndUpdate(
-        existing ? { _id: existing._id } : { user_id: new Types.ObjectId(userId) },
-        { $set: { user_id: new Types.ObjectId(userId), preferences: merged, updated_at: new Date() } },
-        { upsert: true },
-      )
+      if (existing) {
+        // Only update preferences — never touch user_id to avoid unique index collision
+        // (user may have two docs: one Flask owner_email doc and one Node user_id doc)
+        await UserPreference.updateOne(
+          { _id: existing._id },
+          { $set: { preferences: merged, updated_at: new Date() } },
+        )
+      } else {
+        await UserPreference.create({
+          user_id: new Types.ObjectId(userId),
+          preferences: merged,
+          updated_at: new Date(),
+        })
+      }
     }
 
     invalidateAuthCache(req.headers.authorization?.slice(7))
@@ -179,12 +188,18 @@ router.post('/preferences', async (req: AuthRequest, res) => {
     const merged = { ...existingPrefs, ...data }
 
     // Update existing doc if found (may be an owner_email doc from Flask), otherwise upsert by user_id
-    const filter = existing ? { _id: existing._id } : { user_id: userId }
-    await UserPreference.findOneAndUpdate(
-      filter,
-      { $set: { user_id: userId, preferences: merged, updated_at: new Date() } },
-      { upsert: true },
-    )
+    if (existing) {
+      await UserPreference.updateOne(
+        { _id: existing._id },
+        { $set: { preferences: merged, updated_at: new Date() } },
+      )
+    } else {
+      await UserPreference.create({
+        user_id: new Types.ObjectId(userId),
+        preferences: merged,
+        updated_at: new Date(),
+      })
+    }
 
     // Mirror thresholds to user doc
     const mirror: Record<string, unknown> = {}

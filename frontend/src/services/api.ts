@@ -63,7 +63,10 @@ api.interceptors.response.use(
 );
 
 function shouldRetry(error: AxiosError): boolean {
-    if (!error.response) return true; // Network errors
+    // Never retry mutation requests — they are not safe to replay on failure
+    const method = error.config?.method?.toUpperCase();
+    if (method && ['PUT', 'POST', 'DELETE', 'PATCH'].includes(method)) return false;
+    if (!error.response) return true; // Network errors (GET/HEAD only)
     const status = error.response.status;
     return (status >= 500 && status < 600) || status === 429;
 }
