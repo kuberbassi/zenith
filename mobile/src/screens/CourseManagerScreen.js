@@ -223,6 +223,8 @@ const CourseManagerScreen = ({ navigation }) => {
                             <Text style={{ fontSize: 11, color: c.subtext, fontWeight: '600' }}>Target: {item.targetCompletionDate}</Text>
                         </View>
                     ) : null}
+
+
                 </LinearGradient>
             </PressableScale>
         );
@@ -437,19 +439,6 @@ const CourseManagerScreen = ({ navigation }) => {
 
                                     <Text style={styles.label}>URL (Optional)</Text>
                                     <TextInput style={styles.input} value={formData.url} onChangeText={t => setFormData({ ...formData, url: t })} placeholder="https://..." placeholderTextColor={c.subtext} />
-
-                                    <Text style={styles.label}>CERTIFICATE URL (Optional)</Text>
-                                    <TextInput style={styles.input} value={formData.certificateUrl} onChangeText={t => setFormData({ ...formData, certificateUrl: t })} placeholder="Link to certificate" placeholderTextColor={c.subtext} />
-
-                                    <Text style={styles.label}>NOTES</Text>
-                                    <TextInput
-                                        style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-                                        value={formData.notes}
-                                        onChangeText={t => setFormData({ ...formData, notes: t })}
-                                        placeholder="Add notes..."
-                                        placeholderTextColor={c.subtext}
-                                        multiline
-                                    />
 
                                     {editingItem && (
                                         <PressableScale onPress={() => handleDelete(editingItem._id)} style={{ padding: 16, alignItems: 'center', marginTop: 8 }}>

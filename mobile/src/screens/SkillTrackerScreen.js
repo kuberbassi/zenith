@@ -226,6 +226,12 @@ const SkillTrackerScreen = ({ navigation }) => {
                         />
                     </View>
                 </View>
+
+                {item.notes ? (
+                    <Text style={{ fontSize: 13, color: c.subtext, marginTop: 10, lineHeight: 18, fontStyle: 'italic' }} numberOfLines={2}>
+                        {item.notes}
+                    </Text>
+                ) : null}
             </LinearGradient>
         );
     };
@@ -393,6 +399,16 @@ const SkillTrackerScreen = ({ navigation }) => {
                                             }}
                                         />
                                     </View>
+                                    <View style={{ height: 20 }} />
+                                    <Text style={styles.label}>DESCRIPTION / NOTES</Text>
+                                    <TextInput
+                                        style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                                        value={formData.notes}
+                                        onChangeText={t => setFormData({ ...formData, notes: t })}
+                                        placeholder="What are you learning, goals, resources..."
+                                        placeholderTextColor={c.subtext}
+                                        multiline
+                                    />
                                     <View style={{ height: 20 }} />
                                 </ScrollView>
                             </View>

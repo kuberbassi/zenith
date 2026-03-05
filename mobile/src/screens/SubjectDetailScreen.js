@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { theme } from '../theme';
 import api from '../services/api';
-import { ChevronLeft, Edit2, Calendar, CheckCircle, XCircle, X, Trash2, Clock, AlertCircle, Shield } from 'lucide-react-native';
+import { attendanceService } from '../services';
+import { ChevronLeft, ChevronRight, Edit2, Calendar, CheckCircle, XCircle, X, Trash2, Clock, AlertCircle, Shield, MapPin, FileText } from 'lucide-react-native';
 import { LinearGradient } from '../components/LinearGradient';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -66,7 +67,15 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     const [selectedLog, setSelectedLog] = useState(null);
     const [statusNote, setStatusNote] = useState('');
 
-    useEffect(() => { fetchLogs(); }, []);
+    useEffect(() => { fetchLogs(); fetchSubjectDetails(); }, []);
+
+    const fetchSubjectDetails = async () => {
+        try {
+            const res = await attendanceService.getSubjectDetails(subject._id);
+            const detail = res?.data || res;
+            if (detail) setSubject(detail);
+        } catch (error) { console.error(error); }
+    };
 
     const fetchLogs = async () => {
         try {
@@ -84,9 +93,13 @@ const SubjectDetailScreen = ({ route, navigation }) => {
 
     const saveSubject = async (updatedData) => {
         try {
-            await api.put(`/api/academic/subjects/${subject._id}`, updatedData);
+            if (updatedData.isOverride) {
+                await attendanceService.updateAttendanceCount(subject._id, updatedData.attended, updatedData.total);
+            }
+            await attendanceService.updateSubjectFullDetails(subject._id, updatedData);
             setSubject({ ...subject, ...updatedData });
             setEditSubjectVisible(false);
+            await fetchSubjectDetails();
             Alert.alert("Success", "Subject updated successfully.");
         } catch (error) { Alert.alert("Error", "Failed to update subject."); }
     };
@@ -205,7 +218,46 @@ const SubjectDetailScreen = ({ route, navigation }) => {
                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
                 onRefresh={() => { setRefreshing(true); fetchLogs(); }}
                 refreshing={refreshing}
-                ListHeaderComponent={<View style={{ height: 140 }} />}
+                ListHeaderComponent={() => (
+                <View>
+                    <View style={{ height: 146 }} />
+
+                    {/* ── Subject Info Card ── */}
+                    {(subject.classroom || subject.syllabus || subject.attended > 0 || subject.total > 0) ? (
+                        <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={styles.infoCard}>
+
+                            {subject.classroom ? (
+                                <View style={styles.infoRow}>
+                                    <MapPin size={14} color={c.primary} />
+                                    <Text style={styles.infoLabel}>Room</Text>
+                                    <Text style={styles.infoValue}>{subject.classroom}</Text>
+                                </View>
+                            ) : null}
+
+                            {(subject.attended > 0 || subject.total > 0) ? (
+                                <View style={[styles.infoRow, subject.classroom ? styles.infoRowDivider : null]}>
+                                    <Shield size={14} color={c.warning} />
+                                    <Text style={styles.infoLabel}>Override</Text>
+                                    <Text style={styles.infoValue}>{subject.attended} attended / {subject.total} total</Text>
+                                </View>
+                            ) : null}
+
+                            {subject.syllabus ? (
+                                <View style={[styles.infoRow, (subject.classroom || subject.attended > 0 || subject.total > 0) ? styles.infoRowDivider : null]}>
+                                    <FileText size={14} color={c.subtext} />
+                                    <Text style={styles.infoLabel}>Syllabus</Text>
+                                </View>
+                            ) : null}
+                            {subject.syllabus ? (
+                                <Text style={styles.syllabusText}>{subject.syllabus}</Text>
+                            ) : null}
+
+                        </LinearGradient>
+                    ) : null}
+
+                    <Text style={styles.logsHeader}>Attendance Logs</Text>
+                </View>
+            )}
                 ListEmptyComponent={<Text style={styles.empty}>No attendance history found.</Text>}
             />
 
@@ -290,6 +342,15 @@ const getStyles = (c, isDark) => StyleSheet.create({
     statusText: { fontSize: 11, fontWeight: '800', marginTop: 2, letterSpacing: 0.5 },
     notesText: { fontSize: 12, color: c.subtext, marginTop: 4, fontStyle: 'italic' },
     empty: { textAlign: 'center', marginTop: 60, color: c.subtext, fontSize: 15, fontWeight: '600' },
+
+    // Subject info card
+    infoCard: { marginHorizontal: 16, marginBottom: 8, borderRadius: 24, padding: 16, borderWidth: 1, borderColor: c.glassBorder },
+    infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    infoRowDivider: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: c.glassBorder },
+    infoLabel: { fontSize: 13, fontWeight: '700', color: c.subtext, flex: 1 },
+    infoValue: { fontSize: 13, fontWeight: '700', color: c.text, textAlign: 'right', flexShrink: 1 },
+    syllabusText: { fontSize: 13, color: c.subtext, marginTop: 8, lineHeight: 20 },
+    logsHeader: { fontSize: 13, fontWeight: '800', color: c.subtext, marginHorizontal: 20, marginTop: 12, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.8 },
 
     // Modals
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', padding: 20 },

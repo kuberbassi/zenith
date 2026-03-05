@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
     View, Text, StyleSheet, TextInput, ScrollView, KeyboardAvoidingView,
-    Platform, ActivityIndicator, Keyboard, Animated, Dimensions
+    Platform, ActivityIndicator, Keyboard, Animated, Dimensions, Alert
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { Layout } from '../theme';
@@ -116,6 +116,78 @@ const AiBotScreen = ({ navigation }) => {
         );
     };
 
+    const parseInline = (text, color, keyPrefix) => {
+        // Split by **bold**, *italic*, `code` patterns
+        const segments = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+        return segments.map((seg, i) => {
+            const key = `${keyPrefix}_${i}`;
+            if (seg.startsWith('**') && seg.endsWith('**')) {
+                return <Text key={key} style={{ fontWeight: '800', color }}>{seg.slice(2, -2)}</Text>;
+            }
+            if (seg.startsWith('*') && seg.endsWith('*')) {
+                return <Text key={key} style={{ fontStyle: 'italic', color }}>{seg.slice(1, -1)}</Text>;
+            }
+            if (seg.startsWith('`') && seg.endsWith('`')) {
+                return (
+                    <Text key={key} style={{
+                        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.07)',
+                        color,
+                        borderRadius: 3,
+                        paddingHorizontal: 2
+                    }}>{seg.slice(1, -1)}</Text>
+                );
+            }
+            return <Text key={key} style={{ color }}>{seg}</Text>;
+        });
+    };
+
+    const renderMarkdownContent = (content, isUser) => {
+        if (isUser) {
+            return <Text style={[styles.messageText, styles.messageTextUser]}>{content}</Text>;
+        }
+        const color = c.text;
+        const baseStyle = { fontSize: 15, lineHeight: 23, color };
+        const lines = content.split('\n');
+
+        return (
+            <View>
+                {lines.map((line, lineIdx) => {
+                    const key = `line_${lineIdx}`;
+                    if (line.startsWith('### ')) {
+                        return <Text key={key} style={[baseStyle, { fontWeight: '800', fontSize: 15, marginTop: 8, marginBottom: 2 }]}>{line.slice(4)}</Text>;
+                    }
+                    if (line.startsWith('## ')) {
+                        return <Text key={key} style={[baseStyle, { fontWeight: '900', fontSize: 16, marginTop: 10, marginBottom: 4 }]}>{line.slice(3)}</Text>;
+                    }
+                    if (line.startsWith('# ')) {
+                        return <Text key={key} style={[baseStyle, { fontWeight: '900', fontSize: 17, marginTop: 12, marginBottom: 4 }]}>{line.slice(2)}</Text>;
+                    }
+                    const bulletMatch = line.match(/^([-*•])\s(.+)/);
+                    if (bulletMatch) {
+                        return (
+                            <View key={key} style={{ flexDirection: 'row', marginTop: 3, alignItems: 'flex-start' }}>
+                                <Text style={[baseStyle, { marginRight: 8, lineHeight: 23 }]}>•</Text>
+                                <Text style={[baseStyle, { flex: 1 }]}>{parseInline(bulletMatch[2], color, key)}</Text>
+                            </View>
+                        );
+                    }
+                    const numberedMatch = line.match(/^(\d+)\.\s(.+)/);
+                    if (numberedMatch) {
+                        return (
+                            <View key={key} style={{ flexDirection: 'row', marginTop: 3, alignItems: 'flex-start' }}>
+                                <Text style={[baseStyle, { marginRight: 6, minWidth: 22, lineHeight: 23 }]}>{numberedMatch[1]}.</Text>
+                                <Text style={[baseStyle, { flex: 1 }]}>{parseInline(numberedMatch[2], color, key)}</Text>
+                            </View>
+                        );
+                    }
+                    if (line.trim() === '') return <View key={key} style={{ height: 6 }} />;
+                    return <Text key={key} style={baseStyle}>{parseInline(line, color, key)}</Text>;
+                })}
+            </View>
+        );
+    };
+
     const renderMessage = (msg) => {
         const isUser = msg.role === 'user';
 
@@ -127,9 +199,7 @@ const AiBotScreen = ({ navigation }) => {
                     </View>
                 )}
                 <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleBot]}>
-                    <Text style={[styles.messageText, isUser ? styles.messageTextUser : styles.messageTextBot]}>
-                        {msg.content}
-                    </Text>
+                    {renderMarkdownContent(msg.content, isUser)}
                     {msg.isError && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 4 }}>
                             <AlertCircle size={12} color={c.danger} />

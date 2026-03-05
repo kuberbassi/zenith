@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, TextInput, Alert, Animated, RefreshControl, ScrollView } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSemester } from '../contexts/SemesterContext';
@@ -92,7 +92,7 @@ const AssignmentsScreen = ({ navigation }) => {
         } catch (e) { Alert.alert("Error", "Update failed"); fetchSubjects(); }
     };
 
-    const filteredSubjects = subjects.filter(s => {
+    const filteredSubjects = useMemo(() => subjects.filter(s => {
         // Safe category extraction (handling array or single string)
         const cats = s.categories || (s.category ? [s.category] : ['Theory']);
 
@@ -100,10 +100,10 @@ const AssignmentsScreen = ({ navigation }) => {
         const hasWork = cats.includes('Practical') || cats.includes('Assignment');
         if (!hasWork) return false;
 
-        // 2. Tab Filter (if we add tabs later, logic is here)
+        // 2. Tab Filter
         if (filter === 'All') return true;
         return cats.includes(filter);
-    });
+    }), [subjects, filter]);
 
     // Default sort: Theory first, then Lab, then uncategorized
     const sortSubjectsByCategory = (subs) => {
@@ -119,7 +119,7 @@ const AssignmentsScreen = ({ navigation }) => {
         });
     };
 
-    const sortedFilteredSubjects = sortSubjectsByCategory(filteredSubjects);
+    const sortedFilteredSubjects = useMemo(() => sortSubjectsByCategory(filteredSubjects), [filteredSubjects]);
 
     const renderItem = ({ item }) => {
         const practicals = item.practicals || { total: 10, completed: 0, hardcopy: false };
@@ -354,6 +354,7 @@ const AssignmentsScreen = ({ navigation }) => {
             <Animated.FlatList
                 contentContainerStyle={{ padding: 20, paddingBottom: 100 + insets.bottom, paddingTop: 140 + insets.top }} // Adjusted padding for new header
                 data={sortedFilteredSubjects}
+                extraData={filter}
                 renderItem={renderItem}
                 keyExtractor={item => item._id}
                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}

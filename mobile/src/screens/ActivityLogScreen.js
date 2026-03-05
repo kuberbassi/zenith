@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Animated, RefreshControl, TouchableOpacity } from 'react-native';
 import { attendanceService } from '../services';
 import { useFocusEffect } from '@react-navigation/native';
@@ -58,7 +58,46 @@ const ActivityLogScreen = ({ navigation }) => {
 
     useFocusEffect(useCallback(() => { fetchLogs(); }, []));
 
+    // Group logs by date into a flat list with section header items
+    const flatData = useMemo(() => {
+        const getDate = (log) => {
+            if (!log.timestamp) return null;
+            return log.timestamp.$date ? new Date(log.timestamp.$date) : new Date(log.timestamp);
+        };
+
+        const sorted = [...logs].sort((a, b) => {
+            const aT = getDate(a)?.getTime() || 0;
+            const bT = getDate(b)?.getTime() || 0;
+            return bT - aT;
+        });
+
+        const result = [];
+        let lastKey = null;
+        sorted.forEach(log => {
+            const d = getDate(log);
+            const dateKey = d
+                ? d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
+                : 'Unknown';
+            if (dateKey !== lastKey) {
+                result.push({ _type: 'header', date: dateKey, _key: `hdr_${dateKey}` });
+                lastKey = dateKey;
+            }
+            result.push({ _type: 'item', ...log });
+        });
+        return result;
+    }, [logs]);
+
     const renderItem = ({ item }) => {
+        if (item._type === 'header') {
+            return (
+                <View style={{ paddingHorizontal: 4, marginTop: 24, marginBottom: 10 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '900', color: c.subtext, letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                        {item.date}
+                    </Text>
+                    <View style={{ height: 1, backgroundColor: c.glassBorder, marginTop: 8 }} />
+                </View>
+            );
+        }
         let Icon = AlertCircle;
         let color = c.subtext;
         let gradient = [c.subtext + '20', c.subtext + '10'];
@@ -139,8 +178,8 @@ const ActivityLogScreen = ({ navigation }) => {
             />
 
             <Animated.FlatList
-                data={logs} renderItem={renderItem}
-                keyExtractor={(item, index) => index.toString()}
+                data={flatData} renderItem={renderItem}
+                keyExtractor={(item, index) => item._key || index.toString()}
                 contentContainerStyle={styles.listContent}
                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
                 ListEmptyComponent={!loading && <Text style={{ textAlign: 'center', color: c.subtext, marginTop: 40 }}>No logs found.</Text>}

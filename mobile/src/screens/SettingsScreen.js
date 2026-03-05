@@ -71,6 +71,7 @@ const SettingsScreen = ({ navigation }) => {
         linkedin_url: user?.linkedin_url || '',
         github_url: user?.github_url || '',
         portfolio_url: user?.portfolio_url || '',
+        enrollment_number: user?.enrollment_number || '',
     });
 
     const [minAttendance, setMinAttendance] = useState(user?.attendance_threshold ? String(user.attendance_threshold) : '75');
@@ -78,9 +79,6 @@ const SettingsScreen = ({ navigation }) => {
     const [attendanceThreshold, setAttendanceThreshold] = useState('75'); // Legacy state, can be merged
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [showHowToUse, setShowHowToUse] = useState(false);
-    const [academicStats, setAcademicStats] = useState('0.00');
-    const [totalCredits, setTotalCredits] = useState(0);
-
     const { updateStatus, latestRelease, downloadProgress, checkUpdate, downloadAndInstallUpdate, currentVersion } = useUpdate();
 
     useEffect(() => {
@@ -98,6 +96,7 @@ const SettingsScreen = ({ navigation }) => {
                 linkedin_url: user.linkedin_url || prev.linkedin_url,
                 github_url: user.github_url || prev.github_url,
                 portfolio_url: user.portfolio_url || prev.portfolio_url,
+                enrollment_number: user.enrollment_number || prev.enrollment_number,
             }));
 
             // Sync preferences from user context
@@ -132,6 +131,7 @@ const SettingsScreen = ({ navigation }) => {
                     linkedin_url: data.linkedin_url || prev.linkedin_url,
                     github_url: data.github_url || prev.github_url,
                     portfolio_url: data.portfolio_url || prev.portfolio_url,
+                    enrollment_number: data.enrollment_number || prev.enrollment_number,
                 }));
 
                 // Set attendance thresholds from profile
@@ -158,18 +158,6 @@ const SettingsScreen = ({ navigation }) => {
                     }
                 } catch (prefError) {
                     console.log('⚠️ Preferences endpoint not available, using profile data');
-                }
-
-                // 3. Load Academic Stats
-                try {
-                    const resultsRes = await attendanceService.getSavedIPUResults();
-                    if (resultsRes) {
-                        setAcademicStats(resultsRes.cgpa || '0.00');
-                        const credits = (resultsRes.semesters || []).reduce((acc, sem) => acc + (parseInt(sem.total_credits) || 0), 0);
-                        setTotalCredits(credits);
-                    }
-                } catch (statsErr) {
-                    console.log('Skipping academic stats fetch on Settings', statsErr);
                 }
 
                 // CRITICAL FIX: Update global context with fetched picture so Avatar refreshes
@@ -481,19 +469,7 @@ const SettingsScreen = ({ navigation }) => {
                     <Text style={styles.heroEmail}>{user?.email}</Text>
                 </View>
 
-                {/* PROFILE METRICS */}
-                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
-                    <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={[styles.card, { flex: 1, paddingVertical: 16, alignItems: 'center', marginBottom: 0 }]}>
-                        <Text style={{ fontSize: 11, fontWeight: '800', color: c.subtext, marginBottom: 4, letterSpacing: 0.5 }}>OVERALL CGPA</Text>
-                        <Text style={{ fontSize: 24, fontWeight: '900', color: c.text }}>{academicStats}</Text>
-                    </LinearGradient>
-                    <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={[styles.card, { flex: 1, paddingVertical: 16, alignItems: 'center', marginBottom: 0 }]}>
-                        <Text style={{ fontSize: 11, fontWeight: '800', color: c.subtext, marginBottom: 4, letterSpacing: 0.5 }}>TOTAL CREDITS</Text>
-                        <Text style={{ fontSize: 24, fontWeight: '900', color: c.primary }}>{totalCredits}</Text>
-                    </LinearGradient>
-                </View>
 
-                {/* PROFILE CARD */}
                 <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={styles.card} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Profile Details</Text>
@@ -509,6 +485,19 @@ const SettingsScreen = ({ navigation }) => {
                             value={profileData.name}
                             onChangeText={t => setProfileData({ ...profileData, name: t })}
                             editable={editingProfile}
+                        />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Enrollment Number</Text>
+                        <TextInput
+                            style={[styles.input, editingProfile && styles.inputActive]}
+                            value={profileData.enrollment_number}
+                            onChangeText={t => setProfileData({ ...profileData, enrollment_number: t })}
+                            editable={editingProfile}
+                            placeholder="e.g. 12345678"
+                            placeholderTextColor={c.subtext}
+                            keyboardType="numeric"
                         />
                     </View>
 

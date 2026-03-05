@@ -20,7 +20,7 @@ const Practicals: React.FC = () => {
 
     usePageMeta({
         title: 'Assignments & Practicals | AcadHub',
-        description: 'Track practical records, assignments, and project submissions across all your subjects.',
+        description: 'Track practical records and assignment milestones across all your subjects.',
     });
 
     useEffect(() => { loadData(); }, [currentSemester]);
@@ -94,7 +94,7 @@ const Practicals: React.FC = () => {
         return cats.includes(selectedCategory);
     });
 
-    const categories = ['All', 'Theory', 'Practical', 'Assignment', 'Project'];
+    const categories = ['All', 'Theory', 'Practical', 'Assignment'];
 
     if (loading) return <LoadingSpinner fullScreen />;
 
@@ -113,7 +113,7 @@ const Practicals: React.FC = () => {
                             </div>
                             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Mission Execution</h1>
                         </div>
-                        <p className="text-white/40 font-medium max-w-md">Track your project submissions, practical records, and assignment milestones in ultra-stealth mode.</p>
+                        <p className="text-white/40 font-medium max-w-md">Track your practical records and assignment milestones in ultra-stealth mode.</p>
                     </div>
                     <div className="flex gap-1.5 md:gap-4 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.04] overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
                         {categories.map(cat => (
@@ -147,7 +147,7 @@ const Practicals: React.FC = () => {
                                         <div className="min-w-0">
                                             <h3 className="text-lg font-black text-white/90 truncate pr-2 group-hover:text-blue-400 transition-colors uppercase tracking-tight">{subject.name}</h3>
                                             <div className="flex gap-2 mt-2">
-                                                {cats.filter(c => c !== 'Theory').map(c => (
+                                                {cats.filter(c => c !== 'Theory' && c !== 'Project').map(c => (
                                                     <span key={c} className="px-2 py-0.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[9px] font-black text-blue-400 uppercase tracking-widest">{c}</span>
                                                 ))}
                                             </div>

@@ -45,7 +45,14 @@ const NotificationsScreen = ({ navigation }) => {
     const fetchData = async (force = false) => {
         try {
             const data = await attendanceService.getNotices(force);
-            setUniNotices(data || []);
+            const parseDate = (d) => {
+                if (!d) return 0;
+                const p = d.split('-');
+                if (p.length === 3) return new Date(`${p[2]}-${p[1]}-${p[0]}`).getTime();
+                return new Date(d).getTime() || 0;
+            };
+            const sorted = (data || []).slice().sort((a, b) => parseDate(b.date) - parseDate(a.date));
+            setUniNotices(sorted);
         } catch (error) { console.error(error); }
         finally { setRefreshing(false); }
     };
@@ -59,7 +66,13 @@ const NotificationsScreen = ({ navigation }) => {
         try {
             // Handle DD-MM-YYYY (University scraping common format)
             const parts = dateString.split('-');
-            if (parts.length === 3) return `${parts[0]}/${parts[1]}/${parts[2]}`;
+            if (parts.length === 3) {
+                let year = parseInt(parts[2], 10);
+                const currentYear = new Date().getFullYear();
+                // Scraper sometimes returns garbled years (e.g. 2061 instead of 2026)
+                if (year > currentYear + 2) year = currentYear;
+                return `${parts[0]}/${parts[1]}/${year}`;
+            }
             return dateString;
         } catch (e) { return dateString; }
     };

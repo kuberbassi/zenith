@@ -210,6 +210,8 @@ const SlotModal = ({
                                         {subjects.map((sub, idx) => {
                                             const subId = sub._id || sub.id;
                                             const isSelected = newSlot.subject_id === subId;
+                                            const cat = (sub.category || '').charAt(0).toUpperCase();
+                                            const catColor = cat === 'P' ? '#34C759' : cat === 'A' ? '#FF9500' : '#5B5FD9';
                                             return (
                                                 <TouchableOpacity
                                                     key={idx}
@@ -217,6 +219,11 @@ const SlotModal = ({
                                                     onPress={() => setNewSlot({ ...newSlot, subject_id: subId, name: sub.name, type: 'Lecture' })}
                                                 >
                                                     <Text style={[styles.subjectChipText, isSelected && { color: '#FFF' }]}>{sub.name}</Text>
+                                                    {cat ? (
+                                                        <View style={{ backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : catColor + '25', borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, marginTop: 4, alignSelf: 'flex-start' }}>
+                                                            <Text style={{ fontSize: 9, fontWeight: '800', color: isSelected ? '#FFF' : catColor }}>{sub.category || cat}</Text>
+                                                        </View>
+                                                    ) : null}
                                                 </TouchableOpacity>
                                             );
                                         })}
@@ -329,7 +336,7 @@ const getStyles = (c, isDark) => StyleSheet.create({
     inputWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 56, borderWidth: 1, borderColor: c.glassBorder },
     textInput: { flex: 1, color: c.text, fontSize: 16, fontWeight: '600' },
     subjectsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    subjectChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.glassBorder },
+    subjectChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: c.surface, borderWidth: 1, borderColor: c.glassBorder, flexDirection: 'column' },
     subjectChipText: { fontSize: 13, fontWeight: '700', color: c.subtext },
     input: { backgroundColor: c.inputBg, borderRadius: 16, paddingHorizontal: 16, height: 56, borderWidth: 1, borderColor: c.glassBorder, color: c.text, fontWeight: '600', fontSize: 16 },
     footer: { flexDirection: 'row', gap: 12, padding: 24, borderTopWidth: 1, borderTopColor: c.glassBorder },

@@ -22,6 +22,7 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
         surface: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
         inputBg: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
         danger: theme.palette.red,
+        warning: theme.palette.orange,
     };
 
     const styles = getStyles(c, isDark);
@@ -217,6 +218,40 @@ const AddSubjectModal = ({ visible, onClose, onSave, onDelete, initialData, isDa
                                     )
                                 })}
                             </View>
+
+                            {initialData && (
+                                <View style={[styles.overrideCard, { marginTop: 16 }]}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+                                        <AlertTriangle size={16} color={c.warning} />
+                                        <Text style={[styles.overrideTitle, { color: c.warning }]}>Manual Override</Text>
+                                    </View>
+                                    <View style={styles.row}>
+                                        <View style={{ flex: 1, alignItems: 'center' }}>
+                                            <Text style={styles.statLabel}>ATTENDED</Text>
+                                            <TextInput
+                                                style={styles.statInput}
+                                                value={attended}
+                                                onChangeText={setAttended}
+                                                keyboardType='numeric'
+                                                placeholder="0"
+                                                placeholderTextColor={c.subtext}
+                                            />
+                                        </View>
+                                        <View style={{ width: 1, height: 40, backgroundColor: c.glassBorder }} />
+                                        <View style={{ flex: 1, alignItems: 'center' }}>
+                                            <Text style={styles.statLabel}>TOTAL</Text>
+                                            <TextInput
+                                                style={styles.statInput}
+                                                value={total}
+                                                onChangeText={setTotal}
+                                                keyboardType='numeric'
+                                                placeholder="0"
+                                                placeholderTextColor={c.subtext}
+                                            />
+                                        </View>
+                                    </View>
+                                </View>
+                            )}
 
                             {/* Component Targets (Practicals/Assignments) */}
                             {(categories.includes('Practical') || categories.includes('Assignment')) && (

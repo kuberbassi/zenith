@@ -10,7 +10,8 @@ import { attendanceService } from '../services';
 import { useTheme } from '../contexts/ThemeContext';
 import {
     ChevronDown, ChevronUp, Info, Edit3, Save, X, Trash2, Plus,
-    Award, TrendingUp, BookOpen, GraduationCap, Download, BarChart2, Zap
+    Award, TrendingUp, BookOpen, GraduationCap, Download, BarChart2, Zap,
+    RefreshCw, Eye, EyeOff, ShieldCheck, Lock
 } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -457,7 +458,7 @@ const ResultsScreen = ({ navigation }) => {
     const currentResult = (Array.isArray(results) ? results : []).find(r => r.semester === selectedSemester);
 
     // Replace Edit imports and add new icons
-    const { RefreshCw, Eye, EyeOff, ShieldCheck } = require('lucide-react-native');
+    // (icons imported at top level)
 
     if (step === 'loading') {
         return (
@@ -469,7 +470,8 @@ const ResultsScreen = ({ navigation }) => {
 
     if (step === 'form') {
         return (
-            <View style={{ flex: 1, backgroundColor: c.bgGradStart }}>
+            <View style={{ flex: 1 }}>
+                <LinearGradient colors={[c.bgGradStart, c.bgGradMid, c.bgGradEnd]} noTexture style={StyleSheet.absoluteFillObject} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
                 <AnimatedHeader
                     scrollY={scrollY}
                     title="IPU Sync"
@@ -483,13 +485,25 @@ const ResultsScreen = ({ navigation }) => {
                 />
                 <ScrollView contentContainerStyle={{ padding: 24, paddingTop: Layout.header.maxHeight + insets.top + 20 }}>
                     <View style={styles.card}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 12 }}>
-                            <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: c.primary + '20', alignItems: 'center', justifyContent: 'center' }}>
-                                <GraduationCap size={24} color={c.primary} />
-                            </View>
-                            <View>
-                                <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>Academic Portal</Text>
-                                <Text style={{ fontSize: 12, color: c.subtext, fontWeight: '600' }}>Secure Result Retrieval</Text>
+                        {/* Card Header with gradient accent */}
+                        <LinearGradient
+                            colors={c.gradients.primary}
+                            style={{ height: 4, borderRadius: 4, marginBottom: 24 }}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                            noTexture
+                        />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 14 }}>
+                            <LinearGradient
+                                colors={c.gradients.primary}
+                                style={{ width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }}
+                                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                                noTexture
+                            >
+                                <GraduationCap size={26} color="#FFF" />
+                            </LinearGradient>
+                            <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 20, fontWeight: '900', color: c.text, letterSpacing: -0.5 }}>Academic Portal</Text>
+                                <Text style={{ fontSize: 12, color: c.subtext, fontWeight: '600', marginTop: 2 }}>IPU Result Retrieval</Text>
                             </View>
                         </View>
 
@@ -534,6 +548,12 @@ const ResultsScreen = ({ navigation }) => {
                                 )}
                             </LinearGradient>
                         </TouchableOpacity>
+
+                        {/* Security Notice */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, justifyContent: 'center' }}>
+                            <ShieldCheck size={12} color={c.success} />
+                            <Text style={{ fontSize: 11, color: c.subtext, fontWeight: '600' }}>Your credentials are never stored on our servers</Text>
+                        </View>
                     </View>
                 </ScrollView>
             </View>
@@ -542,34 +562,62 @@ const ResultsScreen = ({ navigation }) => {
 
     if (step === 'captcha') {
         return (
-            <View style={{ flex: 1, backgroundColor: c.bgGradStart }}>
+            <View style={{ flex: 1 }}>
+                <LinearGradient colors={[c.bgGradStart, c.bgGradMid, c.bgGradEnd]} noTexture style={StyleSheet.absoluteFillObject} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
                 <AnimatedHeader scrollY={scrollY} title="Security Check" subtitle="Verify identity" isDark={isDark} colors={c} onBack={() => setStep('form')} />
                 <ScrollView contentContainerStyle={{ padding: 24, paddingTop: Layout.header.maxHeight + insets.top + 20 }}>
                     <View style={styles.card}>
+                        {/* Card accent bar */}
+                        <LinearGradient
+                            colors={[c.warning, c.danger]}
+                            style={{ height: 4, borderRadius: 4, marginBottom: 24 }}
+                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                            noTexture
+                        />
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-                            <View>
-                                <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>Security Check</Text>
-                                <Text style={{ fontSize: 12, color: c.subtext }}>Verify human identity</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: c.warning + '20', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Lock size={20} color={c.warning} />
+                                </View>
+                                <View>
+                                    <Text style={{ fontSize: 18, fontWeight: '900', color: c.text, letterSpacing: -0.3 }}>Security Check</Text>
+                                    <Text style={{ fontSize: 11, color: c.subtext, fontWeight: '600' }}>Enter the code shown below</Text>
+                                </View>
                             </View>
                             <TouchableOpacity onPress={refreshCaptcha} style={styles.iconBtn}>
                                 <RefreshCw size={20} color={c.primary} />
                             </TouchableOpacity>
                         </View>
 
-                        <View style={{ backgroundColor: '#FFF', padding: 16, borderRadius: 16, alignItems: 'center', marginBottom: 24 }}>
+                        {/* Captcha image container */}
+                        <View style={{
+                            backgroundColor: '#FFFFFF',
+                            padding: 20,
+                            borderRadius: 20,
+                            alignItems: 'center',
+                            marginBottom: 20,
+                            borderWidth: 1,
+                            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.06,
+                            shadowRadius: 8,
+                        }}>
                             {captchaInfo?.captcha_image ? (
                                 <Animated.Image
                                     source={{ uri: captchaInfo.captcha_image.startsWith('data:') ? captchaInfo.captcha_image : `data:image/png;base64,${captchaInfo.captcha_image}` }}
-                                    style={{ height: 60, width: 200, resizeMode: 'contain' }}
+                                    style={{ height: 70, width: 220, resizeMode: 'contain' }}
                                 />
                             ) : (
-                                <Text style={{ color: '#000', marginVertical: 20 }}>Loading...</Text>
+                                <View style={{ height: 70, alignItems: 'center', justifyContent: 'center' }}>
+                                    <ActivityIndicator color={c.primary} />
+                                </View>
                             )}
                         </View>
 
                         <TextInput
-                            style={[styles.textInputForm, { textAlign: 'center', letterSpacing: 4, textTransform: 'uppercase', fontSize: 18, fontWeight: '800' }]}
-                            placeholder="TYPE CAPTCHA..."
+                            style={[styles.textInputForm, { textAlign: 'center', letterSpacing: 6, textTransform: 'uppercase', fontSize: 20, fontWeight: '900' }]}
+                            placeholder="· · · · · ·"
                             placeholderTextColor={c.subtext}
                             value={captchaCode}
                             onChangeText={setCaptchaCode}
@@ -577,7 +625,7 @@ const ResultsScreen = ({ navigation }) => {
                         />
 
                         <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
-                            <TouchableOpacity onPress={() => setStep('form')} style={[styles.syncBtn, { flex: 1, backgroundColor: c.glassBgStart }]}>
+                            <TouchableOpacity onPress={() => setStep('form')} style={[styles.syncBtn, { flex: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}>
                                 <Text style={[styles.syncBtnText, { color: c.text }]}>BACK</Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={handleFetchResultsWithCaptcha} disabled={fetching} style={{ flex: 1 }}>

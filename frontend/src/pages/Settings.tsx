@@ -158,7 +158,8 @@ const Settings: React.FC = () => {
 
     const handleProfileSave = async () => {
         try {
-            await attendanceService.updateProfile({ name, ...profileForm, enrollment_number: profileForm.enrollment_number });
+            const { picture, ...profileFormData } = profileForm;
+            await attendanceService.updateProfile({ name, ...profileFormData });
 
             // Also sync thresholds to preferences endpoint for full consistency
             if (profileForm.attendance_threshold || profileForm.warning_threshold) {

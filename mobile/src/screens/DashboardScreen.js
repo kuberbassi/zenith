@@ -13,7 +13,7 @@ import { theme, Layout } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { attendanceService, academicService } from '../services';
 import { NotificationService } from '../services/NotificationService';
-import { TrendingUp, Plus, Book, Calendar, ChevronRight, Bell, Clock, CheckCircle2, XCircle, MinusCircle, Settings, Bot } from 'lucide-react-native';
+import { Plus, Book, Calendar, ChevronRight, Bell, Clock, CheckCircle2, XCircle, MinusCircle, Settings, Bot } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import SemesterSelector from '../components/SemesterSelector';
@@ -38,7 +38,6 @@ const DashboardScreen = ({ navigation }) => {
     const scrollY = useRef(new Animated.Value(0)).current;
 
     const [dashboardData, setDashboardData] = useState(null);
-    const [academicStats, setAcademicStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
@@ -52,13 +51,11 @@ const DashboardScreen = ({ navigation }) => {
     const fetchDashboardData = async (force = false) => {
         try {
             // Fetch dashboard data + silently warm notice cache in parallel + fetch user stats 
-            const [data, stats] = await Promise.all([
+            const [data] = await Promise.all([
                 attendanceService.getDashboardData(selectedSemester, force),
-                attendanceService.getSavedIPUResults().catch(() => null), // Get academic stats
                 attendanceService.getNotices(false).catch(() => null), // silent prefetch
             ]);
             setDashboardData(data);
-            if (stats?.cgpa) setAcademicStats(stats.cgpa);
 
             if (data?.subjects) {
                 NotificationService.checkAndNotify(data.subjects, threshold);
@@ -306,20 +303,6 @@ const DashboardScreen = ({ navigation }) => {
                         </View>
                     </LinearGradient>
 
-                    <LinearGradient
-                        colors={c.gradients.card}
-                        style={styles.statCard}
-                    >
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-                            <View style={{ flex: 1, paddingRight: 8 }}>
-                                <Text style={styles.statLabel} numberOfLines={1}>CGPA</Text>
-                                <Text style={styles.statValue}>{academicStats || '0.00'}</Text>
-                            </View>
-                            <View style={styles.iconCircleSmall}>
-                                <TrendingUp size={18} color={c.accent} />
-                            </View>
-                        </View>
-                    </LinearGradient>
 
 
                     <PressableScale
