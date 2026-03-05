@@ -192,12 +192,20 @@ const Results: React.FC = () => {
                 setLastUpdated(new Date().toISOString());
                 setStep('results');
             } else {
-                setError('Invalid credentials or CAPTCHA.');
+                setError('Invalid credentials or CAPTCHA. Try a new CAPTCHA.');
                 await refreshCaptcha();
             }
         } catch (e: any) {
-            setError(e?.response?.data?.error || 'Failed to fetch.');
-            await refreshCaptcha();
+            const status = e?.response?.status;
+            const msg = e?.response?.data?.error || 'Failed to fetch.';
+            setError(msg);
+            // 423 = account locked — stop immediately, never refresh captcha
+            if (status === 423) {
+                setStep('form');
+                setPassword('');
+            } else {
+                await refreshCaptcha();
+            }
         } finally { setFetching(false); }
     }
 
