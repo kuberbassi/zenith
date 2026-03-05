@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     User, Settings as SettingsIcon, Download, Upload,
@@ -102,6 +103,11 @@ const Settings: React.FC = () => {
     const { setAccentColor } = useTheme();
     const { currentSemester, setCurrentSemester } = useSemester();
     const { showToast } = useToast();
+
+    usePageMeta({
+        title: 'Settings | AcadHub',
+        description: 'Manage your AcadHub profile, preferences, semester settings, and account data.',
+    });
 
     const [activeTab, setActiveTab] = useState<TabKey>('profile');
     const [isEditingProfile, setIsEditingProfile] = useState(false);

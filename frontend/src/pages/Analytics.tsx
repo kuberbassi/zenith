@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { Doughnut, Radar, Line } from 'react-chartjs-2';
 import {
     Chart as ChartJS, CategoryScale, LinearScale, BarElement,
@@ -21,6 +22,11 @@ const Analytics: React.FC = () => {
     const { reportsData, dayOfWeekData, loading } = useAnalytics();
     const { user } = useAuth();
     const targetThreshold = user?.attendance_threshold || 75;
+
+    usePageMeta({
+        title: 'Analytics | AcadHub',
+        description: 'Deep-dive into your attendance trends, subject performance, and academic analytics.',
+    });
 
     if (loading) {
         return (

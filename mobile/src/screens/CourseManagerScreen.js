@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from '../components/LinearGradient';
 import { theme, Layout } from '../theme';
 import { Plus, X, Globe, Video, Clock, Trash2, Edit2, ExternalLink, Save, CheckCircle2 } from 'lucide-react-native';
-import { attendanceService } from '../services/attendance.service';
+import { attendanceService } from '../services';
 import AnimatedHeader from '../components/AnimatedHeader';
 import * as Linking from 'expo-linking';
 import * as Haptics from 'expo-haptics';
@@ -390,7 +390,7 @@ const CourseManagerScreen = ({ navigation }) => {
             {/* MODAL - Flush Bottom Sheet */}
             <Modal visible={modalVisible} animationType="fade" transparent onRequestClose={() => setModalVisible(false)}>
                 <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-                    <TouchableOpacity noTexture style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} activeOpacity={1} />
+                    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setModalVisible(false)} activeOpacity={1} />
                     <Animated.View style={[styles.modalRefined, { transform: [{ scale: modalScale }], opacity: modalOpacity }]}>
                         <LinearGradient colors={[isDark ? '#000000' : '#FFFFFF', isDark ? '#000000' : '#F2F2F7']} style={{ flexShrink: 1 }}>
                             <View style={styles.dragHandle} />

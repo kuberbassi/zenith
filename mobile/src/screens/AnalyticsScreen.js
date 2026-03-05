@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, Dimensions, Animated, UIManager, Platform } from 'react-native';
 import { theme, Layout } from '../theme';
-import { attendanceService } from '../services/attendance.service';
+import { attendanceService } from '../services';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BarChart2, TrendingDown, Activity, Zap, CheckCircle, AlertTriangle } from 'lucide-react-native';
@@ -11,6 +11,8 @@ import AnimatedHeader from '../components/AnimatedHeader';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSemester } from '../contexts/SemesterContext';
 import PressableScale from '../components/PressableScale';
+import academicService from '../services/academic.service';
+import { LineChart } from 'react-native-chart-kit';
 
 const AnalyticsScreen = () => {
     const { isDark } = useTheme();
@@ -48,15 +50,22 @@ const AnalyticsScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [reportData, setReportData] = useState(null);
     const [weeklyRawData, setWeeklyRawData] = useState(null);
+    const [allResults, setAllResults] = useState([]);
+    const [overallCgpa, setOverallCgpa] = useState('0.00');
 
     const fetchData = async () => {
         try {
-            const [reportRes, weeklyRes] = await Promise.all([
+            const [reportRes, weeklyRes, resultsRes] = await Promise.all([
                 attendanceService.getReportsData(selectedSemester),
-                attendanceService.getDayOfWeekAnalytics(selectedSemester)
+                attendanceService.getDayOfWeekAnalytics(selectedSemester),
+                attendanceService.getSavedIPUResults()
             ]);
             setReportData(reportRes);
             setWeeklyRawData(weeklyRes);
+            if (resultsRes) {
+                setAllResults(resultsRes.semesters || []);
+                setOverallCgpa(resultsRes.cgpa || '0.00');
+            }
         } catch (error) {
             console.error("Analytics Fetch Error:", error);
         } finally {
@@ -88,7 +97,7 @@ const AnalyticsScreen = () => {
     };
 
     const getFocusSubjects = () => {
-        if (!reportData?.subject_breakdown) return [];
+        if (!Array.isArray(reportData?.subject_breakdown)) return [];
         return [...reportData.subject_breakdown].sort((a, b) => a.percentage - b.percentage).slice(0, 4);
     };
 
@@ -110,6 +119,26 @@ const AnalyticsScreen = () => {
     const titleSize = scrollY.interpolate({ inputRange: [0, 100], outputRange: [32, 24], extrapolate: 'clamp' });
     const subHeight = scrollY.interpolate({ inputRange: [0, 100], outputRange: [20, 0], extrapolate: 'clamp' });
     const subOpacity = scrollY.interpolate({ inputRange: [0, 50], outputRange: [1, 0], extrapolate: 'clamp' });
+
+    // SGPA Chart Data Formatting
+    const sgpaLabels = allResults.map(r => `Sem ${r.semester}`);
+    const sgpaDataset = allResults.map(r => parseFloat(r.sgpa) || 0);
+    const sgpaChartData = {
+        labels: sgpaLabels.length ? sgpaLabels : ['Sem 1'],
+        datasets: [{ data: sgpaDataset.length ? sgpaDataset : [0] }]
+    };
+    const maxSgpaValue = Math.max(...(sgpaDataset.length ? sgpaDataset : [0]), 10);
+    const chartConfig = {
+        backgroundGradientFrom: c.surface,
+        backgroundGradientFromOpacity: 0,
+        backgroundGradientTo: c.surface,
+        backgroundGradientToOpacity: 0,
+        color: (opacity = 1) => c.primary,
+        strokeWidth: 2,
+        barPercentage: 0.5,
+        useShadowColorFromDataset: false,
+        decimalPlaces: 2
+    };
 
     return (
         <View style={{ flex: 1 }}>
@@ -138,6 +167,55 @@ const AnalyticsScreen = () => {
                     />
                 }
             >
+                {/* Overall Stats Grid */}
+                {allResults.length > 0 && (
+                    <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+                        <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={[styles.card, { flex: 1, marginBottom: 0, paddingVertical: 16 }]}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: c.subtext, marginBottom: 4 }}>OVERALL CGPA</Text>
+                            <Text style={{ fontSize: 32, fontWeight: '800', color: c.text }}>
+                                {overallCgpa}
+                            </Text>
+                        </LinearGradient>
+                        <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={[styles.card, { flex: 1, marginBottom: 0, paddingVertical: 16 }]}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: c.subtext, marginBottom: 4 }}>TOTAL CREDITS</Text>
+                            <Text style={{ fontSize: 32, fontWeight: '800', color: c.primary }}>
+                                {allResults.reduce((acc, sem) => acc + (parseInt(sem.total_credits) || 0), 0)}
+                            </Text>
+                        </LinearGradient>
+                    </View>
+                )}
+
+                {/* SGPA Performance Trend Card */}
+                <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={styles.card}>
+                    <View style={[styles.cardHeader, { marginBottom: 12 }]}>
+                        <View style={[styles.iconBox, { backgroundColor: c.accent + '20' }]}>
+                            <TrendingDown size={18} color={c.accent} style={{ transform: [{ scaleY: -1 }] }} />
+                        </View>
+                        <Text style={styles.cardTitle}>SGPA Trend</Text>
+                    </View>
+
+                    {sgpaDataset.length > 0 ? (
+                        <View style={{ overflow: 'hidden', paddingBottom: 16 }}>
+                            <LineChart
+                                data={sgpaChartData}
+                                width={Dimensions.get('window').width - 72}
+                                height={220}
+                                chartConfig={chartConfig}
+                                bezier
+                                style={{ marginVertical: 8, borderRadius: 16, marginLeft: -16 }}
+                                fromZero
+                                yAxisSuffix=""
+                                yAxisInterval={1}
+                            />
+                        </View>
+                    ) : (
+                        <View style={styles.emptyState}>
+                            <Activity size={32} color={c.subtext} />
+                            <Text style={styles.emptyText}>No academic data</Text>
+                        </View>
+                    )}
+                </LinearGradient>
+
                 {/* Weekly Chart Card */}
                 <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={styles.card}>
                     <View style={[styles.cardHeader, { marginBottom: 24 }]}>

@@ -26,9 +26,12 @@ const CreateSubjectSchema = z.object({
   professor: z.string().max(200).optional().default(''),
   classroom: z.string().max(100).optional().default(''),
   type: z.string().optional().default('theory'),
-  credits: z.number().optional(),
+  credits: z.number().optional().default(0),
   categories: z.array(z.string()).optional().default(['Theory']),
   target: z.number().min(0).max(100).optional().default(75),
+  syllabus: z.string().optional().default(''),
+  practical_total: z.number().optional().default(10),
+  assignment_total: z.number().optional().default(4),
 })
 
 const UpdateSubjectSchema = z.object({
@@ -96,7 +99,13 @@ router.post('/subjects', async (req: AuthRequest, res) => {
     const userThreshold = req.user?.attendance_threshold ?? 75
     const target = body.target === 75 ? userThreshold : body.target // 75 is the Zod default, so override it
 
-    const subject = await Subject.create({ ...body, target, ...ownership(req) })
+    const subject = await Subject.create({
+      ...body,
+      target,
+      practicals: { total: body.practical_total, completed: 0, hardcopy: false },
+      assignments: { total: body.assignment_total, completed: 0, hardcopy: false },
+      ...ownership(req)
+    })
     sysLog(req.userId!, 'Subject Added', `Added '${body.name}' to semester ${body.semester}`).catch(() => { })
     created(res, { id: String(subject._id), ...subject.toObject() })
   } catch (err) {

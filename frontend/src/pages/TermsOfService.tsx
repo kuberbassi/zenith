@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import { ArrowLeft, FileText, AlertTriangle, UserCheck, XCircle, RefreshCw, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -44,6 +45,12 @@ const sections = [
 
 const TermsOfService: React.FC = () => {
     const navigate = useNavigate();
+
+    usePageMeta({
+        title: 'Terms of Service | AcadHub',
+        description: 'Read the AcadHub terms of service. Understand your rights and responsibilities as a user.',
+        indexable: true,
+    });
 
     return (
         <div className="min-h-screen bg-black text-white">

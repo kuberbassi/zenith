@@ -2,6 +2,7 @@ import React, { useState, Suspense } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Float, Sphere, MeshDistortMaterial } from '@react-three/drei';
 
@@ -37,6 +38,12 @@ const ThreeBackground = () => {
 const Login: React.FC = () => {
     const { loginWithGoogle } = useAuth();
     const [error, setError] = useState<string | null>(null);
+
+    usePageMeta({
+        title: 'AcadHub | Student Center',
+        description: 'Sign in to AcadHub — your all-in-one student dashboard for IPU. Track attendance, sync results, manage timetables, and develop your skills.',
+        indexable: true,
+    });
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-black">

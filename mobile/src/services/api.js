@@ -54,6 +54,10 @@ api.interceptors.response.use(
       const ms = Date.now() - res.config._startTime;
       console.log(`⚡ ${res.config.method?.toUpperCase()} ${res.config.url} → ${ms}ms`);
     }
+    // Unwrap the backend's { success: true, data: ... } envelope
+    if (res.data && res.data.success !== undefined && res.data.data !== undefined) {
+      res.data = res.data.data;
+    }
     return res;
   },
   async (err) => {
@@ -65,7 +69,7 @@ api.interceptors.response.use(
       try {
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('user_data');
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // 429 → exponential backoff (max 3 retries)

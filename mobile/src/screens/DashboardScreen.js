@@ -11,9 +11,9 @@ const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 import { useTheme } from '../contexts/ThemeContext';
 import { theme, Layout } from '../theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { attendanceService } from '../services';
+import { attendanceService, academicService } from '../services';
 import { NotificationService } from '../services/NotificationService';
-import { TrendingUp, Plus, Book, Calendar, ChevronRight, Bell, Clock, CheckCircle2, XCircle, MinusCircle, Settings } from 'lucide-react-native';
+import { TrendingUp, Plus, Book, Calendar, ChevronRight, Bell, Clock, CheckCircle2, XCircle, MinusCircle, Settings, Bot } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import SemesterSelector from '../components/SemesterSelector';
@@ -38,6 +38,7 @@ const DashboardScreen = ({ navigation }) => {
     const scrollY = useRef(new Animated.Value(0)).current;
 
     const [dashboardData, setDashboardData] = useState(null);
+    const [academicStats, setAcademicStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
@@ -50,12 +51,14 @@ const DashboardScreen = ({ navigation }) => {
 
     const fetchDashboardData = async (force = false) => {
         try {
-            // Fetch dashboard data + silently warm notice cache in parallel
-            const [data] = await Promise.all([
+            // Fetch dashboard data + silently warm notice cache in parallel + fetch user stats 
+            const [data, stats] = await Promise.all([
                 attendanceService.getDashboardData(selectedSemester, force),
+                attendanceService.getSavedIPUResults().catch(() => null), // Get academic stats
                 attendanceService.getNotices(false).catch(() => null), // silent prefetch
             ]);
             setDashboardData(data);
+            if (stats?.cgpa) setAcademicStats(stats.cgpa);
 
             if (data?.subjects) {
                 NotificationService.checkAndNotify(data.subjects, threshold);
@@ -95,17 +98,7 @@ const DashboardScreen = ({ navigation }) => {
                 await attendanceService.updateSubjectFullDetails(data.subject_id, data);
             } else {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                await attendanceService.addSubject(
-                    data.name,
-                    selectedSemester,
-                    data.categories,
-                    data.code,
-                    data.professor,
-                    data.classroom,
-                    data.practical_total,
-                    data.assignment_total,
-                    data.syllabus
-                );
+                await attendanceService.addSubject(data);
             }
             setModalVisible(false);
             setEditingSubject(null);
@@ -183,7 +176,7 @@ const DashboardScreen = ({ navigation }) => {
 
     // Default sort: Theory first, then Lab, then uncategorized
     const sortSubjectsByCategory = (subjects) => {
-        if (!subjects) return [];
+        if (!Array.isArray(subjects)) return [];
         return [...subjects].sort((a, b) => {
             const getCategoryPriority = (sub) => {
                 const cats = sub.categories || [];
@@ -297,7 +290,7 @@ const DashboardScreen = ({ navigation }) => {
                 </Animated.View>
 
                 {/* STATS ROW */}
-                <Animated.View style={[styles.statsRow, statsStyle]}>
+                <Animated.View style={[styles.statsRow, statsStyle, { flexWrap: 'nowrap' }]}>
                     <LinearGradient
                         colors={c.gradients.card}
                         style={styles.statCard}
@@ -309,6 +302,21 @@ const DashboardScreen = ({ navigation }) => {
                             </View>
                             <View style={styles.iconCircleSmall}>
                                 <Book size={18} color={c.primary} />
+                            </View>
+                        </View>
+                    </LinearGradient>
+
+                    <LinearGradient
+                        colors={c.gradients.card}
+                        style={styles.statCard}
+                    >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
+                            <View style={{ flex: 1, paddingRight: 8 }}>
+                                <Text style={styles.statLabel} numberOfLines={1}>CGPA</Text>
+                                <Text style={styles.statValue}>{academicStats || '0.00'}</Text>
+                            </View>
+                            <View style={styles.iconCircleSmall}>
+                                <TrendingUp size={18} color={c.accent} />
                             </View>
                         </View>
                     </LinearGradient>
@@ -390,6 +398,14 @@ const DashboardScreen = ({ navigation }) => {
                 colors={c}
                 rightComponent={
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <PressableScale
+                            onPress={() => navigation.navigate('AiBot')}
+                            style={styles.bellBtn}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Bot size={24} color={c.text} />
+                        </PressableScale>
+
                         <PressableScale
                             onPress={() => navigation.navigate('Notifications')}
                             style={styles.bellBtn}
@@ -616,17 +632,17 @@ const getStyles = (c, isDark) => StyleSheet.create({
         elevation: 3
     },
     statLabel: {
-        fontSize: 11,
-        fontWeight: '700',
+        fontSize: 10,
+        fontWeight: '800',
         color: c.subtext,
-        marginBottom: 4,
+        marginBottom: 2,
         letterSpacing: 0.5,
         textTransform: 'uppercase',
         flexWrap: 'wrap'
     },
     statValue: {
-        fontSize: 28, // Reduced from 32 to prevent wrapping
-        fontWeight: '800',
+        fontSize: 24, // Reduced from 32 to prevent wrapping
+        fontWeight: '900',
         color: c.text,
         letterSpacing: -1
     },

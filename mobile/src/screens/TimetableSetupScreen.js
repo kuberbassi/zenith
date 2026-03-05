@@ -124,13 +124,17 @@ const TimetableSetupScreen = ({ navigation }) => {
         } else if (timePickerTarget === 'end') {
             setNewSlot(prev => ({ ...prev, endTime: timeStr }));
         } else if (timePickerTarget === 'struct_start' && timePickerIndex !== null) {
-            const updated = [...tempPeriods];
-            updated[timePickerIndex].startTime = timeStr;
-            setTempPeriods(updated);
+            const updated = Array.isArray(tempPeriods) ? [...tempPeriods] : [];
+            if (updated[timePickerIndex]) {
+                updated[timePickerIndex].startTime = timeStr;
+                setTempPeriods(updated);
+            }
         } else if (timePickerTarget === 'struct_end' && timePickerIndex !== null) {
-            const updated = [...tempPeriods];
-            updated[timePickerIndex].endTime = timeStr;
-            setTempPeriods(updated);
+            const updated = Array.isArray(tempPeriods) ? [...tempPeriods] : [];
+            if (updated[timePickerIndex]) {
+                updated[timePickerIndex].endTime = timeStr;
+                setTempPeriods(updated);
+            }
         }
         setTimePickerVisible(false);
     };
@@ -150,8 +154,8 @@ const TimetableSetupScreen = ({ navigation }) => {
 
     const handleAddPeriod = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const nextIdx = tempPeriods.length + 1;
-        setTempPeriods([...tempPeriods, {
+        const currentP = Array.isArray(tempPeriods) ? tempPeriods : [];
+        setTempPeriods([...currentP, {
             id: `p-${Date.now()}`,
             name: '', // Empty name by default to avoid redundancy
             startTime: '09:00 AM',
@@ -162,17 +166,21 @@ const TimetableSetupScreen = ({ navigation }) => {
 
     const handleDeletePeriod = (index) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const updated = [...tempPeriods];
-        updated.splice(index, 1);
-        setTempPeriods(updated);
+        const updated = Array.isArray(tempPeriods) ? [...tempPeriods] : [];
+        if (updated[index]) {
+            updated.splice(index, 1);
+            setTempPeriods(updated);
+        }
     };
 
     const togglePeriodType = (index) => {
         Haptics.selectionAsync();
-        const updated = [...tempPeriods];
+        const updated = Array.isArray(tempPeriods) ? [...tempPeriods] : [];
         // Toggle between 'class' and 'break' (lowercase)
-        updated[index].type = updated[index].type === 'break' ? 'class' : 'break';
-        setTempPeriods(updated);
+        if (updated[index]) {
+            updated[index].type = updated[index].type === 'break' ? 'class' : 'break';
+            setTempPeriods(updated);
+        }
     };
 
     const saveStructureMutation = useMutation({
@@ -440,14 +448,14 @@ const TimetableSetupScreen = ({ navigation }) => {
     };
 
     // Merge Structure (Periods) with Schedule (Slots)
-    const rawDailySlots = timetable[selectedDay] || [];
+    const rawDailySlots = Array.isArray(timetable[selectedDay]) ? timetable[selectedDay] : [];
     const dailySlots = [...rawDailySlots].sort((a, b) => {
         const aTime = a.startTime || a.start_time || (a.time ? a.time.split('-')[0] : '');
         const bTime = b.startTime || b.start_time || (b.time ? b.time.split('-')[0] : '');
         return getMinutes(aTime) - getMinutes(bTime);
     });
 
-    const sortedPeriods = [...periods].sort((a, b) => getMinutes(a.startTime) - getMinutes(b.startTime));
+    const sortedPeriods = Array.isArray(periods) ? [...periods].sort((a, b) => getMinutes(a.startTime) - getMinutes(b.startTime)) : [];
 
     const currentSlots = sortedPeriods.length > 0 ? sortedPeriods.map((period, index) => {
         // Find matching slot for this period

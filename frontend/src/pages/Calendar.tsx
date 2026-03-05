@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import Sparkles from '@/components/ui/Sparkles';
@@ -23,6 +24,11 @@ const Calendar: React.FC = () => {
     const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceRecord[]>>({});
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isMarkModalOpen, setIsMarkModalOpen] = useState(false);
+
+    usePageMeta({
+        title: 'Calendar | AcadHub',
+        description: 'View and mark your daily attendance on a calendar. Log present, absent, or cancelled classes.',
+    });
 
     useEffect(() => { loadData(); }, [currentDate, currentSemester]);
 

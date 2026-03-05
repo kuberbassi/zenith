@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import {
     Rocket, ShieldCheck, Sparkles, Edit2, Trash2, Plus
 } from 'lucide-react';
@@ -32,6 +33,11 @@ const SkillTracker: React.FC = () => {
     const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [filter, setFilter] = useState('all');
+
+    usePageMeta({
+        title: 'Skill Tracker | AcadHub',
+        description: 'Log and track your technical and soft skills. Monitor progress and set learning milestones.',
+    });
 
     const [formData, setFormData] = useState<Omit<Skill, '_id'>>({
         name: '', category: 'Technical', level: 'beginner', progress: 0, notes: ''

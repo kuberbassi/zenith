@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import {
     Chart as ChartJS,
@@ -81,6 +82,11 @@ interface CaptchaInfo {
 /*  Component  */
 const Results: React.FC = () => {
     const { user } = useAuth();
+
+    usePageMeta({
+        title: 'Results | AcadHub',
+        description: 'View your semester-wise IPU results, CGPA, and grade breakdowns. Track academic performance over time.',
+    });
 
     const [step, setStep] = useState<Step>('loading');
     const [enrollmentNo, setEnrollmentNo] = useState('');

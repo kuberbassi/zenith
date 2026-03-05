@@ -11,7 +11,7 @@ import {
     Plus, Edit2, Trash2, Zap, Palette, Globe, Briefcase, Heart, Grid, X, Save, TrendingUp
 } from 'lucide-react-native';
 import { LinearGradient } from '../components/LinearGradient';
-import { attendanceService } from '../services/attendance.service';
+import { attendanceService } from '../services';
 import * as Haptics from 'expo-haptics';
 import AnimatedHeader from '../components/AnimatedHeader';
 import PressableScale from '../components/PressableScale';

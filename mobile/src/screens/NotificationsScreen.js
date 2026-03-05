@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Animated, RefreshControl, Linking } from 'react-native';
 import { theme, Layout } from '../theme';
-import { attendanceService } from '../services/attendance.service';
+import { attendanceService } from '../services';
 import { useTheme } from '../contexts/ThemeContext';
 import { Bell, Info, Megaphone, ExternalLink, FileText } from 'lucide-react-native';
 import { LinearGradient } from '../components/LinearGradient';

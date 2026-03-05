@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import { Bell, Info, ExternalLink, Calendar, RefreshCw, AlertCircle, ShieldCheck, Zap } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -14,6 +15,11 @@ const Notifications: React.FC = () => {
     const [notices, setNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<boolean>(false);
+
+    usePageMeta({
+        title: 'Notices | AcadHub',
+        description: 'Stay updated with the latest university notices and announcements from IPU.',
+    });
 
     useEffect(() => { loadData(); }, []);
 

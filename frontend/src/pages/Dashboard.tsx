@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence, motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
@@ -114,6 +115,11 @@ const Dashboard: React.FC = () => {
     const { showToast } = useToast();
     const { user } = useAuth();
     const { data: dashboardData, isLoading: loading, refetch: loadDashboard } = useDashboard();
+
+    usePageMeta({
+        title: 'Dashboard | AcadHub',
+        description: 'Your academic overview — attendance, upcoming classes, and performance at a glance.',
+    });
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingSubject, setEditingSubject] = useState<any | null>(null);

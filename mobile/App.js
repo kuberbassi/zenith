@@ -30,6 +30,7 @@ import AssignmentsScreen from './src/screens/AssignmentsScreen';
 import CourseManagerScreen from './src/screens/CourseManagerScreen';
 import TimetableScreen from './src/screens/TimetableScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import AiBotScreen from './src/screens/AiBotScreen';
 import useRealTimeSync from './src/hooks/useRealTimeSync';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -297,6 +298,7 @@ const AppNavigator = () => {
               <Stack.Screen name="Assignments" component={AssignmentsScreen} />
               <Stack.Screen name="CourseManager" component={CourseManagerScreen} options={{ presentation: 'modal' }} />
               <Stack.Screen name="Timetable" component={TimetableScreen} />
+              <Stack.Screen name="AiBot" component={AiBotScreen} />
             </>
           )}
         </Stack.Navigator>

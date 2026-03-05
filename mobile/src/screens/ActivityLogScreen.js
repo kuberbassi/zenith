@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Animated, RefreshControl, TouchableOpacity } from 'react-native';
-import { attendanceService } from '../services/attendance.service';
+import { attendanceService } from '../services';
 import { useFocusEffect } from '@react-navigation/native';
 import { CheckCircle, XCircle, Trash2, Edit, AlertCircle, ArrowLeft } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';

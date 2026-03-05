@@ -60,6 +60,27 @@ export const getLogsForDate = async (date) => {
   return data;
 };
 
+// ── IPU Results ────────────────────────────────────────────
+export const getSavedIPUResults = async () => {
+  const { data } = await api.get('/api/attendance/ipu-results/saved');
+  return data;
+};
+
+export const autoFetchIPUResults = async (credentials) => {
+  const { data } = await api.post('/api/attendance/ipu-results/auto-fetch', credentials);
+  return data;
+};
+
+export const fetchIPUResults = async (payload) => {
+  const { data } = await api.post('/api/attendance/ipu-results/fetch', payload);
+  return data;
+};
+
+export const getIPUCaptcha = async () => {
+  const { data } = await api.get('/api/attendance/ipu-results/captcha');
+  return data;
+};
+
 export default {
   markAttendance,
   markAllAttendance,
@@ -69,4 +90,8 @@ export default {
   getCalendarData,
   getClassesForDate,
   getLogsForDate,
+  getSavedIPUResults,
+  autoFetchIPUResults,
+  fetchIPUResults,
+  getIPUCaptcha,
 };

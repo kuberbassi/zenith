@@ -6,7 +6,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme, Layout } from '../theme';
-import { attendanceService } from '../services/attendance.service';
+import { attendanceService } from '../services';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from '../components/LinearGradient';
 import AnimatedHeader from '../components/AnimatedHeader';
@@ -225,7 +225,7 @@ const CalculationsScreen = ({ navigation }) => {
                                                 }]} />
                                             </View>
                                             <Text style={styles.subjectStats}>
-                                                {subject.attended_classes || 0}/{subject.total_classes || 0} • 
+                                                {subject.attended_classes || 0}/{subject.total_classes || 0} •
                                                 {pct < 75 ? ` Need ${Math.ceil((0.75 * (subject.total_classes || 0) - (subject.attended_classes || 0)) / 0.25)} more` : ' Safe to bunk ' + Math.floor(((subject.attended_classes || 0) - 0.75 * (subject.total_classes || 0)) / 0.75)}
                                             </Text>
                                         </LinearGradient>

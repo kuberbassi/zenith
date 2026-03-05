@@ -63,6 +63,7 @@ const LoginScreen = () => {
                 });
 
                 const { user, token } = backendResponse.data;
+
                 if (user && token) {
                     await login(user, token);
                 } else {

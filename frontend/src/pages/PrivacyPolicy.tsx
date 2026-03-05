@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Shield, Eye, Database, Lock, Globe, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -48,6 +49,12 @@ const sections = [
 
 const PrivacyPolicy: React.FC = () => {
     const navigate = useNavigate();
+
+    usePageMeta({
+        title: 'Privacy Policy | AcadHub',
+        description: 'Read the AcadHub privacy policy to understand how we collect, use, and protect your data.',
+        indexable: true,
+    });
 
     return (
         <div className="min-h-screen bg-black text-white">

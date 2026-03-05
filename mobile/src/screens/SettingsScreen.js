@@ -78,6 +78,8 @@ const SettingsScreen = ({ navigation }) => {
     const [attendanceThreshold, setAttendanceThreshold] = useState('75'); // Legacy state, can be merged
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const [showHowToUse, setShowHowToUse] = useState(false);
+    const [academicStats, setAcademicStats] = useState('0.00');
+    const [totalCredits, setTotalCredits] = useState(0);
 
     const { updateStatus, latestRelease, downloadProgress, checkUpdate, downloadAndInstallUpdate, currentVersion } = useUpdate();
 
@@ -156,6 +158,18 @@ const SettingsScreen = ({ navigation }) => {
                     }
                 } catch (prefError) {
                     console.log('⚠️ Preferences endpoint not available, using profile data');
+                }
+
+                // 3. Load Academic Stats
+                try {
+                    const resultsRes = await attendanceService.getSavedIPUResults();
+                    if (resultsRes) {
+                        setAcademicStats(resultsRes.cgpa || '0.00');
+                        const credits = (resultsRes.semesters || []).reduce((acc, sem) => acc + (parseInt(sem.total_credits) || 0), 0);
+                        setTotalCredits(credits);
+                    }
+                } catch (statsErr) {
+                    console.log('Skipping academic stats fetch on Settings', statsErr);
                 }
 
                 // CRITICAL FIX: Update global context with fetched picture so Avatar refreshes
@@ -465,6 +479,18 @@ const SettingsScreen = ({ navigation }) => {
                     </PressableScale>
                     <Text style={styles.heroName}>{user?.name || 'Student'}</Text>
                     <Text style={styles.heroEmail}>{user?.email}</Text>
+                </View>
+
+                {/* PROFILE METRICS */}
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+                    <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={[styles.card, { flex: 1, paddingVertical: 16, alignItems: 'center', marginBottom: 0 }]}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: c.subtext, marginBottom: 4, letterSpacing: 0.5 }}>OVERALL CGPA</Text>
+                        <Text style={{ fontSize: 24, fontWeight: '900', color: c.text }}>{academicStats}</Text>
+                    </LinearGradient>
+                    <LinearGradient colors={[c.glassBgStart, c.glassBgEnd]} style={[styles.card, { flex: 1, paddingVertical: 16, alignItems: 'center', marginBottom: 0 }]}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: c.subtext, marginBottom: 4, letterSpacing: 0.5 }}>TOTAL CREDITS</Text>
+                        <Text style={{ fontSize: 24, fontWeight: '900', color: c.primary }}>{totalCredits}</Text>
+                    </LinearGradient>
                 </View>
 
                 {/* PROFILE CARD */}

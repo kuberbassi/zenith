@@ -9,6 +9,8 @@ import { ChevronLeft, Edit2, Calendar, CheckCircle, XCircle, X, Trash2, Clock, A
 import { LinearGradient } from '../components/LinearGradient';
 import { useTheme } from '../contexts/ThemeContext';
 
+import AddSubjectModal from '../components/AddSubjectModal';
+
 const SubjectDetailScreen = ({ route, navigation }) => {
     const { subject: initialSubject } = route.params;
     const { isDark } = useTheme();
@@ -62,11 +64,6 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     const [editSubjectVisible, setEditSubjectVisible] = useState(false);
     const [logModalVisible, setLogModalVisible] = useState(false);
     const [selectedLog, setSelectedLog] = useState(null);
-
-    // Form States
-    const [editForm, setEditForm] = useState({
-        name: '', code: '', professor: '', classroom: '', type: 'theory'
-    });
     const [statusNote, setStatusNote] = useState('');
 
     useEffect(() => { fetchLogs(); }, []);
@@ -82,45 +79,24 @@ const SubjectDetailScreen = ({ route, navigation }) => {
     // --- SUBJECT MANAGEMENT ---
 
     const openEditSubject = () => {
-        setEditForm({
-            name: subject.name,
-            code: subject.code || '',
-            professor: subject.professor || '',
-            classroom: subject.classroom || '',
-            type: subject.type || 'theory'
-        });
         setEditSubjectVisible(true);
     };
 
-    const saveSubject = async () => {
+    const saveSubject = async (updatedData) => {
         try {
-            await api.put(`/api/academic/subjects/${subject._id}`, {
-                ...editForm
-            });
-            setSubject({ ...subject, ...editForm });
+            await api.put(`/api/academic/subjects/${subject._id}`, updatedData);
+            setSubject({ ...subject, ...updatedData });
             setEditSubjectVisible(false);
             Alert.alert("Success", "Subject updated successfully.");
         } catch (error) { Alert.alert("Error", "Failed to update subject."); }
     };
 
-    const deleteSubject = async () => {
-        Alert.alert(
-            "Delete Subject",
-            "Are you sure? This will delete all attendance logs for this subject.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            await api.delete(`/api/academic/subjects/${subject._id}`);
-                            navigation.goBack();
-                        } catch (e) { Alert.alert("Error", "Failed to delete."); }
-                    }
-                }
-            ]
-        );
+    const deleteSubject = async (subjectId) => {
+        try {
+            await api.delete(`/api/academic/subjects/${subjectId}`);
+            setEditSubjectVisible(false);
+            navigation.goBack();
+        } catch (e) { Alert.alert("Error", "Failed to delete."); }
     };
 
     // --- ATTENDANCE MANAGEMENT ---
@@ -229,7 +205,7 @@ const SubjectDetailScreen = ({ route, navigation }) => {
                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
                 onRefresh={() => { setRefreshing(true); fetchLogs(); }}
                 refreshing={refreshing}
-                ListHeaderComponent={<View style={{ height: Layout.header.maxHeight + insets.top + 10 }} />}
+                ListHeaderComponent={<View style={{ height: 140 }} />}
                 ListEmptyComponent={<Text style={styles.empty}>No attendance history found.</Text>}
             />
 
@@ -288,58 +264,14 @@ const SubjectDetailScreen = ({ route, navigation }) => {
             </Modal>
 
             {/* --- SUBJECT EDIT MODAL --- */}
-            <Modal animationType="slide" transparent={true} visible={editSubjectVisible} onRequestClose={() => setEditSubjectVisible(false)}>
-                <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
-                    <LinearGradient colors={[isDark ? '#000000' : '#fff', isDark ? '#000000' : '#f0f0f0']} style={styles.modalContent}>
-                        <View style={styles.dragBar} />
-                        <Text style={styles.modalTitle}>Edit Subject</Text>
-
-                        <ScrollView style={{ maxHeight: 400 }}>
-                            <Text style={styles.label}>Subject Name</Text>
-                            <TextInput style={styles.input} value={editForm.name} onChangeText={t => setEditForm({ ...editForm, name: t })} />
-
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.label}>Code</Text>
-                                    <TextInput style={styles.input} value={editForm.code} onChangeText={t => setEditForm({ ...editForm, code: t })} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.label}>Classroom</Text>
-                                    <TextInput style={styles.input} value={editForm.classroom} onChangeText={t => setEditForm({ ...editForm, classroom: t })} />
-                                </View>
-                            </View>
-
-                            <Text style={styles.label}>Professor</Text>
-                            <TextInput style={styles.input} value={editForm.professor} onChangeText={t => setEditForm({ ...editForm, professor: t })} />
-
-                            <Text style={styles.label}>Syllabus / Topics</Text>
-                            <TextInput
-                                style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
-                                value={editForm.syllabus}
-                                onChangeText={t => setEditForm({ ...editForm, syllabus: t })}
-                                multiline
-                                numberOfLines={4}
-                                placeholder="Enter syllabus details..."
-                                placeholderTextColor={c.subtext}
-                            />
-                        </ScrollView>
-
-                        <View style={{ gap: 12, marginTop: 20 }}>
-                            <TouchableOpacity style={[styles.fullBtn, { backgroundColor: c.primary }]} onPress={saveSubject}>
-                                <Text style={{ color: '#FFF', fontWeight: '700' }}>Save Changes</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={[styles.fullBtn, { backgroundColor: c.danger + '10' }]} onPress={deleteSubject}>
-                                <Text style={{ color: c.danger, fontWeight: '700' }}>Delete Subject</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={[styles.fullBtn, { backgroundColor: 'transparent' }]} onPress={() => setEditSubjectVisible(false)}>
-                                <Text style={{ color: c.subtext }}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </LinearGradient>
-                </KeyboardAvoidingView>
-            </Modal>
+            <AddSubjectModal
+                visible={editSubjectVisible}
+                onClose={() => setEditSubjectVisible(false)}
+                onSave={saveSubject}
+                onDelete={deleteSubject}
+                initialData={subject}
+                isDark={isDark}
+            />
         </View>
     );
 };
@@ -371,7 +303,7 @@ const getStyles = (c, isDark) => StyleSheet.create({
     chipText: { fontWeight: '800', fontSize: 13, letterSpacing: 0.5 },
     input: { backgroundColor: c.inputBg, borderRadius: 16, padding: 16, color: c.text, fontSize: 16, marginBottom: 16, borderWidth: 1, borderColor: c.glassBorder },
     label: { color: c.subtext, fontSize: 13, fontWeight: '700', marginBottom: 8, marginLeft: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
-    fullBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: 20, gap: 10 },
+    fullBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 18, borderRadius: 20, gap: 10, flex: 1 },
 });
 
 export default SubjectDetailScreen;

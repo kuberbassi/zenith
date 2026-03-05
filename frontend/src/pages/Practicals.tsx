@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Plus, Minus, Edit2, Target, FlaskConical } from 'lucide-react';
 import Button from '@/components/ui/Button';
@@ -16,6 +17,11 @@ const Practicals: React.FC = () => {
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
     const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+
+    usePageMeta({
+        title: 'Assignments & Practicals | AcadHub',
+        description: 'Track practical records, assignments, and project submissions across all your subjects.',
+    });
 
     useEffect(() => { loadData(); }, [currentSemester]);
 

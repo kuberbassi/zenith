@@ -1,41 +1,5 @@
-/**
- * Service barrel export
- */
-
-export { default as api } from './api';
-export { API_URL } from './api';
-
-export { default as AuthService } from './auth.service';
-export * from './auth.service';
-
-export { default as DashboardService } from './dashboard.service';
-export * from './dashboard.service';
-
-export { default as AttendanceService } from './attendance.service';
-export * from './attendance.service';
-
-export { default as AcademicService } from './academic.service';
-export * from './academic.service';
-
-export { default as TimetableService } from './timetable.service';
-export * from './timetable.service';
-
-export { default as ProfileService } from './profile.service';
-export * from './profile.service';
-
-export { default as SkillsService } from './skills.service';
-export * from './skills.service';
-
-export { default as DataService } from './data.service';
-export * from './data.service';
-
-export { default as ScraperService } from './scraper.service';
-export * from './scraper.service';
-
-// ────────────────────────────────────────────────────────────
-// Backward-compatible facade  (maps old monolithic method names
-// to the new domain-specific services so existing screens keep working)
-// ────────────────────────────────────────────────────────────
+import api from './api';
+import AuthService from './auth.service';
 import DashboardService from './dashboard.service';
 import AttendanceService from './attendance.service';
 import AcademicService from './academic.service';
@@ -44,77 +8,97 @@ import ProfileService from './profile.service';
 import SkillsService from './skills.service';
 import DataService from './data.service';
 import ScraperService from './scraper.service';
+import AiService from './ai.service';
+
+export {
+  api,
+  AuthService,
+  DashboardService,
+  AttendanceService,
+  AcademicService,
+  TimetableService,
+  ProfileService,
+  SkillsService,
+  DataService,
+  ScraperService,
+  AiService
+};
 
 export const attendanceService = {
-  // ── Dashboard ──
-  getDashboardData: DashboardService.getDashboardData,
-  getReportsData: DashboardService.getReportsData,
-  getNotifications: DashboardService.getNotifications,
-  getDayOfWeekAnalytics: DashboardService.getDayOfWeekAnalytics,
+  // Dashboard
+  getDashboardData: (sem) => DashboardService.getDashboardData(sem),
+  getReportsData: (sem) => DashboardService.getReportsData(sem),
+  getNotifications: () => DashboardService.getNotifications(),
+  getDayOfWeekAnalytics: (sem) => DashboardService.getDayOfWeekAnalytics(sem),
 
-  // ── Attendance ──
-  markAttendance: AttendanceService.markAttendance,
-  markAllAttendance: AttendanceService.markAllAttendance,
-  getAttendanceLogs: AttendanceService.getAttendanceLogs,
-  editAttendance: AttendanceService.editAttendance,
-  deleteAttendance: AttendanceService.deleteAttendance,
-  getCalendarData: AttendanceService.getCalendarData,
-  getClassesForDate: AttendanceService.getClassesForDate,
-  getLogsForDate: AttendanceService.getLogsForDate,
+  // Attendance
+  markAttendance: (p) => AttendanceService.markAttendance(p),
+  markAllAttendance: (e) => AttendanceService.markAllAttendance(e),
+  getAttendanceLogs: () => AttendanceService.getAttendanceLogs(),
+  editAttendance: (id, u) => AttendanceService.editAttendance(id, u),
+  deleteAttendance: (id) => AttendanceService.deleteAttendance(id),
+  getCalendarData: (p) => AttendanceService.getCalendarData(p),
+  getClassesForDate: (d, s) => AttendanceService.getClassesForDate(d, s),
+  getLogsForDate: (d) => AttendanceService.getLogsForDate(d),
 
-  // ── Academic ──
-  getSubjects: AcademicService.getSubjects,
-  addSubject: AcademicService.addSubject,
-  getSubjectDetails: AcademicService.getSubjectDetails,
-  updateSubject: AcademicService.updateSubject,
-  deleteSubject: AcademicService.deleteSubject,
-  updateAttendanceCount: AcademicService.updateAttendanceCount,
-  updateSubjectFullDetails: AcademicService.updateSubjectFullDetails,
-  updatePracticals: AcademicService.updatePracticals,
-  updateAssignments: AcademicService.updateAssignments,
-  getFullSubjectsData: AcademicService.getFullSubjectsData,
-  getSemesterResults: AcademicService.getResults,
-  saveSemesterResult: AcademicService.saveResults,
-  deleteSemesterResult: AcademicService.deleteResults,
-  getManualCourses: AcademicService.getManualCourses,
-  addManualCourse: AcademicService.addManualCourse,
-  saveManualCourses: AcademicService.addManualCourse,
-  updateManualCourse: AcademicService.updateManualCourse,
-  deleteManualCourse: AcademicService.deleteManualCourse,
-  getAllSemestersOverview: AcademicService.getAllSemestersOverview,
+  // Academic
+  getSubjects: (s) => AcademicService.getSubjects(s),
+  addSubject: (s) => AcademicService.addSubject(s),
+  getSubjectDetails: (id) => AcademicService.getSubjectDetails(id),
+  updateSubject: (id, u) => AcademicService.updateSubject(id, u),
+  deleteSubject: (id) => AcademicService.deleteSubject(id),
+  updateAttendanceCount: (id, a, t) => AcademicService.updateAttendanceCount(id, a, t),
+  updateSubjectFullDetails: (id, d) => AcademicService.updateSubjectFullDetails(id, d),
+  updatePracticals: (id, u) => AcademicService.updatePracticals(id, u),
+  updateAssignments: (id, u) => AcademicService.updateAssignments(id, u),
+  getFullSubjectsData: (s) => AcademicService.getFullSubjectsData(s),
+  getSemesterResults: (s) => AcademicService.getResults(s),
+  getSavedIPUResults: (s) => AcademicService.getResults(s),
+  saveSemesterResult: (r) => AcademicService.saveResults(r),
+  deleteSemesterResult: (s) => AcademicService.deleteResults(s),
+  getManualCourses: () => AcademicService.getManualCourses(),
+  addManualCourse: (c) => AcademicService.addManualCourse(c),
+  saveManualCourses: (c) => AcademicService.addManualCourse(c),
+  updateManualCourse: (id, u) => AcademicService.updateManualCourse(id, u),
+  deleteManualCourse: (id) => AcademicService.deleteManualCourse(id),
+  getAllSemestersOverview: () => AcademicService.getAllSemestersOverview(),
 
-  // ── Timetable ──
-  getTimetable: TimetableService.getTimetable,
-  saveTimetable: TimetableService.saveTimetable,
-  saveTimetableStructure: TimetableService.saveTimetableStructure,
-  addTimetableSlot: TimetableService.addSlot,
-  updateTimetableSlot: TimetableService.updateSlot,
-  deleteTimetableSlot: TimetableService.deleteSlot,
-  getHolidays: TimetableService.getHolidays,
-  addHoliday: TimetableService.addHoliday,
-  deleteHoliday: TimetableService.deleteHoliday,
+  // Timetable
+  getTimetable: () => TimetableService.getTimetable(),
+  saveTimetable: (t) => TimetableService.saveTimetable(t),
+  saveTimetableStructure: (s) => TimetableService.saveTimetableStructure(s),
+  addTimetableSlot: (s) => TimetableService.addSlot(s),
+  updateTimetableSlot: (id, u) => TimetableService.updateSlot(id, u),
+  deleteTimetableSlot: (id) => TimetableService.deleteSlot(id),
+  getHolidays: () => TimetableService.getHolidays(),
+  addHoliday: (h) => TimetableService.addHoliday(h),
+  deleteHoliday: (id) => TimetableService.deleteHoliday(id),
 
-  // ── Profile ──
-  getProfile: ProfileService.getProfile,
-  updateProfile: ProfileService.updateProfile,
-  uploadProfilePicture: ProfileService.uploadProfilePicture,
-  getPreferences: ProfileService.getPreferences,
-  updatePreferences: ProfileService.savePreferences,
-  getSystemLogs: ProfileService.getSystemLogs,
+  // Profile
+  getProfile: () => ProfileService.getProfile(),
+  updateProfile: (u) => ProfileService.updateProfile(u),
+  uploadProfilePicture: (f) => ProfileService.uploadProfilePicture(f),
+  getPreferences: () => ProfileService.getPreferences(),
+  updatePreferences: (p) => ProfileService.savePreferences(p),
+  getSystemLogs: () => ProfileService.getSystemLogs(),
 
-  // ── Skills ──
-  getSkills: SkillsService.getSkills,
-  addSkill: SkillsService.addSkill,
-  updateSkill: SkillsService.updateSkill,
-  deleteSkill: SkillsService.deleteSkill,
+  // Skills
+  getSkills: () => SkillsService.getSkills(),
+  addSkill: (s) => SkillsService.addSkill(s),
+  updateSkill: (id, u) => SkillsService.updateSkill(id, u),
+  deleteSkill: (id) => SkillsService.deleteSkill(id),
 
-  // ── Data ──
-  exportData: DataService.exportData,
-  importData: DataService.importData,
-  deleteAllData: DataService.deleteAllData,
-  getBackups: DataService.getBackups,
-  restoreBackup: DataService.restoreBackup,
+  // Data
+  exportData: (f) => DataService.exportData(f),
+  importData: (d) => DataService.importData(d),
+  deleteAllData: () => DataService.deleteAllData(),
+  getBackups: () => DataService.getBackups(),
+  restoreBackup: (id) => DataService.restoreBackup(id),
 
-  // ── Scraper ──
-  getNotices: ScraperService.getNotices,
+  // Scraper
+  getNotices: () => ScraperService.getNotices(),
+
+  // AI
+  chat: (m) => AiService.chat(m),
 };
+

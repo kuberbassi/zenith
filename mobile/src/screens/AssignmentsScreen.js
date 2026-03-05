@@ -7,7 +7,7 @@ import { LinearGradient } from '../components/LinearGradient';
 import { theme, Layout } from '../theme';
 import { Plus, Minus, CheckCircle, Beaker, FileText, Filter } from 'lucide-react-native';
 // import api from '../services/api'; // Removed in favor of attendanceService
-import { attendanceService } from '../services/attendance.service';
+import { attendanceService } from '../services';
 import * as Haptics from 'expo-haptics';
 import AnimatedHeader from '../components/AnimatedHeader';
 

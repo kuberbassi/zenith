@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ExternalLink, Trash2, Edit2, Award,
@@ -43,6 +44,11 @@ const Courses: React.FC = () => {
     const { showToast } = useToast();
     const [courses, setCourses] = useState<Course[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    usePageMeta({
+        title: 'Courses | AcadHub',
+        description: 'Track your enrolled courses, progress, and learning milestones all in one place.',
+    });
     const [editingCourse, setEditingCourse] = useState<Course | null>(null);
     const [formData, setFormData] = useState<Partial<Course>>({
         title: '', platform: 'coursera', url: '', progress: 0,

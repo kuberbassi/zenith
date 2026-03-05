@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import {
     Clock, LayoutGrid, List, Plus, Edit3, ShieldCheck
 } from 'lucide-react';
@@ -35,6 +36,11 @@ const TimeTable: React.FC = () => {
     const [periods, setPeriods] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<'grid' | 'list'>('grid');
+
+    usePageMeta({
+        title: 'Timetable | AcadHub',
+        description: 'View and manage your weekly class schedule. Customize periods and subjects per semester.',
+    });
 
     // Modal state
     const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);

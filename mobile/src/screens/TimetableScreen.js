@@ -382,6 +382,18 @@ const TimetableScreen = ({ navigation }) => {
                                     <Text style={styles.cardDetailText}>{item.classroom}</Text>
                                 </View>
                             ) : null}
+                            {item.url ? (
+                                <View style={styles.cardDetailRow}>
+                                    <Text style={{ fontSize: 10, marginRight: 4 }}>🔗</Text>
+                                    <Text style={styles.cardDetailText} numberOfLines={1}>{item.url}</Text>
+                                </View>
+                            ) : null}
+                            {item.note ? (
+                                <View style={[styles.cardDetailRow, { marginTop: 6 }]}>
+                                    <Text style={{ fontSize: 10, marginRight: 4 }}>📝</Text>
+                                    <Text style={[styles.cardDetailText, { fontStyle: 'italic', color: c.subtext, opacity: 0.8 }]} numberOfLines={2}>{item.note}</Text>
+                                </View>
+                            ) : null}
                         </LinearGradient>
 
                         {/* Quick Actions (Today Only) */}
@@ -429,14 +441,14 @@ const TimetableScreen = ({ navigation }) => {
     };
 
     // Merge Structure (Periods) with Schedule (Slots)
-    const rawDailySlots = effectiveTimetable[selectedDay] || [];
+    const rawDailySlots = Array.isArray(effectiveTimetable[selectedDay]) ? effectiveTimetable[selectedDay] : [];
     const dailySlots = [...rawDailySlots].sort((a, b) => {
         const aTime = a.startTime || a.start_time || (a.time ? a.time.split('-')[0] : '');
         const bTime = b.startTime || b.start_time || (b.time ? b.time.split('-')[0] : '');
         return getMinutes(aTime) - getMinutes(bTime);
     });
 
-    const sortedPeriods = [...periods].sort((a, b) => getMinutes(a.startTime) - getMinutes(b.startTime));
+    const sortedPeriods = Array.isArray(periods) ? [...periods].sort((a, b) => getMinutes(a.startTime) - getMinutes(b.startTime)) : [];
 
     const currentSlots = sortedPeriods.length > 0 ? sortedPeriods.map((period, index) => {
         const periodStart = getMinutes(period.startTime);

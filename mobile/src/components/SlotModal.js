@@ -42,6 +42,8 @@ const SlotModal = ({
         startTime: '09:00 AM',
         endTime: '10:00 AM',
         classroom: '',
+        url: '',
+        note: '',
         type: 'Lecture'
     });
 
@@ -67,6 +69,8 @@ const SlotModal = ({
                     startTime: editingSlot.startTime || editingSlot.time?.split('-')[0]?.trim() || '09:00 AM',
                     endTime: editingSlot.endTime || editingSlot.time?.split('-')[1]?.trim() || '10:00 AM',
                     classroom: editingSlot.classroom || '',
+                    url: editingSlot.url || '',
+                    note: editingSlot.note || '',
                     type: type === 'Class' ? 'Lecture' : type
                 });
             } else {
@@ -231,6 +235,38 @@ const SlotModal = ({
                                         placeholderTextColor={c.subtext}
                                         value={newSlot.classroom}
                                         onChangeText={t => setNewSlot({ ...newSlot, classroom: t })}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* URL Input */}
+                            <View style={[styles.inputContainer, { marginTop: 10 }]}>
+                                <Text style={styles.label}>Link (Optional)</Text>
+                                <View style={styles.inputWrapper}>
+                                    <Text style={{ marginRight: 10, fontSize: 18, color: c.subtext }}>🔗</Text>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Meeting link or document..."
+                                        placeholderTextColor={c.subtext}
+                                        value={newSlot.url}
+                                        onChangeText={t => setNewSlot({ ...newSlot, url: t })}
+                                        autoCapitalize="none"
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Note Input */}
+                            <View style={[styles.inputContainer, { marginTop: 10 }]}>
+                                <Text style={styles.label}>Note (Optional)</Text>
+                                <View style={[styles.inputWrapper, { height: 'auto', minHeight: 56, paddingVertical: 10 }]}>
+                                    <Text style={{ marginRight: 10, fontSize: 18, color: c.subtext, marginTop: 4 }}>📝</Text>
+                                    <TextInput
+                                        style={[styles.textInput, { textAlignVertical: 'top' }]}
+                                        placeholder="Bring lab coat..."
+                                        placeholderTextColor={c.subtext}
+                                        value={newSlot.note}
+                                        onChangeText={t => setNewSlot({ ...newSlot, note: t })}
+                                        multiline
                                     />
                                 </View>
                             </View>

@@ -10,7 +10,7 @@ import { attendanceService } from '../services';
 import { useTheme } from '../contexts/ThemeContext';
 import {
     ChevronDown, ChevronUp, Info, Edit3, Save, X, Trash2, Plus,
-    Award, TrendingUp, BookOpen, GraduationCap, Download, BarChart2
+    Award, TrendingUp, BookOpen, GraduationCap, Download, BarChart2, Zap
 } from 'lucide-react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -69,38 +69,50 @@ const ResultsScreen = ({ navigation }) => {
     const [stats, setStats] = useState({ cgpa: '0.00', totalCredits: 0 });
     const [showGradingRef, setShowGradingRef] = useState(false);
 
-    // Editing
-    const [isEditing, setIsEditing] = useState(false);
-    const [editData, setEditData] = useState(null);
-    const [saving, setSaving] = useState(false);
+    // IPU Sync State
+    const [step, setStep] = useState('results'); // 'results', 'form', 'captcha'
+    const [enrollmentNo, setEnrollmentNo] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPw, setShowPw] = useState(false);
+    const [captchaInfo, setCaptchaInfo] = useState(null);
+    const [captchaCode, setCaptchaCode] = useState('');
+    const [fetching, setFetching] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState(null);
 
     useEffect(() => {
         fetchResults();
     }, []);
 
     const fetchResults = async () => {
+        setStep('results'); // default if data exists
         try {
-            const data = await attendanceService.getSemesterResults();
-            const sems = [1, 2, 3, 4, 5, 6, 7, 8];
-            setResults(data);
-            setAvailableSems(sems);
-            calculateOverallStats(data);
+            const data = await attendanceService.getSavedIPUResults();
+            if (data?.semesters?.length) {
+                setResults(data.semesters);
+                setAvailableSems(data.semesters.map(s => s.semester));
+                calculateOverallStats(data.semesters, data.cgpa);
+                setLastUpdated(data.last_updated);
+                setStep('results');
+
+                // Set auth details if available from user context later
+                if (data.enrollment_number) setEnrollmentNo(data.enrollment_number);
+            } else {
+                setStep('form');
+            }
         } catch (error) {
             console.error(error);
+            setStep('form');
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     };
 
-    const calculateOverallStats = (data) => {
-        // High Parity: Prioritize CGPA calculated by the server if available
-        const latestResult = data.length > 0 ? data.sort((a, b) => b.semester - a.semester)[0] : null;
-
-        if (latestResult && latestResult.cgpa !== undefined) {
+    const calculateOverallStats = (semesters, providedCgpa) => {
+        if (providedCgpa) {
             setStats({
-                cgpa: parseFloat(latestResult.cgpa).toFixed(2),
-                totalCredits: data.reduce((acc, r) => acc + (r.total_credits || 0), 0)
+                cgpa: parseFloat(providedCgpa).toFixed(2),
+                totalCredits: semesters.reduce((acc, r) => acc + (r.total_credits || 0), 0)
             });
             return;
         }
@@ -108,11 +120,11 @@ const ResultsScreen = ({ navigation }) => {
         let totalCredits = 0;
         let weightedSum = 0;
 
-        (Array.isArray(data) ? data : []).forEach(r => {
+        (Array.isArray(semesters) ? semesters : []).forEach(r => {
             const credits = r.total_credits || 0;
             const sgpa = r.sgpa || 0;
             if (credits > 0) {
-                weightedSum += (sgpa * credits);
+                weightedSum += (parseFloat(sgpa) * credits);
                 totalCredits += credits;
             }
         });
@@ -174,83 +186,96 @@ const ResultsScreen = ({ navigation }) => {
         return { sgpa, credits: totalCredits, processedSubjects: processed };
     };
 
-    const handleEditStart = () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        const current = (Array.isArray(results) ? results : []).find(r => r.semester === selectedSemester);
-        if (current) {
-            setEditData(JSON.parse(JSON.stringify(current)));
-        } else {
-            setEditData({ semester: selectedSemester, subjects: [], sgpa: 0, total_credits: 0 });
+    const handleAutoFetch = async () => {
+        if (!enrollmentNo.trim() || !password.trim()) {
+            Alert.alert("Error", "Please enter Enrollment Number and Password.");
+            return;
         }
-        setIsEditing(true);
-    };
-
-    const handleSave = async () => {
+        setFetching(true);
         try {
-            setSaving(true);
-            const { sgpa, credits, processedSubjects } = calculateSemesterStats(editData.subjects);
-            const payload = {
-                semester: editData.semester,
-                subjects: processedSubjects,
-                sgpa: parseFloat(sgpa),
-                total_credits: credits
-            };
-
-            // Optimistic Update
-            const prevResults = [...results];
-            setResults(prev => {
-                const idx = prev.findIndex(r => r.semester === editData.semester);
-                if (idx !== -1) {
-                    const newRes = [...prev];
-                    newRes[idx] = { ...newRes[idx], ...payload };
-                    return newRes;
-                } else {
-                    return [...prev, payload];
-                }
-            });
-
-            setIsEditing(false);
-            setEditData(null);
-
-            await attendanceService.saveSemesterResult(payload);
-            fetchResults(); // Background Sync
+            const data = await attendanceService.autoFetchIPUResults({ enrollment_number: enrollmentNo, password });
+            if (data?.captcha_required) {
+                setCaptchaInfo({
+                    captcha_image: data.captcha_image,
+                    hidden_fields: data.hidden_fields || {},
+                    field_names: data.field_names || {},
+                    login_action: data.login_action,
+                    ocr_attempted: data.ocr_attempted,
+                });
+                setCaptchaCode(data.ocr_attempted || '');
+                setStep('captcha');
+            } else if (data?.semesters !== undefined) {
+                setResults(data.semesters);
+                calculateOverallStats(data.semesters, data.cgpa);
+                setLastUpdated(new Date().toISOString());
+                setStep('results');
+                Alert.alert("Success", "Results synced successfully!");
+            } else {
+                Alert.alert("Error", "Could not retrieve results.");
+            }
         } catch (e) {
-            console.error(e);
-            Analytics.logError("Save Result Failed");
-            // We could revert here, but for now we just rely on next fetch or alert
-            // Ideally revert `setResults(prevResults)`
-            Alert.alert("Error", "Failed to save results");
+            Alert.alert("Error", e?.response?.data?.error || "Failed to reach server.");
         } finally {
-            setSaving(false);
+            setFetching(false);
         }
     };
 
-    const handleDeleteSemester = () => {
-        Alert.alert("Delete Semester", `Clear all data for Semester ${selectedSemester}?`, [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Delete", style: "destructive", onPress: async () => {
-                    // Optimistic Delete
-                    const prevResults = [...results];
-                    setResults(prev => prev.filter(r => r.semester !== selectedSemester));
-                    setIsEditing(false);
-                    setEditData(null);
-
-                    try {
-                        await attendanceService.deleteSemesterResult(selectedSemester);
-                    } catch (e) {
-                        setResults(prevResults); // Revert
-                        Alert.alert("Error", "Failed to delete.");
-                    }
-                }
+    const handleFetchResultsWithCaptcha = async () => {
+        if (!captchaCode.trim()) {
+            Alert.alert("Error", "Please enter CAPTCHA.");
+            return;
+        }
+        setFetching(true);
+        try {
+            const payload = {
+                enrollment_number: enrollmentNo, password, captcha: captchaCode,
+                hidden_fields: captchaInfo?.hidden_fields || {},
+                field_names: captchaInfo?.field_names || {},
+                login_action: captchaInfo?.login_action || '',
+            };
+            const data = await attendanceService.fetchIPUResults(payload);
+            if (data?.semesters !== undefined) {
+                setResults(data.semesters);
+                calculateOverallStats(data.semesters, data.cgpa);
+                setLastUpdated(new Date().toISOString());
+                setStep('results');
+                Alert.alert("Success", "Results synced successfully!");
+            } else {
+                Alert.alert("Error", "Invalid credentials or CAPTCHA.");
+                await refreshCaptcha();
             }
-        ]);
+        } catch (e) {
+            const status = e?.response?.status;
+            Alert.alert("Error", e?.response?.data?.error || "Failed to fetch.");
+            if (status === 423) {
+                setStep('form');
+                setPassword('');
+            } else {
+                await refreshCaptcha();
+            }
+        } finally {
+            setFetching(false);
+        }
     };
 
-    const handleSubjectChange = (text, index, field) => {
-        const newData = { ...editData };
-        newData.subjects[index][field] = text;
-        setEditData(newData);
+    const refreshCaptcha = async () => {
+        setFetching(true);
+        setCaptchaCode('');
+        try {
+            const data = await attendanceService.getIPUCaptcha();
+            if (data?.captcha_image) {
+                setCaptchaInfo({
+                    captcha_image: data.captcha_image,
+                    hidden_fields: data.hidden_fields || {},
+                    field_names: data.field_names || {},
+                    login_action: data.login_action,
+                });
+            }
+        } catch (e) {
+            Alert.alert("Error", "Failed to refresh CAPTCHA.");
+        } finally {
+            setFetching(false);
+        }
     };
 
     // --- Renderers ---
@@ -431,7 +456,141 @@ const ResultsScreen = ({ navigation }) => {
 
     const currentResult = (Array.isArray(results) ? results : []).find(r => r.semester === selectedSemester);
 
-    // Header Animation
+    // Replace Edit imports and add new icons
+    const { RefreshCw, Eye, EyeOff, ShieldCheck } = require('lucide-react-native');
+
+    if (step === 'loading') {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: c.bgGradStart }}>
+                <ActivityIndicator size="large" color={c.primary} />
+            </View>
+        );
+    }
+
+    if (step === 'form') {
+        return (
+            <View style={{ flex: 1, backgroundColor: c.bgGradStart }}>
+                <AnimatedHeader
+                    scrollY={scrollY}
+                    title="IPU Sync"
+                    subtitle="Fetch Academic Records"
+                    isDark={isDark}
+                    colors={c}
+                    onBack={() => {
+                        if (results?.length) setStep('results');
+                        else navigation.goBack();
+                    }}
+                />
+                <ScrollView contentContainerStyle={{ padding: 24, paddingTop: Layout.header.maxHeight + insets.top + 20 }}>
+                    <View style={styles.card}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 12 }}>
+                            <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: c.primary + '20', alignItems: 'center', justifyContent: 'center' }}>
+                                <GraduationCap size={24} color={c.primary} />
+                            </View>
+                            <View>
+                                <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>Academic Portal</Text>
+                                <Text style={{ fontSize: 12, color: c.subtext, fontWeight: '600' }}>Secure Result Retrieval</Text>
+                            </View>
+                        </View>
+
+                        <View style={{ gap: 16 }}>
+                            <View>
+                                <Text style={styles.inputLabelForm}>ENROLLMENT NUMBER</Text>
+                                <TextInput
+                                    style={styles.textInputForm}
+                                    placeholder="00000000000"
+                                    placeholderTextColor={c.subtext}
+                                    value={enrollmentNo}
+                                    onChangeText={setEnrollmentNo}
+                                    keyboardType="numeric"
+                                />
+                            </View>
+
+                            <View>
+                                <Text style={styles.inputLabelForm}>PORTAL PASSWORD</Text>
+                                <View style={styles.passwordWrapper}>
+                                    <TextInput
+                                        style={[styles.textInputForm, { flex: 1, borderWidth: 0 }]}
+                                        placeholder="********"
+                                        placeholderTextColor={c.subtext}
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry={!showPw}
+                                    />
+                                    <TouchableOpacity onPress={() => setShowPw(!showPw)} style={{ padding: 12 }}>
+                                        {showPw ? <EyeOff size={20} color={c.subtext} /> : <Eye size={20} color={c.subtext} />}
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity onPress={handleAutoFetch} disabled={fetching} style={{ marginTop: 24 }}>
+                            <LinearGradient colors={theme.gradients.primary} style={styles.syncBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                                {fetching ? <ActivityIndicator color="#FFF" /> : (
+                                    <>
+                                        <Zap size={18} color="#FFF" />
+                                        <Text style={styles.syncBtnText}>SYNC NOW</Text>
+                                    </>
+                                )}
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
+            </View>
+        );
+    }
+
+    if (step === 'captcha') {
+        return (
+            <View style={{ flex: 1, backgroundColor: c.bgGradStart }}>
+                <AnimatedHeader scrollY={scrollY} title="Security Check" subtitle="Verify identity" isDark={isDark} colors={c} onBack={() => setStep('form')} />
+                <ScrollView contentContainerStyle={{ padding: 24, paddingTop: Layout.header.maxHeight + insets.top + 20 }}>
+                    <View style={styles.card}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                            <View>
+                                <Text style={{ fontSize: 20, fontWeight: '800', color: c.text }}>Security Check</Text>
+                                <Text style={{ fontSize: 12, color: c.subtext }}>Verify human identity</Text>
+                            </View>
+                            <TouchableOpacity onPress={refreshCaptcha} style={styles.iconBtn}>
+                                <RefreshCw size={20} color={c.primary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ backgroundColor: '#FFF', padding: 16, borderRadius: 16, alignItems: 'center', marginBottom: 24 }}>
+                            {captchaInfo?.captcha_image ? (
+                                <Animated.Image
+                                    source={{ uri: captchaInfo.captcha_image.startsWith('data:') ? captchaInfo.captcha_image : `data:image/png;base64,${captchaInfo.captcha_image}` }}
+                                    style={{ height: 60, width: 200, resizeMode: 'contain' }}
+                                />
+                            ) : (
+                                <Text style={{ color: '#000', marginVertical: 20 }}>Loading...</Text>
+                            )}
+                        </View>
+
+                        <TextInput
+                            style={[styles.textInputForm, { textAlign: 'center', letterSpacing: 4, textTransform: 'uppercase', fontSize: 18, fontWeight: '800' }]}
+                            placeholder="TYPE CAPTCHA..."
+                            placeholderTextColor={c.subtext}
+                            value={captchaCode}
+                            onChangeText={setCaptchaCode}
+                            autoCapitalize="characters"
+                        />
+
+                        <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+                            <TouchableOpacity onPress={() => setStep('form')} style={[styles.syncBtn, { flex: 1, backgroundColor: c.glassBgStart }]}>
+                                <Text style={[styles.syncBtnText, { color: c.text }]}>BACK</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={handleFetchResultsWithCaptcha} disabled={fetching} style={{ flex: 1 }}>
+                                <LinearGradient colors={theme.gradients.primary} style={styles.syncBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                                    {fetching ? <ActivityIndicator color="#FFF" /> : <Text style={styles.syncBtnText}>VERIFY</Text>}
+                                </LinearGradient>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </ScrollView>
+            </View>
+        );
+    }
 
     return (
         <View style={{ flex: 1 }}>
@@ -508,183 +667,155 @@ const ResultsScreen = ({ navigation }) => {
 
                 {/* ACTIONS */}
                 <View style={styles.actionRow}>
-                    <Text style={styles.sectionTitle}>{isEditing ? `Editing Sem ${selectedSemester}` : 'Subjects'}</Text>
+                    <Text style={styles.sectionTitle}>Subjects</Text>
 
                     {/* Right Side Actions Container */}
                     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                        {!isEditing ? (
-                            <>
-                                <PressableScale style={styles.iconBtn} onPress={handleEditStart}>
-                                    <Edit3 size={20} color={c.primary} />
-                                </PressableScale>
+                        <PressableScale style={styles.iconBtn} onPress={() => setStep('form')}>
+                            <RefreshCw size={20} color={c.primary} />
+                        </PressableScale>
 
-                                <PressableScale style={styles.iconBtn} onPress={() => {
-                                    // Mock Report Download
-                                    const generatePDF = async () => {
-                                        try {
-                                            setLoading(true);
+                        <PressableScale style={styles.iconBtn} onPress={() => {
+                            // Mock Report Download
+                            const generatePDF = async () => {
+                                try {
+                                    setLoading(true);
 
-                                            const current = (Array.isArray(results) ? results : []).find(r => r.semester === selectedSemester);
-                                            if (!current) {
-                                                Alert.alert("Error", "No data to export for this semester.");
-                                                setLoading(false);
-                                                return;
-                                            }
-                                            // ... func body continues ...
+                                    const current = (Array.isArray(results) ? results : []).find(r => r.semester === selectedSemester);
+                                    if (!current) {
+                                        Alert.alert("Error", "No data to export for this semester.");
+                                        setLoading(false);
+                                        return;
+                                    }
+                                    // ... func body continues ...
 
-                                            const htmlContent = `
-                                        <!DOCTYPE html>
-                                        <html>
-                                            <head>
-                                                <style>
-                                                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; }
-                                                    .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid ${theme.palette.purple}; padding-bottom: 20px; }
-                                                    .brand { color: ${theme.palette.purple}; font-size: 24px; font-weight: bold; }
-                                                    .title { font-size: 20px; font-weight: bold; margin-top: 10px; }
-                                                    .subtitle { color: #666; font-size: 14px; margin-top: 5px; }
-                                                    
-                                                    .stats-grid { display: flex; justify-content: space-between; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 12px; }
-                                                    .stat-item { text-align: center; flex: 1; }
-                                                    .stat-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
-                                                    .stat-value { font-size: 24px; font-weight: bold; color: ${theme.palette.purple}; margin-top: 5px; }
-                                                    
-                                                    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
-                                                    th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #666; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
-                                                    td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
-                                                    .grade-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; color: white; font-weight: bold; font-size: 12px; }
-                                                    
-                                                    .footer { margin-top: 50px; text-align: center; color: #999; font-size: 10px; border-top: 1px solid #eee; padding-top: 20px; }
-                                                </style>
-                                            </head>
-                                            <body>
-                                                <div class="header">
-                                                    <div class="brand">AcadHzub</div>
-                                                    <div class="title">Semester ${selectedSemester} Report</div>
-                                                    <div class="subtitle">Generated on ${new Date().toLocaleDateString()}</div>
-                                                </div>
+                                    const htmlContent = `
+                                <!DOCTYPE html>
+                                <html>
+                                    <head>
+                                        <style>
+                                            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #333; }
+                                            .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid ${theme.palette.purple}; padding-bottom: 20px; }
+                                            .brand { color: ${theme.palette.purple}; font-size: 24px; font-weight: bold; }
+                                            .title { font-size: 20px; font-weight: bold; margin-top: 10px; }
+                                            .subtitle { color: #666; font-size: 14px; margin-top: 5px; }
+                                            
+                                            .stats-grid { display: flex; justify-content: space-between; margin-bottom: 30px; background: #f8f9fa; padding: 20px; border-radius: 12px; }
+                                            .stat-item { text-align: center; flex: 1; }
+                                            .stat-label { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+                                            .stat-value { font-size: 24px; font-weight: bold; color: ${theme.palette.purple}; margin-top: 5px; }
+                                            
+                                            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
+                                            th { text-align: left; padding: 12px; border-bottom: 2px solid #eee; color: #666; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+                                            td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; }
+                                            .grade-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; color: white; font-weight: bold; font-size: 12px; }
+                                            
+                                            .footer { margin-top: 50px; text-align: center; color: #999; font-size: 10px; border-top: 1px solid #eee; padding-top: 20px; }
+                                        </style>
+                                    </head>
+                                    <body>
+                                        <div class="header">
+                                            <div class="brand">AcadHzub</div>
+                                            <div class="title">Semester ${selectedSemester} Report</div>
+                                            <div class="subtitle">Generated on ${new Date().toLocaleDateString()}</div>
+                                        </div>
 
-                                                <div class="stats-grid">
-                                                    <div class="stat-item">
-                                                        <div class="stat-label">SGPA</div>
-                                                        <div class="stat-value">${current.sgpa}</div>
-                                                    </div>
-                                                    <div class="stat-item">
-                                                        <div class="stat-label">CGPA</div>
-                                                        <div class="stat-value">${stats.cgpa}</div>
-                                                    </div>
-                                                    <div class="stat-item">
-                                                        <div class="stat-label">Credits</div>
-                                                        <div class="stat-value">${current.total_credits}</div>
-                                                    </div>
-                                                </div>
+                                        <div class="stats-grid">
+                                            <div class="stat-item">
+                                                <div class="stat-label">SGPA</div>
+                                                <div class="stat-value">${current.sgpa}</div>
+                                            </div>
+                                            <div class="stat-item">
+                                                <div class="stat-label">CGPA</div>
+                                                <div class="stat-value">${stats.cgpa}</div>
+                                            </div>
+                                            <div class="stat-item">
+                                                <div class="stat-label">Credits</div>
+                                                <div class="stat-value">${current.total_credits}</div>
+                                            </div>
+                                        </div>
 
-                                                <table>
-                                                    <thead>
-                                                        <tr>
-                                                            <th style="width: 40%">Subject</th>
-                                                            <th style="width: 15%">Type</th>
-                                                            <th style="width: 15%">Credits</th>
-                                                            <th style="width: 15%">Score</th>
-                                                            <th style="width: 15%">Grade</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        ${(current.subjects || []).map(sub => {
-                                                let total = sub.total;
-                                                // Recalculate if generic logic was used in display
-                                                if (total === undefined) {
-                                                    if (sub.type?.toLowerCase() === 'nues') total = sub.internal_theory;
-                                                    else total = (parseInt(sub.internal_theory || 0) + parseInt(sub.external_theory || 0) + parseInt(sub.internal_practical || 0) + parseInt(sub.external_practical || 0));
-                                                }
-
-                                                let gradeColor = '#666';
-                                                const g = (sub.grade || '').toUpperCase();
-                                                if (g === 'O') gradeColor = theme.palette.green;
-                                                else if (g === 'A+' || g === 'A') gradeColor = theme.palette.purple;
-                                                else if (g === 'F') gradeColor = theme.palette.red;
-                                                else gradeColor = theme.palette.orange;
-
-                                                return `
-                                                                <tr>
-                                                                    <td><b>${sub.name}</b><br/><span style="color:#999;font-size:10px">${sub.code || ''}</span></td>
-                                                                    <td style="text-transform:uppercase;font-size:10px">${sub.type}</td>
-                                                                    <td>${sub.credits}</td>
-                                                                    <td>${total}</td>
-                                                                    <td><span class="grade-badge" style="background-color: ${gradeColor}">${sub.grade}</span></td>
-                                                                </tr>
-                                                            `;
-                                            }).join('')}
-                                                    </tbody>
-                                                </table>
-
-                                                <div class="footer">
-                                                    This report was generated via AcadHzub Mobile App.
-                                                </div>
-                                            </body>
-                                        </html>
-                                    `;
-
-                                            const { uri } = await Print.printToFileAsync({ html: htmlContent });
-                                            await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
-
-                                        } catch (error) {
-                                            console.error(error);
-                                            Alert.alert("Error", "Failed to generate PDF. Please try again.");
-                                        } finally {
-                                            setLoading(false);
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 40%">Subject</th>
+                                                    <th style="width: 15%">Type</th>
+                                                    <th style="width: 15%">Credits</th>
+                                                    <th style="width: 15%">Score</th>
+                                                    <th style="width: 15%">Grade</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${(current.subjects || []).map(sub => {
+                                        let total = sub.total;
+                                        // Recalculate if generic logic was used in display
+                                        if (total === undefined) {
+                                            if (sub.type?.toLowerCase() === 'nues') total = sub.internal_theory;
+                                            else total = (parseInt(sub.internal_theory || 0) + parseInt(sub.external_theory || 0) + parseInt(sub.internal_practical || 0) + parseInt(sub.external_practical || 0));
                                         }
-                                    };
 
-                                    Alert.alert(
-                                        "Download Report",
-                                        `Generate PDF report for Semester ${selectedSemester}?`,
-                                        [
-                                            { text: "Cancel", style: "cancel" },
-                                            { text: "Generate PDF", onPress: generatePDF }
-                                        ]
-                                    );
-                                }}>
-                                    <Download size={20} color={c.primary} />
-                                </PressableScale>
-                            </>
-                        ) : (
-                            <View style={{ flexDirection: 'row', gap: 12 }}>
-                                <PressableScale onPress={handleDeleteSemester} style={{ marginRight: 8 }}>
-                                    <Trash2 size={24} color={c.danger} />
-                                </PressableScale>
-                                <PressableScale onPress={() => { setIsEditing(false); setEditData(null); }}>
-                                    <X size={24} color={c.subtext} />
-                                </PressableScale>
-                                <PressableScale onPress={handleSave}>
-                                    {saving ? <ActivityIndicator color={c.success} /> : <Save size={24} color={c.success} />}
-                                </PressableScale>
-                            </View>
-                        )}
+                                        let gradeColor = '#666';
+                                        const g = (sub.grade || '').toUpperCase();
+                                        if (g === 'O') gradeColor = theme.palette.green;
+                                        else if (g === 'A+' || g === 'A') gradeColor = theme.palette.purple;
+                                        else if (g === 'F') gradeColor = theme.palette.red;
+                                        else gradeColor = theme.palette.orange;
+
+                                        return `
+                                                        <tr>
+                                                            <td><b>${sub.name}</b><br/><span style="color:#999;font-size:10px">${sub.code || ''}</span></td>
+                                                            <td style="text-transform:uppercase;font-size:10px">${sub.type}</td>
+                                                            <td>${sub.credits}</td>
+                                                            <td>${total}</td>
+                                                            <td><span class="grade-badge" style="background-color: ${gradeColor}">${sub.grade}</span></td>
+                                                        </tr>
+                                                    `;
+                                    }).join('')}
+                                            </tbody>
+                                        </table>
+
+                                        <div class="footer">
+                                            This report was generated via AcadHzub Mobile App.
+                                        </div>
+                                    </body>
+                                </html>
+                            `;
+
+                                    const { uri } = await Print.printToFileAsync({ html: htmlContent });
+                                    await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+
+                                } catch (error) {
+                                    console.error(error);
+                                    Alert.alert("Error", "Failed to generate PDF. Please try again.");
+                                } finally {
+                                    setLoading(false);
+                                }
+                            };
+
+                            Alert.alert(
+                                "Download Report",
+                                `Generate PDF report for Semester ${selectedSemester}?`,
+                                [
+                                    { text: "Cancel", style: "cancel" },
+                                    { text: "Generate PDF", onPress: generatePDF }
+                                ]
+                            );
+                        }}>
+                            <Download size={20} color={c.primary} />
+                        </PressableScale>
                     </View>
                 </View>
 
                 {/* LIST */}
                 <View style={{ gap: 16, paddingBottom: 40 }}>
-                    {isEditing ? (
-                        <>
-                            {(editData?.subjects || []).map((sub, i) => renderEditSubject(sub, i))}
-                            <PressableScale style={styles.addBtn} onPress={() => {
-                                const n = { ...editData };
-                                n.subjects.push({ name: '', credits: 4, type: 'theory', internal_theory: 0, external_theory: 0, internal_practical: 0, external_practical: 0 });
-                                setEditData(n);
-                            }}>
-                                <Plus size={20} color={c.primary} />
-                                <Text style={{ color: c.primary, fontWeight: '700' }}>Add Subject</Text>
-                            </PressableScale>
-                        </>
-                    ) : (
-                        (currentResult?.subjects || []).map(sub => renderSubjectCard(sub))
-                    )}
+                    {(currentResult?.subjects || []).map(sub => renderSubjectCard(sub))}
 
-                    {!currentResult && !isEditing && (
+                    {!currentResult && (
                         <View style={styles.emptyState}>
-                            <Text style={{ color: c.subtext }}>No results found.</Text>
-                            <PressableScale onPress={handleEditStart}><Text style={{ color: c.primary, fontWeight: '700', marginTop: 8 }}>Add Now</Text></PressableScale>
+                            <Text style={{ color: c.subtext, marginBottom: 12 }}>No academic results available for this semester.</Text>
+                            <TouchableOpacity onPress={() => setStep('form')} style={{ backgroundColor: c.glassBgStart, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: c.glassBorder }}>
+                                <Text style={{ color: c.primary, fontWeight: '700' }}>Fetch IPU Results</Text>
+                            </TouchableOpacity>
                         </View>
                     )}
                 </View>
@@ -787,6 +918,13 @@ const getStyles = (c, isDark, insets) => StyleSheet.create({
     markLabel: { fontSize: 9, color: c.subtext, fontWeight: '700' },
     markValue: { fontSize: 9, color: c.text, fontWeight: '700' },
     totalText: { fontSize: 12, fontWeight: '800', color: c.text, marginLeft: 'auto' },
+
+    // Form
+    inputLabelForm: { fontSize: 10, fontWeight: '800', color: c.subtext, marginBottom: 8, letterSpacing: 0.5 },
+    textInputForm: { backgroundColor: c.inputBg, borderRadius: 12, padding: 16, color: c.text, fontSize: 16, borderWidth: 1, borderColor: c.glassBorder },
+    passwordWrapper: { flexDirection: 'row', alignItems: 'center', backgroundColor: c.inputBg, borderRadius: 12, borderWidth: 1, borderColor: c.glassBorder },
+    syncBtn: { padding: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+    syncBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14, letterSpacing: 1 },
 
     // Edit
     editCard: { padding: 16, borderRadius: 24, borderWidth: 1, borderColor: c.glassBorder },
