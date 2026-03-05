@@ -158,7 +158,7 @@ const Dashboard: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="space-y-4 pb-32 max-w-[1320px] mx-auto pt-20 px-5">
+            <div className="space-y-4 pb-32 max-w-[1320px] mx-auto px-5">
                 <Skeleton className="h-[400px] w-full rounded-3xl" />
                 <div className="grid grid-cols-2 gap-3">
                     <Skeleton className="h-80 rounded-2xl" />
@@ -179,7 +179,7 @@ const Dashboard: React.FC = () => {
         <motion.div
             initial="hidden" animate="visible"
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } }}
-            className="pb-28 max-w-[1320px] mx-auto pt-20 px-3 md:px-5"
+            className="pb-28 max-w-[1320px] mx-auto px-3 md:px-5"
         >
             {/* ── Beacon Section ── */}
             <motion.section
