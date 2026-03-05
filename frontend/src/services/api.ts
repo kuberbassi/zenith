@@ -1,4 +1,5 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
+import { dispatchGlobalToast } from '@/components/ui/Toast';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -47,6 +48,14 @@ api.interceptors.response.use(
             window.location.href = '/login';
         }
 
+        // Handle 429 — show toast immediately, never retry
+        if (error.response?.status === 429) {
+            const msg = (error.response.data as any)?.error
+                || 'You are making requests too quickly. Please wait a minute and try again.';
+            dispatchGlobalToast('warning', msg);
+            return Promise.reject(error);
+        }
+
         if (shouldRetry(error)) {
             config._retry = (config._retry || 0) + 1;
             const maxRetries = 3;
@@ -68,7 +77,7 @@ function shouldRetry(error: AxiosError): boolean {
     if (method && ['PUT', 'POST', 'DELETE', 'PATCH'].includes(method)) return false;
     if (!error.response) return true; // Network errors (GET/HEAD only)
     const status = error.response.status;
-    return (status >= 500 && status < 600) || status === 429;
+    return status >= 500 && status < 600;
 }
 
 export default api;

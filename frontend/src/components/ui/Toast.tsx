@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
 import { CheckCircle2, XCircle, AlertCircle, Info, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,6 +21,13 @@ interface ToastContextType {
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
+
+/**
+ * Dispatch a toast from anywhere (outside React). Used by api.ts interceptors.
+ */
+export function dispatchGlobalToast(type: ToastType, message: string) {
+    window.dispatchEvent(new CustomEvent('global-toast', { detail: { type, message } }));
+}
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [toasts, setToasts] = useState<Toast[]>([]);
@@ -46,6 +53,16 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const error = (message: string) => showToast('error', message);
     const warning = (message: string) => showToast('warning', message);
     const info = (message: string) => showToast('info', message);
+
+    // Listen for global toast events fired from outside React (e.g. api.ts)
+    useEffect(() => {
+        const handler = (e: Event) => {
+            const { type, message } = (e as CustomEvent<{ type: ToastType; message: string }>).detail;
+            showToast(type, message);
+        };
+        window.addEventListener('global-toast', handler);
+        return () => window.removeEventListener('global-toast', handler);
+    });
 
     const getIcon = (type: ToastType) => {
         switch (type) {
