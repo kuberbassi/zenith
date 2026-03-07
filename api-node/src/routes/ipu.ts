@@ -420,9 +420,22 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
       })),
     }
 
+    // Compute grade distribution and overall percentage for the response
+    const gradeDistribution: Record<string, number> = {}
+    const allSubjsFetch = results.semesters.flatMap(s => s.subjects)
+    for (const sub of allSubjsFetch) {
+      const g = sub.grade || 'F'
+      gradeDistribution[g] = (gradeDistribution[g] || 0) + 1
+    }
+    const totalMarksFetch = allSubjsFetch.reduce((a, s) => a + (s.total_marks || 0), 0)
+    const totalMaxFetch = allSubjsFetch.reduce((a, s) => a + (s.max_marks || 100), 0)
+    const overallPercentage = totalMaxFetch > 0
+      ? parseFloat(((totalMarksFetch / totalMaxFetch) * 100).toFixed(1))
+      : 0
+
     await saveResultsToDB(req, results)
 
-    ok(res, results)
+    ok(res, { ...results, gradeDistribution, overallPercentage, totalSubjects: allSubjsFetch.length })
   } catch (e: any) {
     console.error('[IPU fetch-results]', e.message)
     if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'ETIMEDOUT') {
@@ -464,11 +477,27 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
       max_marks: r.max_marks || null,
     }))
 
+    // Compute grade distribution and overall percentage from saved subjects
+    const gradeDistSaved: Record<string, number> = {}
+    const allSubjsSaved = results.flatMap(r => r.subjects || [])
+    for (const sub of allSubjsSaved) {
+      const g = (sub as any).grade || 'F'
+      gradeDistSaved[g] = (gradeDistSaved[g] || 0) + 1
+    }
+    const totalMarksSaved = allSubjsSaved.reduce((a, s) => a + ((s as any).total_marks || 0), 0)
+    const totalMaxSaved = allSubjsSaved.reduce((a, s) => a + ((s as any).max_marks || 100), 0)
+    const overallPctSaved = totalMaxSaved > 0
+      ? parseFloat(((totalMarksSaved / totalMaxSaved) * 100).toFixed(1))
+      : 0
+
     ok(res, {
       enrollment_number: enrollmentNumber,
       student_info: studentInfo,
       semesters,
       cgpa,
+      gradeDistribution: gradeDistSaved,
+      overallPercentage: overallPctSaved,
+      totalSubjects: allSubjsSaved.length,
       saved: true,
       last_updated: results.reduce((latest, r) => {
         const d = new Date(r.updated_at)

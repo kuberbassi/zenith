@@ -69,6 +69,86 @@ function formatDate(iso: string | null): string {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/* ── Demo / Preview mock data ────────────────────────────────────────── */
+const MOCK_RESULTS = {
+    enrollment_number: '00113302725',
+    student_info: {
+        name: 'PARAG BASSI',
+        father: '—',
+        programme: 'Bachelor of Technology (Information Technology)',
+        institution: 'Vivekananda Institute of Professional Studies-TC',
+        batch: '2022',
+        roll_no: '00113302725',
+    },
+    cgpa: 8.12,
+    overallPercentage: 70.9,
+    totalSubjects: 29,
+    gradeDistribution: { O: 3, 'A+': 7, A: 13, 'B+': 4, B: 1, 'C+': 1 },
+    saved: false,
+    last_updated: null as string | null,
+    semesters: [
+        {
+            semester: '1', semester_num: 1, semester_label: 'Semester 1',
+            sgpa: '7.80', total_marks: '425', max_marks: '600',
+            subjects: [
+                { code: 'MAT-101', name: 'Mathematics I', internal: '18', external: '44', total_marks: 62, max_marks: 100, percentage: 62, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'PHY-101', name: 'Engineering Physics', internal: '15', external: '40', total_marks: 55, max_marks: 100, percentage: 55, grade: 'B+', grade_point: 7, status: 'P', credits: '4' },
+                { code: 'BEE-101', name: 'Basic Elec. & Electronics', internal: '14', external: '36', total_marks: 50, max_marks: 100, percentage: 50, grade: 'B', grade_point: 6, status: 'P', credits: '4' },
+                { code: 'CSE-101', name: 'Programming in C', internal: '25', external: '65', total_marks: 90, max_marks: 100, percentage: 90, grade: 'O', grade_point: 10, status: 'P', credits: '4' },
+                { code: 'ME-101', name: 'Engineering Graphics', internal: '20', external: '48', total_marks: 68, max_marks: 100, percentage: 68, grade: 'A', grade_point: 8, status: 'P', credits: '2' },
+                { code: 'HU-101', name: 'Communication Skills', internal: '22', external: '50', total_marks: 72, max_marks: 100, percentage: 72, grade: 'A', grade_point: 8, status: 'P', credits: '2' },
+            ],
+        },
+        {
+            semester: '2', semester_num: 2, semester_label: 'Semester 2',
+            sgpa: '7.55', total_marks: '395', max_marks: '600',
+            subjects: [
+                { code: 'MAT-201', name: 'Mathematics II', internal: '20', external: '48', total_marks: 68, max_marks: 100, percentage: 68, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'CHE-201', name: 'Engineering Chemistry', internal: '16', external: '41', total_marks: 57, max_marks: 100, percentage: 57, grade: 'B+', grade_point: 7, status: 'P', credits: '4' },
+                { code: 'CSE-201', name: 'Data Structures using C', internal: '24', external: '58', total_marks: 82, max_marks: 100, percentage: 82, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
+                { code: 'ME-201', name: 'Engineering Mechanics', internal: '13', external: '35', total_marks: 48, max_marks: 100, percentage: 48, grade: 'C+', grade_point: 5, status: 'P', credits: '4' },
+                { code: 'EC-201', name: 'Basic Electronics', internal: '19', external: '46', total_marks: 65, max_marks: 100, percentage: 65, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'EVS-201', name: 'Environmental Science', internal: '22', external: '53', total_marks: 75, max_marks: 100, percentage: 75, grade: 'A+', grade_point: 9, status: 'P', credits: '2' },
+            ],
+        },
+        {
+            semester: '3', semester_num: 3, semester_label: 'Semester 3',
+            sgpa: '8.55', total_marks: '442', max_marks: '600',
+            subjects: [
+                { code: 'MAT-301', name: 'Mathematics III', internal: '21', external: '49', total_marks: 70, max_marks: 100, percentage: 70, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'DE-301', name: 'Digital Electronics', internal: '23', external: '55', total_marks: 78, max_marks: 100, percentage: 78, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
+                { code: 'CO-301', name: 'Computer Organization', internal: '18', external: '45', total_marks: 63, max_marks: 100, percentage: 63, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'OOP-301', name: 'Object Oriented Prog. (Java)', internal: '26', external: '65', total_marks: 91, max_marks: 100, percentage: 91, grade: 'O', grade_point: 10, status: 'P', credits: '4' },
+                { code: 'DM-301', name: 'Discrete Mathematics', internal: '22', external: '50', total_marks: 72, max_marks: 100, percentage: 72, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'SE-301', name: 'Software Engineering', internal: '20', external: '48', total_marks: 68, max_marks: 100, percentage: 68, grade: 'A', grade_point: 8, status: 'P', credits: '2' },
+            ],
+        },
+        {
+            semester: '4', semester_num: 4, semester_label: 'Semester 4',
+            sgpa: '8.09', total_marks: '427', max_marks: '600',
+            subjects: [
+                { code: 'OS-401', name: 'Operating Systems', internal: '22', external: '52', total_marks: 74, max_marks: 100, percentage: 74, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'DBMS-401', name: 'Database Management Systems', internal: '24', external: '58', total_marks: 82, max_marks: 100, percentage: 82, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
+                { code: 'CN-401', name: 'Computer Networks', internal: '20', external: '48', total_marks: 68, max_marks: 100, percentage: 68, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'DAA-401', name: 'Design & Analysis of Algorithms', internal: '19', external: '46', total_marks: 65, max_marks: 100, percentage: 65, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'TOC-401', name: 'Theory of Computation', internal: '17', external: '43', total_marks: 60, max_marks: 100, percentage: 60, grade: 'B+', grade_point: 7, status: 'P', credits: '4' },
+                { code: 'AI-401', name: 'Artificial Intelligence', internal: '23', external: '55', total_marks: 78, max_marks: 100, percentage: 78, grade: 'A+', grade_point: 9, status: 'P', credits: '2' },
+            ],
+        },
+        {
+            semester: '5', semester_num: 5, semester_label: 'Semester 5',
+            sgpa: '8.60', total_marks: '367', max_marks: '500',
+            subjects: [
+                { code: 'WT-501', name: 'Web Technologies', internal: '24', external: '56', total_marks: 80, max_marks: 100, percentage: 80, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
+                { code: 'MP-501', name: 'Microprocessors', internal: '18', external: '44', total_marks: 62, max_marks: 100, percentage: 62, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
+                { code: 'CG-501', name: 'Computer Graphics', internal: '16', external: '42', total_marks: 58, max_marks: 100, percentage: 58, grade: 'B+', grade_point: 7, status: 'P', credits: '4' },
+                { code: 'CC-501', name: 'Cloud Computing', internal: '22', external: '53', total_marks: 75, max_marks: 100, percentage: 75, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
+                { code: 'PR-501', name: 'Minor Project', internal: '27', external: '65', total_marks: 92, max_marks: 100, percentage: 92, grade: 'O', grade_point: 10, status: 'P', credits: '4' },
+            ],
+        },
+    ],
+};
+
 /*  Types  */
 type Step = 'loading' | 'form' | 'captcha' | 'results';
 
@@ -133,6 +213,13 @@ const Results: React.FC = () => {
         setError(null);
         setPassword('');
         setStep('form');
+    }
+
+    function loadDemoData() {
+        setResults(MOCK_RESULTS);
+        setLastUpdated(null);
+        setStep('results');
+        showToast('success', 'Demo mode — showing sample results preview');
     }
 
     async function handleAutoFetch() {
@@ -368,6 +455,11 @@ const Results: React.FC = () => {
                         {error && <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400">{error}</div>}
 
                         <form onSubmit={(e) => { e.preventDefault(); handleAutoFetch(); }} className="space-y-4">
+                            {/* Demo banner */}
+                            <div className="mb-2 p-3 rounded-xl border border-blue-500/10 bg-blue-500/[0.04] flex items-center justify-between">
+                                <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Account locked? Preview the UI</span>
+                                <button type="button" onClick={loadDemoData} className="text-[10px] font-black text-blue-400/60 hover:text-blue-400 uppercase tracking-widest transition-colors">Demo →</button>
+                            </div>
                             <div>
                                 <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 ml-1">Enrollment Number</label>
                                 <input type="text" value={enrollmentNo} onChange={e => setEnrollmentNo(e.target.value)} placeholder="00000000000" className={inputCls} required />

@@ -29,6 +29,67 @@ if (Platform.OS === 'android') {
 
 import { useSemester } from '../contexts/SemesterContext';
 
+/* ── Demo / Preview data (shown when account is locked) ──────────── */
+const MOBILE_MOCK = {
+    cgpa: '8.12',
+    semesters: [
+        {
+            semester: '1', semester_label: 'Semester 1', sgpa: 7.80, total_credits: 20,
+            subjects: [
+                { code: 'MAT-101', name: 'Mathematics I', type: 'theory', internal_theory: '18', external_theory: '44', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'PHY-101', name: 'Engineering Physics', type: 'theory', internal_theory: '15', external_theory: '40', credits: '4', grade: 'B+', grade_point: 7 },
+                { code: 'BEE-101', name: 'Basic Elec. & Electronics', type: 'theory', internal_theory: '14', external_theory: '36', credits: '4', grade: 'B', grade_point: 6 },
+                { code: 'CSE-101', name: 'Programming in C', type: 'theory', internal_theory: '25', external_theory: '65', credits: '4', grade: 'O', grade_point: 10 },
+                { code: 'ME-101', name: 'Engineering Graphics', type: 'theory', internal_theory: '20', external_theory: '48', credits: '2', grade: 'A', grade_point: 8 },
+                { code: 'HU-101', name: 'Communication Skills', type: 'theory', internal_theory: '22', external_theory: '50', credits: '2', grade: 'A', grade_point: 8 },
+            ],
+        },
+        {
+            semester: '2', semester_label: 'Semester 2', sgpa: 7.55, total_credits: 22,
+            subjects: [
+                { code: 'MAT-201', name: 'Mathematics II', type: 'theory', internal_theory: '20', external_theory: '48', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'CHE-201', name: 'Engineering Chemistry', type: 'theory', internal_theory: '16', external_theory: '41', credits: '4', grade: 'B+', grade_point: 7 },
+                { code: 'CSE-201', name: 'Data Structures using C', type: 'theory', internal_theory: '24', external_theory: '58', credits: '4', grade: 'A+', grade_point: 9 },
+                { code: 'ME-201', name: 'Engineering Mechanics', type: 'theory', internal_theory: '13', external_theory: '35', credits: '4', grade: 'C+', grade_point: 5 },
+                { code: 'EC-201', name: 'Basic Electronics', type: 'theory', internal_theory: '19', external_theory: '46', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'EVS-201', name: 'Environmental Science', type: 'theory', internal_theory: '22', external_theory: '53', credits: '2', grade: 'A+', grade_point: 9 },
+            ],
+        },
+        {
+            semester: '3', semester_label: 'Semester 3', sgpa: 8.55, total_credits: 22,
+            subjects: [
+                { code: 'MAT-301', name: 'Mathematics III', type: 'theory', internal_theory: '21', external_theory: '49', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'DE-301', name: 'Digital Electronics', type: 'theory', internal_theory: '23', external_theory: '55', credits: '4', grade: 'A+', grade_point: 9 },
+                { code: 'CO-301', name: 'Computer Organization', type: 'theory', internal_theory: '18', external_theory: '45', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'OOP-301', name: 'OOP with Java', type: 'theory', internal_theory: '26', external_theory: '65', credits: '4', grade: 'O', grade_point: 10 },
+                { code: 'DM-301', name: 'Discrete Mathematics', type: 'theory', internal_theory: '22', external_theory: '50', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'SE-301', name: 'Software Engineering', type: 'theory', internal_theory: '20', external_theory: '48', credits: '2', grade: 'A', grade_point: 8 },
+            ],
+        },
+        {
+            semester: '4', semester_label: 'Semester 4', sgpa: 8.09, total_credits: 22,
+            subjects: [
+                { code: 'OS-401', name: 'Operating Systems', type: 'theory', internal_theory: '22', external_theory: '52', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'DBMS-401', name: 'Database Management', type: 'theory', internal_theory: '24', external_theory: '58', credits: '4', grade: 'A+', grade_point: 9 },
+                { code: 'CN-401', name: 'Computer Networks', type: 'theory', internal_theory: '20', external_theory: '48', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'DAA-401', name: 'Design & Analysis of Algo.', type: 'theory', internal_theory: '19', external_theory: '46', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'TOC-401', name: 'Theory of Computation', type: 'theory', internal_theory: '17', external_theory: '43', credits: '4', grade: 'B+', grade_point: 7 },
+                { code: 'AI-401', name: 'Artificial Intelligence', type: 'theory', internal_theory: '23', external_theory: '55', credits: '2', grade: 'A+', grade_point: 9 },
+            ],
+        },
+        {
+            semester: '5', semester_label: 'Semester 5', sgpa: 8.60, total_credits: 20,
+            subjects: [
+                { code: 'WT-501', name: 'Web Technologies', type: 'theory', internal_theory: '24', external_theory: '56', credits: '4', grade: 'A+', grade_point: 9 },
+                { code: 'MP-501', name: 'Microprocessors', type: 'theory', internal_theory: '18', external_theory: '44', credits: '4', grade: 'A', grade_point: 8 },
+                { code: 'CG-501', name: 'Computer Graphics', type: 'theory', internal_theory: '16', external_theory: '42', credits: '4', grade: 'B+', grade_point: 7 },
+                { code: 'CC-501', name: 'Cloud Computing', type: 'theory', internal_theory: '22', external_theory: '53', credits: '4', grade: 'A+', grade_point: 9 },
+                { code: 'PR-501', name: 'Minor Project', type: 'theory', internal_theory: '27', external_theory: '65', credits: '4', grade: 'O', grade_point: 10 },
+            ],
+        },
+    ],
+};
+
 const ResultsScreen = ({ navigation }) => {
     const { isDark, colors: themeColors } = useTheme();
     const insets = useSafeAreaInsets();
@@ -185,6 +246,14 @@ const ResultsScreen = ({ navigation }) => {
 
         const sgpa = totalCredits > 0 ? (weightedSum / totalCredits).toFixed(2) : "0.00";
         return { sgpa, credits: totalCredits, processedSubjects: processed };
+    };
+
+    const loadDemoData = () => {
+        setResults(MOBILE_MOCK.semesters);
+        setAvailableSems(MOBILE_MOCK.semesters.map(s => s.semester));
+        calculateOverallStats(MOBILE_MOCK.semesters, MOBILE_MOCK.cgpa);
+        setLastUpdated(null);
+        setStep('results');
     };
 
     const handleAutoFetch = async () => {
@@ -536,7 +605,16 @@ const ResultsScreen = ({ navigation }) => {
                             </View>
                         </View>
 
-                        <TouchableOpacity onPress={handleAutoFetch} disabled={fetching} style={{ marginTop: 24 }}>
+                        {/* Demo preview banner */}
+                        <TouchableOpacity
+                            onPress={loadDemoData}
+                            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(99,102,241,0.2)', backgroundColor: 'rgba(99,102,241,0.05)', padding: 12, marginTop: 20, marginBottom: 4 }}
+                        >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: c.subtext, textTransform: 'uppercase', letterSpacing: 0.5 }}>Account locked? Preview demo</Text>
+                            <Text style={{ fontSize: 11, fontWeight: '900', color: c.primary }}>VIEW →</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity onPress={handleAutoFetch} disabled={fetching} style={{ marginTop: 12 }}>
                             <LinearGradient colors={theme.gradients.primary} style={styles.syncBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                                 {fetching ? <ActivityIndicator color="#FFF" /> : (
                                     <>
