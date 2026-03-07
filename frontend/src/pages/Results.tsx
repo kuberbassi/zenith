@@ -824,10 +824,13 @@ const Results: React.FC = () => {
 
                         <div className="flex flex-col gap-2 mb-6">
                             {[{ label: 'All Semesters (Full Transcript)', val: 'overall' },
-                              ...(results?.semesters || []).map((s: any) => ({
-                                  label: s.semester_label || `Semester ${s.semester_num}`,
-                                  val: String(s.semester_num),
-                              }))
+                              ...(results?.semesters || []).map((s: any) => {
+                                  const num = s.semester_num ?? s.semester;
+                                  return {
+                                      label: s.semester_label || (num ? `Semester ${num}` : 'Semester'),
+                                      val: String(num),
+                                  };
+                              })
                             ].map(opt => (
                                 <button
                                     key={opt.val}

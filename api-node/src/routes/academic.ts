@@ -6,6 +6,7 @@ import { Subject } from '../models/Subject.js'
 import { AttendanceLog } from '../models/AttendanceLog.js'
 import { SemesterResult } from '../models/SemesterResult.js'
 import { ManualCourse } from '../models/ManualCourse.js'
+import { User } from '../models/User.js'
 import { SystemLog } from '../models/SystemLog.js'
 import { GradeCalculator } from '../lib/calculations.js'
 import { fetchIpuResults } from '../services/ipuClient.js'
@@ -273,40 +274,73 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
             return;
         }
 
-        const semesters = results.map(r => r.subjects as Array<Record<string, unknown>>);
-        const cgpaCalc = GradeCalculator.calculateCGPA(semesters);
+        const userId = (req as AuthRequest).userId!
 
+        // Enrich student_info from User document (same as /api/ipu/saved-results)
+        const userDoc = await User.findById(userId).lean()
+        const rawStudentInfo = results.find(r => r.student_info)?.student_info || {}
+        const enrichedStudentInfo = {
+            ...rawStudentInfo,
+            ...(userDoc?.name ? { name: userDoc.name } : {}),
+            ...(userDoc?.mother_name ? { mother: userDoc.mother_name } : {}),
+            ...(userDoc?.phone_number ? { phone: userDoc.phone_number } : {}),
+            ...(userDoc?.email ? { email: userDoc.email } : {}),
+            ...(userDoc?.gender ? { gender: userDoc.gender } : {}),
+            ...(userDoc?.batch ? { batch: userDoc.batch } : {}),
+            ...(userDoc?.course ? { programme: userDoc.course } : {}),
+            ...(userDoc?.college ? { institution: userDoc.college } : {}),
+            ...(userDoc?.admission_year ? { admission_year: userDoc.admission_year } : {}),
+        }
+
+        // Map semesters with normalized shape (semester_num, semester_label)
+        const mappedSemesters = results.map(r => ({
+            semester: String(r.semester),
+            semester_num: r.semester,
+            semester_label: (r as any).semester_label || `Semester ${r.semester}`,
+            subjects: r.subjects || [],
+            sgpa: r.sgpa ? String(r.sgpa) : null,
+            total_marks: r.total_marks || null,
+            max_marks: r.max_marks || null,
+        }))
+
+        // Compute CGPA via GradeCalculator (existing logic)
+        const semSubjects = results.map(r => r.subjects as Array<Record<string, unknown>>);
+        const cgpaCalc = GradeCalculator.calculateCGPA(semSubjects);
+
+        // Compute grade distribution and percentages — exclude pending subjects
+        const gradeDist: Record<string, number> = {}
         let totalMarks = 0;
         let totalMaxMarks = 0;
-        const gradeDist: Record<string, number> = { 'O': 0, 'A+': 0, 'A': 0, 'B+': 0, 'B': 0, 'C+': 0, 'C': 0, 'F': 0 };
 
         results.forEach(r => {
-            let semTotal = 0;
-            let semMax = 0;
             if (Array.isArray(r.subjects)) {
                 r.subjects.forEach((s: any) => {
-                    semTotal += Number(s.total_marks || 0);
-                    semMax += Number(s.max_marks || 100);
+                    if (s.is_pending || s.grade === '-' || s.total_marks === null) return; // skip pending
+                    const marks = Number(s.total_marks ?? 0);
+                    const max = Number(s.max_marks ?? 100);
+                    totalMarks += marks;
+                    totalMaxMarks += max;
                     const g = (s.grade || 'F').toString().toUpperCase();
-                    if (gradeDist[g] !== undefined) gradeDist[g]++;
-                    else gradeDist[g] = 1;
+                    gradeDist[g] = (gradeDist[g] || 0) + 1;
                 });
             }
-            (r as any).semester_total_marks = semTotal;
-            (r as any).semester_max_marks = semMax;
-            (r as any).semester_percentage = semMax > 0 ? (semTotal / semMax) * 100 : 0;
-            totalMarks += semTotal;
-            totalMaxMarks += semMax;
         });
 
         ok(res, {
+            enrollment_number: results.find(r => r.enrollment_number)?.enrollment_number || userDoc?.enrollment_number || '',
+            student_info: enrichedStudentInfo,
+            last_updated: results.reduce((latest: Date, r) => {
+                const d = new Date(r.updated_at);
+                return d > latest ? d : latest;
+            }, new Date(0)).toISOString(),
             cgpa: cgpaCalc.cgpa,
-            overallPercentage: totalMaxMarks > 0 ? (totalMarks / totalMaxMarks) * 100 : 0,
+            overallPercentage: totalMaxMarks > 0 ? parseFloat(((totalMarks / totalMaxMarks) * 100).toFixed(1)) : 0,
             gradeDistribution: gradeDist,
             totalSubjects: Object.values(gradeDist).reduce((a, b) => a + b, 0),
             totalMarks,
             totalMaxMarks,
-            semesters: results
+            semesters: mappedSemesters,
+            saved: true,
         });
     } catch (err) {
         console.error('[academic/results/analytics GET]', err);

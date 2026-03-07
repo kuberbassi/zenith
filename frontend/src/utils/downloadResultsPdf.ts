@@ -106,11 +106,17 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
     const allSems: any[] = results.semesters || [];
     const semsToRender = selectedSem === 'overall'
         ? allSems
-        : allSems.filter(s => String(s.semester) === selectedSem || String(s.semester_num) === selectedSem);
+        : allSems.filter(s => {
+              const num = s.semester_num ?? s.semester;
+              return String(num) === selectedSem;
+          });
 
     /* ── RENDER EACH SEMESTER ───────────────────────────────────────────── */
     for (const sem of semsToRender) {
         if (y > pageH - 55) { doc.addPage(); y = 14; }
+
+        const semNum = sem.semester_num ?? sem.semester;
+        const rawLabel = sem.semester_label || (semNum ? `Semester ${semNum}` : 'Semester');
 
         // Semester header bar
         doc.setFillColor(...GRAY_DARK);
@@ -118,7 +124,7 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         doc.setTextColor(...WHITE);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.5);
-        const semLabel = (sem.semester_label || `Semester ${sem.semester_num}`).toUpperCase();
+        const semLabel = rawLabel.toUpperCase();
         doc.text(semLabel, margin + 4, y + 5.5);
 
         const sgpaVal = sem.sgpa ? parseFloat(sem.sgpa) : 0;
@@ -129,15 +135,17 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
 
         const subjects = sem.subjects || [];
         const tableBody = subjects.map((sub: any, idx: number) => {
-            const isPending = sub.is_pending || sub.grade === '-';
+            const isPending = sub.is_pending || sub.grade === '-' || sub.total_marks === null || sub.total_marks === undefined;
+            const totalDisp = isPending ? 'Pending' : (sub.total_marks ?? '-');
+            const maxDisp = isPending ? '---' : (sub.max_marks ?? 100);
             return [
                 idx + 1,
                 sub.code || '---',
                 sub.name || '---',
                 sub.internal ?? '-',
                 sub.external ?? '-',
-                isPending ? 'Pending' : (sub.total_marks ?? '-'),
-                isPending ? '---' : (sub.max_marks ?? 100),
+                totalDisp,
+                maxDisp,
                 sub.grade || '-',
                 sub.status || '-',
             ];
@@ -194,7 +202,11 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         // SGPA progression table
         const sgpaRows = allSems
             .filter(s => s.sgpa && parseFloat(s.sgpa) > 0)
-            .map(s => [s.semester_label || `Semester ${s.semester_num}`, parseFloat(s.sgpa).toFixed(2)]);
+            .map(s => {
+                const num = s.semester_num ?? s.semester;
+                const label = s.semester_label || (num ? `Semester ${num}` : 'Semester');
+                return [label, parseFloat(s.sgpa).toFixed(2)];
+            });
 
         if (sgpaRows.length > 0) {
             doc.setFont('helvetica', 'bold');
