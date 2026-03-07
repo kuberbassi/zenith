@@ -242,8 +242,7 @@ const ResultsScreen = ({ navigation }) => {
                 setStep('results');
                 Alert.alert("Success", "Results synced successfully!");
             } else {
-                Alert.alert("Error", "Invalid credentials or CAPTCHA.");
-                await refreshCaptcha();
+                Alert.alert("Error", "Invalid credentials or CAPTCHA. Tap ↻ to get a new CAPTCHA.");
             }
         } catch (e) {
             const status = e?.response?.status;
@@ -251,9 +250,8 @@ const ResultsScreen = ({ navigation }) => {
             if (status === 423) {
                 setStep('form');
                 setPassword('');
-            } else {
-                await refreshCaptcha();
             }
+            // For other failures, just show error — user can tap ↻ for a new CAPTCHA.
         } finally {
             setFetching(false);
         }

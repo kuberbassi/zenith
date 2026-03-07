@@ -25,7 +25,7 @@ ChartJS.register(
 
 /*  Grade utilities  */
 const GRADE_POINTS: Record<string, number> = {
-    'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C': 5, 'P': 4, 'F': 0, 'Ab': 0, 'I': 0,
+    'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C+': 5, 'C': 4, 'P': 4, 'F': 0, 'Ab': 0, 'I': 0,
 };
 
 function calcSGPA(subjects: any[]): number {
@@ -198,8 +198,7 @@ const Results: React.FC = () => {
                 setLastUpdated(new Date().toISOString());
                 showToast('success', 'Results synced successfully!');
             } else {
-                setError('Invalid credentials or CAPTCHA. Try a new CAPTCHA.');
-                await refreshCaptcha();
+                setError('Invalid credentials or CAPTCHA. Click ↻ to get a new CAPTCHA.');
             }
         } catch (e: any) {
             const status = e?.response?.status;
@@ -209,9 +208,9 @@ const Results: React.FC = () => {
             if (status === 423) {
                 setStep('form');
                 setPassword('');
-            } else {
-                await refreshCaptcha();
             }
+            // For other failures (wrong captcha/creds) just show the error.
+            // User can click ↻ to manually get a new CAPTCHA.
         } finally { setFetching(false); }
     }
 

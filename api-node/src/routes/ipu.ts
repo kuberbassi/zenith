@@ -397,10 +397,18 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
       return fail(res, 'No results found on IPU portal.', 'NO_RESULTS', 404)
     }
 
+    // Deduplicate: the IPU API sometimes returns the same semester data for multiple euno calls
+    const seenSemesters = new Set<number>()
+    const uniqueSemesters = rawSemesters.filter(s => {
+      if (seenSemesters.has(s.semester)) return false
+      seenSemesters.add(s.semester)
+      return true
+    })
+
     const results = {
       enrollment_number: enrollment,
-      student_info: rawSemesters[0].student_info as Record<string, unknown>,
-      semesters: rawSemesters.map(sem => ({
+      student_info: uniqueSemesters[0].student_info as Record<string, unknown>,
+      semesters: uniqueSemesters.map(sem => ({
         semester: String(sem.semester),
         semester_num: sem.semester,
         semester_label: `Semester ${sem.semester}`,
