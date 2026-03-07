@@ -11,7 +11,10 @@ export interface IUser extends Document {
   college?: string
   batch?: string
   enrollment_number?: string
+  mother_name?: string
+  gender?: string
   phone_number?: string
+  admission_year?: string
   headline?: string
   linkedin_url?: string
   github_url?: string
@@ -38,7 +41,10 @@ const UserSchema = new Schema<IUser>(
     college: { type: String },
     batch: { type: String },
     enrollment_number: { type: String },
+    mother_name: { type: String },
+    gender: { type: String },
     phone_number: { type: String },
+    admission_year: { type: String },
     headline: { type: String },
     linkedin_url: { type: String },
     github_url: { type: String },

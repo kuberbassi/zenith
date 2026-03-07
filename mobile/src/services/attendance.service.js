@@ -81,6 +81,11 @@ export const getIPUCaptcha = async () => {
   return data;
 };
 
+export const changeIPUPassword = async (payload) => {
+  const { data } = await api.post('/api/ipu/change-password', payload);
+  return data;
+};
+
 export default {
   markAttendance,
   markAllAttendance,
@@ -94,4 +99,5 @@ export default {
   autoFetchIPUResults,
   fetchIPUResults,
   getIPUCaptcha,
+  changeIPUPassword,
 };

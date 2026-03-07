@@ -30,12 +30,13 @@ export interface ProcessedSubject {
   code: string
   internal: string
   external: string
-  total_marks: number
+  total_marks: number | null  // null when result is pending/withheld
   max_marks: number
-  percentage: number
+  percentage: number | null
   grade: string
-  grade_point: number
+  grade_point: number | null
   status: string
+  is_pending: boolean
 }
 
 export interface FetchedSemesterResult {
@@ -51,6 +52,7 @@ export interface FetchedSemesterResult {
     programme: string
     batch: string
     roll_no: string
+    admission_year?: string
   }
 }
 
@@ -124,40 +126,47 @@ export async function fetchIpuResults(
   const first = data[0]
 
   const subjects: ProcessedSubject[] = data.map((raw) => {
-    const internal = raw.minorprint
-    const external = raw.majorprint
-    const total = parseInt(raw.moderatedprint) || 0
+    const internal = raw.minorprint?.trim() || '-'
+    const external = raw.majorprint?.trim() || '-'
+    const totalStr = raw.moderatedprint?.trim() || ''
+
+    // Detect pending/withheld results — moderatedprint will be "-" or non-numeric
+    const isPending = totalStr === '-' || totalStr === '' || isNaN(parseInt(totalStr))
+    const total = isPending ? null : (parseInt(totalStr) || 0)
     const maxMarks = 100
-    const pct = (total / maxMarks) * 100
-    const grade = percentageToGrade(pct)
+    const pct = total !== null ? parseFloat(((total / maxMarks) * 100).toFixed(2)) : null
+    const grade = isPending ? '-' : percentageToGrade(total! / maxMarks * 100)
+    const statusRaw = raw.statuscode?.trim() || ''
 
     return {
-      name: raw.papername,
-      code: raw.papercode,
+      name: raw.papername?.trim() || 'Unknown Subject',
+      code: raw.papercode?.trim() || '',
       internal,
       external,
       total_marks: total,
       max_marks: maxMarks,
-      percentage: Math.round(pct * 100) / 100,
+      percentage: pct,
       grade,
-      grade_point: IPU_GRADE_SCALE[grade] ?? 0,
-      status: raw.statuscode,
+      grade_point: isPending ? null : (IPU_GRADE_SCALE[grade] ?? 0),
+      status: statusRaw || (isPending ? 'Pending' : '-'),
+      is_pending: isPending,
     }
   })
 
   return {
-    enrollment_number: first.nrollno,
+    enrollment_number: first.nrollno?.trim() || '',
     semester: first.euno,
     subjects,
-    sgpa: first.eugpa,
+    sgpa: first.eugpa ?? 0,
     total_credits: 0, // The raw API doesn't include per-subject credits
     student_info: {
-      name: first.stname,
-      father: first.father,
-      institution: first.iname,
-      programme: first.prgname,
-      batch: String(first.byoa),
-      roll_no: first.nrollno,
+      name: first.stname?.trim() || '',
+      father: first.father?.trim() || '',
+      institution: first.iname?.trim() || '',
+      programme: first.prgname?.trim() || '',
+      batch: first.byoa ? String(first.byoa) : '',
+      roll_no: first.nrollno?.trim() || '',
+      ...(first.yoa ? { admission_year: String(first.yoa) } : {}),
     },
   }
 }

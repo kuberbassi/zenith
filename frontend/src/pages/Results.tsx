@@ -10,7 +10,7 @@ import {
 import { Bar, Radar, Doughnut } from 'react-chartjs-2';
 import {
     Eye, EyeOff, RefreshCw, Zap, GraduationCap, TrendingUp, BarChart3,
-    ShieldCheck, Activity, BookOpen, PieChart
+    ShieldCheck, Activity, BookOpen, PieChart, KeyRound, X, Download
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
@@ -69,86 +69,6 @@ function formatDate(iso: string | null): string {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/* ── Demo / Preview mock data ────────────────────────────────────────── */
-const MOCK_RESULTS = {
-    enrollment_number: '00113302725',
-    student_info: {
-        name: 'PARAG BASSI',
-        father: '—',
-        programme: 'Bachelor of Technology (Information Technology)',
-        institution: 'Vivekananda Institute of Professional Studies-TC',
-        batch: '2022',
-        roll_no: '00113302725',
-    },
-    cgpa: 8.12,
-    overallPercentage: 70.9,
-    totalSubjects: 29,
-    gradeDistribution: { O: 3, 'A+': 7, A: 13, 'B+': 4, B: 1, 'C+': 1 },
-    saved: false,
-    last_updated: null as string | null,
-    semesters: [
-        {
-            semester: '1', semester_num: 1, semester_label: 'Semester 1',
-            sgpa: '7.80', total_marks: '425', max_marks: '600',
-            subjects: [
-                { code: 'MAT-101', name: 'Mathematics I', internal: '18', external: '44', total_marks: 62, max_marks: 100, percentage: 62, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'PHY-101', name: 'Engineering Physics', internal: '15', external: '40', total_marks: 55, max_marks: 100, percentage: 55, grade: 'B+', grade_point: 7, status: 'P', credits: '4' },
-                { code: 'BEE-101', name: 'Basic Elec. & Electronics', internal: '14', external: '36', total_marks: 50, max_marks: 100, percentage: 50, grade: 'B', grade_point: 6, status: 'P', credits: '4' },
-                { code: 'CSE-101', name: 'Programming in C', internal: '25', external: '65', total_marks: 90, max_marks: 100, percentage: 90, grade: 'O', grade_point: 10, status: 'P', credits: '4' },
-                { code: 'ME-101', name: 'Engineering Graphics', internal: '20', external: '48', total_marks: 68, max_marks: 100, percentage: 68, grade: 'A', grade_point: 8, status: 'P', credits: '2' },
-                { code: 'HU-101', name: 'Communication Skills', internal: '22', external: '50', total_marks: 72, max_marks: 100, percentage: 72, grade: 'A', grade_point: 8, status: 'P', credits: '2' },
-            ],
-        },
-        {
-            semester: '2', semester_num: 2, semester_label: 'Semester 2',
-            sgpa: '7.55', total_marks: '395', max_marks: '600',
-            subjects: [
-                { code: 'MAT-201', name: 'Mathematics II', internal: '20', external: '48', total_marks: 68, max_marks: 100, percentage: 68, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'CHE-201', name: 'Engineering Chemistry', internal: '16', external: '41', total_marks: 57, max_marks: 100, percentage: 57, grade: 'B+', grade_point: 7, status: 'P', credits: '4' },
-                { code: 'CSE-201', name: 'Data Structures using C', internal: '24', external: '58', total_marks: 82, max_marks: 100, percentage: 82, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
-                { code: 'ME-201', name: 'Engineering Mechanics', internal: '13', external: '35', total_marks: 48, max_marks: 100, percentage: 48, grade: 'C+', grade_point: 5, status: 'P', credits: '4' },
-                { code: 'EC-201', name: 'Basic Electronics', internal: '19', external: '46', total_marks: 65, max_marks: 100, percentage: 65, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'EVS-201', name: 'Environmental Science', internal: '22', external: '53', total_marks: 75, max_marks: 100, percentage: 75, grade: 'A+', grade_point: 9, status: 'P', credits: '2' },
-            ],
-        },
-        {
-            semester: '3', semester_num: 3, semester_label: 'Semester 3',
-            sgpa: '8.55', total_marks: '442', max_marks: '600',
-            subjects: [
-                { code: 'MAT-301', name: 'Mathematics III', internal: '21', external: '49', total_marks: 70, max_marks: 100, percentage: 70, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'DE-301', name: 'Digital Electronics', internal: '23', external: '55', total_marks: 78, max_marks: 100, percentage: 78, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
-                { code: 'CO-301', name: 'Computer Organization', internal: '18', external: '45', total_marks: 63, max_marks: 100, percentage: 63, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'OOP-301', name: 'Object Oriented Prog. (Java)', internal: '26', external: '65', total_marks: 91, max_marks: 100, percentage: 91, grade: 'O', grade_point: 10, status: 'P', credits: '4' },
-                { code: 'DM-301', name: 'Discrete Mathematics', internal: '22', external: '50', total_marks: 72, max_marks: 100, percentage: 72, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'SE-301', name: 'Software Engineering', internal: '20', external: '48', total_marks: 68, max_marks: 100, percentage: 68, grade: 'A', grade_point: 8, status: 'P', credits: '2' },
-            ],
-        },
-        {
-            semester: '4', semester_num: 4, semester_label: 'Semester 4',
-            sgpa: '8.09', total_marks: '427', max_marks: '600',
-            subjects: [
-                { code: 'OS-401', name: 'Operating Systems', internal: '22', external: '52', total_marks: 74, max_marks: 100, percentage: 74, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'DBMS-401', name: 'Database Management Systems', internal: '24', external: '58', total_marks: 82, max_marks: 100, percentage: 82, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
-                { code: 'CN-401', name: 'Computer Networks', internal: '20', external: '48', total_marks: 68, max_marks: 100, percentage: 68, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'DAA-401', name: 'Design & Analysis of Algorithms', internal: '19', external: '46', total_marks: 65, max_marks: 100, percentage: 65, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'TOC-401', name: 'Theory of Computation', internal: '17', external: '43', total_marks: 60, max_marks: 100, percentage: 60, grade: 'B+', grade_point: 7, status: 'P', credits: '4' },
-                { code: 'AI-401', name: 'Artificial Intelligence', internal: '23', external: '55', total_marks: 78, max_marks: 100, percentage: 78, grade: 'A+', grade_point: 9, status: 'P', credits: '2' },
-            ],
-        },
-        {
-            semester: '5', semester_num: 5, semester_label: 'Semester 5',
-            sgpa: '8.60', total_marks: '367', max_marks: '500',
-            subjects: [
-                { code: 'WT-501', name: 'Web Technologies', internal: '24', external: '56', total_marks: 80, max_marks: 100, percentage: 80, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
-                { code: 'MP-501', name: 'Microprocessors', internal: '18', external: '44', total_marks: 62, max_marks: 100, percentage: 62, grade: 'A', grade_point: 8, status: 'P', credits: '4' },
-                { code: 'CG-501', name: 'Computer Graphics', internal: '16', external: '42', total_marks: 58, max_marks: 100, percentage: 58, grade: 'B+', grade_point: 7, status: 'P', credits: '4' },
-                { code: 'CC-501', name: 'Cloud Computing', internal: '22', external: '53', total_marks: 75, max_marks: 100, percentage: 75, grade: 'A+', grade_point: 9, status: 'P', credits: '4' },
-                { code: 'PR-501', name: 'Minor Project', internal: '27', external: '65', total_marks: 92, max_marks: 100, percentage: 92, grade: 'O', grade_point: 10, status: 'P', credits: '4' },
-            ],
-        },
-    ],
-};
-
 /*  Types  */
 type Step = 'loading' | 'form' | 'captcha' | 'results';
 
@@ -183,7 +103,18 @@ const Results: React.FC = () => {
     const [selectedSem, setSelectedSem] = useState<string>('overall');
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
-    // CGPA Calculator (Removed per user request)
+    // PDF download
+    const [showPdfModal, setShowPdfModal] = useState(false);
+    const [pdfSem, setPdfSem] = useState<string>('overall');
+    const [pdfLoading, setPdfLoading] = useState(false);
+
+    // Change portal password modal
+    const [showCPwModal, setShowCPwModal] = useState(false);
+    const [cpwCurrent, setCpwCurrent] = useState('');
+    const [cpwNew, setCpwNew] = useState('');
+    const [cpwConfirm, setCpwConfirm] = useState('');
+    const [cpwLoading, setCpwLoading] = useState(false);
+    const [cpwError, setCpwError] = useState<string | null>(null);
 
     const accentColor = '#3b82f6';
     const gridColor = 'rgba(255,255,255,0.04)';
@@ -215,11 +146,38 @@ const Results: React.FC = () => {
         setStep('form');
     }
 
-    function loadDemoData() {
-        setResults(MOCK_RESULTS);
-        setLastUpdated(null);
-        setStep('results');
-        showToast('success', 'Demo mode — showing sample results preview');
+    async function handleDownloadPdf() {
+        if (!results) return;
+        setPdfLoading(true);
+        try {
+            // Dynamic import so the PDF library only loads when needed
+            const { downloadResultsPdf } = await import('@/utils/downloadResultsPdf');
+            downloadResultsPdf(results, pdfSem);
+        } catch (e: any) {
+            showToast('error', 'PDF generation failed: ' + (e?.message || 'Unknown error'));
+        } finally {
+            setPdfLoading(false);
+            setShowPdfModal(false);
+        }
+    }
+
+    async function handleChangePw() {
+        if (!cpwCurrent.trim() || !cpwNew.trim() || !cpwConfirm.trim()) {
+            setCpwError('All fields are required.'); return;
+        }
+        if (cpwNew !== cpwConfirm) { setCpwError('Passwords do not match.'); return; }
+        if (cpwNew.length < 6) { setCpwError('New password must be at least 6 characters.'); return; }
+        setCpwError(null); setCpwLoading(true);
+        try {
+            const res: any = await attendanceService.changeIPUPassword({
+                current_password: cpwCurrent, new_password: cpwNew, confirm_password: cpwConfirm,
+            });
+            showToast('success', res?.message || 'Password changed successfully!');
+            setShowCPwModal(false);
+            setCpwCurrent(''); setCpwNew(''); setCpwConfirm('');
+        } catch (e: any) {
+            setCpwError(e?.response?.data?.error || 'Failed to change password. Sync results first to establish a session.');
+        } finally { setCpwLoading(false); }
     }
 
     async function handleAutoFetch() {
@@ -455,11 +413,6 @@ const Results: React.FC = () => {
                         {error && <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400">{error}</div>}
 
                         <form onSubmit={(e) => { e.preventDefault(); handleAutoFetch(); }} className="space-y-4">
-                            {/* Demo banner */}
-                            <div className="mb-2 p-3 rounded-xl border border-blue-500/10 bg-blue-500/[0.04] flex items-center justify-between">
-                                <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Account locked? Preview the UI</span>
-                                <button type="button" onClick={loadDemoData} className="text-[10px] font-black text-blue-400/60 hover:text-blue-400 uppercase tracking-widest transition-colors">Demo →</button>
-                            </div>
                             <div>
                                 <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 ml-1">Enrollment Number</label>
                                 <input type="text" value={enrollmentNo} onChange={e => setEnrollmentNo(e.target.value)} placeholder="00000000000" className={inputCls} required />
@@ -538,30 +491,70 @@ const Results: React.FC = () => {
                                 <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-2">{results.student_info?.name || user?.name}</h1>
                                 <p className="text-blue-400/60 font-medium tracking-wide mb-8">{results.student_info?.programme} &bull; Batch {results.student_info?.batch}</p>
 
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Enrollment</p>
                                         <p className="text-sm font-bold text-white/70">{results.enrollment_number}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Institution</p>
-                                        <p className="text-sm font-bold text-white/70 truncate">{results.student_info?.institution}</p>
+                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Batch</p>
+                                        <p className="text-sm font-bold text-white/70">{results.student_info?.batch || '---'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Admission Year</p>
+                                        <p className="text-sm font-bold text-white/70">{results.student_info?.admission_year || '---'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Gender</p>
+                                        <p className="text-sm font-bold text-white/70">{results.student_info?.gender || '---'}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Father's Name</p>
                                         <p className="text-sm font-bold text-white/70">{results.student_info?.father || '---'}</p>
                                     </div>
-                                    <div className="col-span-2 md:col-span-1 border-t md:border-t-0 md:border-l border-white/5 pt-4 md:pt-0 md:pl-6">
+                                    <div>
+                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Mother's Name</p>
+                                        <p className="text-sm font-bold text-white/70">{results.student_info?.mother || '---'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Phone</p>
+                                        <p className="text-sm font-bold text-white/70">{results.student_info?.phone || '---'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Email</p>
+                                        <p className="text-sm font-bold text-white/70 truncate">{results.student_info?.email || '---'}</p>
+                                    </div>
+                                    <div className="col-span-2 md:col-span-1">
+                                        <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Institution</p>
+                                        <p className="text-sm font-bold text-white/70 truncate">{results.student_info?.institution || '---'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-5 border-t border-white/5">
+                                    <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1 flex items-center gap-2">
                                             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
                                             Last Synced
                                         </p>
-                                        <p className="text-xs font-bold text-white/40 mb-3">{formatDate(lastUpdated)}</p>
+                                        <p className="text-xs font-bold text-white/40">{formatDate(lastUpdated)}</p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
                                         <button
                                             onClick={handleSyncClick}
                                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-black text-blue-400 hover:bg-blue-500/20 transition-all"
                                         >
                                             <RefreshCw size={12} /> Sync Results
+                                        </button>
+                                        <button
+                                            onClick={() => setShowPdfModal(true)}
+                                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-black text-emerald-400 hover:bg-emerald-500/20 transition-all"
+                                        >
+                                            <Download size={12} /> Download PDF
+                                        </button>
+                                        <button
+                                            onClick={() => setShowCPwModal(true)}
+                                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/[0.08] text-xs font-black text-white/40 hover:bg-white/10 hover:text-white/60 transition-all"
+                                        >
+                                            <KeyRound size={12} /> Change Password
                                         </button>
                                     </div>
                                 </div>
@@ -804,6 +797,126 @@ const Results: React.FC = () => {
                             </div>
                         </>
                     )}
+                </div>
+            )}
+
+            {/* ── PDF Download Modal ───────────────────────────────────────── */}
+            {showPdfModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="w-full max-w-sm rounded-3xl border border-white/[0.08] bg-[#080808] p-8"
+                    >
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                                    <Download size={14} className="text-emerald-400" />
+                                </div>
+                                <h3 className="text-base font-black text-white">Download Results PDF</h3>
+                            </div>
+                            <button onClick={() => setShowPdfModal(false)} className="text-white/20 hover:text-white/60 transition-colors">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <p className="text-[11px] text-white/30 mb-4">Select which results to include in the PDF:</p>
+
+                        <div className="flex flex-col gap-2 mb-6">
+                            {[{ label: 'All Semesters (Full Transcript)', val: 'overall' },
+                              ...(results?.semesters || []).map((s: any) => ({
+                                  label: s.semester_label || `Semester ${s.semester_num}`,
+                                  val: String(s.semester_num),
+                              }))
+                            ].map(opt => (
+                                <button
+                                    key={opt.val}
+                                    onClick={() => setPdfSem(opt.val)}
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-xs font-bold text-left transition-all ${
+                                        pdfSem === opt.val
+                                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                                            : 'border-white/[0.06] bg-white/[0.02] text-white/40 hover:bg-white/[0.05]'
+                                    }`}
+                                >
+                                    <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${pdfSem === opt.val ? 'border-emerald-400 bg-emerald-400' : 'border-white/20'}`} />
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowPdfModal(false)}
+                                className="flex-1 py-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-xs font-black text-white/40 hover:bg-white/[0.06] transition-all"
+                            >Cancel</button>
+                            <button
+                                onClick={handleDownloadPdf}
+                                disabled={pdfLoading}
+                                className="flex-1 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-xs font-black text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                            >
+                                {pdfLoading
+                                    ? <><RefreshCw size={12} className="animate-spin" /> Generating…</>
+                                    : <><Download size={12} /> Download PDF</>
+                                }
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
+            {/* ── Change Portal Password Modal ─────────────────────────────── */}
+            {showCPwModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#080808] p-8"
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
+                                    <KeyRound size={14} className="text-white/40" />
+                                </div>
+                                <h3 className="text-base font-black text-white">Change Portal Password</h3>
+                            </div>
+                            <button onClick={() => { setShowCPwModal(false); setCpwError(null); }} className="text-white/20 hover:text-white/60 transition-colors">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-amber-400/60 mb-6 ml-11">Sync results first if this fails — active session required (expires in 30 min)</p>
+
+                        {cpwError && (
+                            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{cpwError}</div>
+                        )}
+
+                        <div className="space-y-3 mb-6">
+                            <input
+                                type="password" value={cpwCurrent} onChange={e => setCpwCurrent(e.target.value)}
+                                placeholder="Current Password" className={inputCls}
+                            />
+                            <input
+                                type="password" value={cpwNew} onChange={e => setCpwNew(e.target.value)}
+                                placeholder="New Password" className={inputCls}
+                            />
+                            <input
+                                type="password" value={cpwConfirm} onChange={e => setCpwConfirm(e.target.value)}
+                                placeholder="Confirm New Password" className={inputCls}
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setShowCPwModal(false); setCpwError(null); setCpwCurrent(''); setCpwNew(''); setCpwConfirm(''); }}
+                                className="flex-1 py-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-xs font-black text-white/40 hover:bg-white/[0.06] transition-all"
+                            >Cancel</button>
+                            <button
+                                onClick={handleChangePw} disabled={cpwLoading}
+                                className="flex-1 py-3 rounded-2xl bg-white/10 border border-white/10 text-xs font-black text-white/70 hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                            >
+                                {cpwLoading ? <><RefreshCw size={12} className="animate-spin" /> Changing…</> : 'Change Password'}
+                            </button>
+                        </div>
+                    </motion.div>
                 </div>
             )}
         </motion.div>

@@ -21,6 +21,8 @@ const IPU_BASE = 'https://examweb.ggsipu.ac.in'
 const IPU_LOGIN_URL = `${IPU_BASE}/web/login.jsp`
 const IPU_LOGIN_ACTION = `${IPU_BASE}/web/loginaction.do`
 const IPU_HOME_URL = `${IPU_BASE}/web/student/studenthome.jsp`
+const IPU_PROFILE_URL = `${IPU_BASE}/web/student/studentprofile.jsp`
+const IPU_CHANGE_PW_URL = `${IPU_BASE}/web/student/changepassword.jsp`
 
 const HEADERS = {
   'User-Agent':
@@ -82,6 +84,51 @@ function getSession(userId: string): IpuSession {
 }
 
 /* ── Helpers ──────────────────────────────────────────────────────────── */
+
+/* ── Scrape IPU student profile page for extended info ─────────────── */
+async function scrapeIpuProfile(client: AxiosInstance): Promise<Record<string, string>> {
+  const info: Record<string, string> = {}
+  try {
+    const resp = await client.get(IPU_PROFILE_URL, { timeout: 10_000 })
+    const html = resp.data as string
+    if (html.toLowerCase().includes('j_username') || html.toLowerCase().includes('login.jsp')) {
+      return info // session expired
+    }
+    const $ = cheerio.load(html)
+    const labelMap: Record<string, string> = {
+      'enrollment': 'roll_no', 'enrollment no': 'roll_no', 'enrollment no.': 'roll_no',
+      'batch': 'batch', 'admission year': 'admission_year',
+      'name': 'name',
+      "father's name": 'father', 'father': 'father', "father name": 'father',
+      "mother's name": 'mother', 'mother': 'mother', "mother name": 'mother',
+      'gender': 'gender',
+      'email': 'email', 'email id': 'email',
+      'contact': 'phone', 'contact no': 'phone', 'contact no.': 'phone', 'mobile': 'phone', 'phone': 'phone',
+      'institute': 'institution', 'institution': 'institution',
+      'program': 'programme', 'programme': 'programme',
+    }
+    const extract = (label: string, value: string) => {
+      const key = labelMap[label.toLowerCase().replace(/[:.]/g, '').trim()]
+      if (key && value && value !== '---' && value !== '-') info[key] = value.trim()
+    }
+    // Table rows
+    $('table tr').each((_i, row) => {
+      const cells = $(row).find('td')
+      if (cells.length >= 2) extract($(cells[0]).text(), $(cells[1]).text())
+    })
+    // Definition lists
+    $('dl dt').each((_i, el) => extract($(el).text(), $(el).next('dd').text()))
+    // Label/value class patterns
+    $('[class*="field-label" i], label').each((_i, el) => {
+      const val = $(el).next().text() || $(el).siblings('[class*="value" i]').first().text()
+      if (val) extract($(el).text(), val)
+    })
+    console.log('[IPU Profile] Fields scraped:', Object.keys(info))
+  } catch (e: any) {
+    console.error('[IPU Profile] Scrape failed:', e.message)
+  }
+  return info
+}
 
 /** Detect if the account is locked/blocked */
 function detectAccountLockout(html: string): string | null {
@@ -227,7 +274,11 @@ async function saveResultsToDB(req: AuthRequest, results: {
     profileUpdate.branch = info.programme
   }
   if (info.batch) profileUpdate.batch = info.batch
+  if (info.admission_year) profileUpdate.admission_year = info.admission_year
   if (info.name) profileUpdate.name = info.name
+  if (info.mother) profileUpdate.mother_name = info.mother
+  if (info.phone) profileUpdate.phone_number = info.phone
+  if (info.gender) profileUpdate.gender = info.gender
 
   if (Object.keys(profileUpdate).length) {
     await User.updateOne({ _id: userId }, { $set: profileUpdate })
@@ -388,8 +439,9 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
       return fail(res, 'Login failed — incorrect credentials or CAPTCHA. Please try again.', 'LOGIN_FAILED', 401)
     }
 
-    // Successful login — fetch results via direct JSON API
-    console.log('[IPU] Login successful, fetching JSON API data...')
+    // Successful login — scrape profile first, then fetch results
+    console.log('[IPU] Login successful, scraping profile + fetching JSON API data...')
+    const profileInfo = await scrapeIpuProfile(sess.client)
     const cookieStr = sess.getCookieString()
     const rawSemesters = await fetchAllIpuResults(cookieStr)
 
@@ -407,7 +459,18 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
 
     const results = {
       enrollment_number: enrollment,
-      student_info: uniqueSemesters[0].student_info as Record<string, unknown>,
+      student_info: {
+        ...uniqueSemesters[0].student_info as Record<string, unknown>,
+        // Enrich with portal profile data
+        ...(profileInfo.name ? { name: profileInfo.name } : {}),
+        ...(profileInfo.father ? { father: profileInfo.father } : {}),
+        ...(profileInfo.mother ? { mother: profileInfo.mother } : {}),
+        ...(profileInfo.email ? { email: profileInfo.email } : {}),
+        ...(profileInfo.phone ? { phone: profileInfo.phone } : {}),
+        ...(profileInfo.gender ? { gender: profileInfo.gender } : {}),
+        ...(profileInfo.batch ? { batch: profileInfo.batch } : {}),
+        ...(profileInfo.admission_year ? { admission_year: profileInfo.admission_year } : {}),
+      },
       semesters: uniqueSemesters.map(sem => ({
         semester: String(sem.semester),
         semester_num: sem.semester,
@@ -415,27 +478,28 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
         subjects: sem.subjects,
         sgpa: String(sem.sgpa),
         total_credits: sem.total_credits,
-        total_marks: String(sem.subjects.reduce((a, s) => a + (s.total_marks || 0), 0)),
-        max_marks: String(sem.subjects.reduce((a, s) => a + (s.max_marks || 100), 0)),
+        total_marks: String(sem.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.total_marks ?? 0), 0)),
+        max_marks: String(sem.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.max_marks ?? 100), 0)),
       })),
     }
 
-    // Compute grade distribution and overall percentage for the response
+    // Compute grade distribution and overall percentage — exclude pending subjects
     const gradeDistribution: Record<string, number> = {}
     const allSubjsFetch = results.semesters.flatMap(s => s.subjects)
-    for (const sub of allSubjsFetch) {
+    const completedSubjs = allSubjsFetch.filter(s => !s.is_pending && s.grade !== '-')
+    for (const sub of completedSubjs) {
       const g = sub.grade || 'F'
       gradeDistribution[g] = (gradeDistribution[g] || 0) + 1
     }
-    const totalMarksFetch = allSubjsFetch.reduce((a, s) => a + (s.total_marks || 0), 0)
-    const totalMaxFetch = allSubjsFetch.reduce((a, s) => a + (s.max_marks || 100), 0)
+    const totalMarksFetch = completedSubjs.reduce((a, s) => a + (s.total_marks ?? 0), 0)
+    const totalMaxFetch = completedSubjs.reduce((a, s) => a + (s.max_marks ?? 100), 0)
     const overallPercentage = totalMaxFetch > 0
       ? parseFloat(((totalMarksFetch / totalMaxFetch) * 100).toFixed(1))
       : 0
 
     await saveResultsToDB(req, results)
 
-    ok(res, { ...results, gradeDistribution, overallPercentage, totalSubjects: allSubjsFetch.length })
+    ok(res, { ...results, gradeDistribution, overallPercentage, totalSubjects: completedSubjs.length })
   } catch (e: any) {
     console.error('[IPU fetch-results]', e.message)
     if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'ETIMEDOUT') {
@@ -460,6 +524,20 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
     // Build response matching the scraped format
     const studentInfo = results[0]?.student_info || {}
     const enrollmentNumber = results[0]?.enrollment_number || ''
+    const userId = (req as AuthRequest).userId!
+
+    // Enrich student_info with User document
+    const userDoc = await User.findById(userId).lean()
+    const enrichedStudentInfo = {
+      ...studentInfo,
+      ...(userDoc?.mother_name ? { mother: userDoc.mother_name } : {}),
+      ...(userDoc?.phone_number ? { phone: userDoc.phone_number } : {}),
+      ...(userDoc?.email ? { email: userDoc.email } : {}),
+      ...(userDoc?.gender ? { gender: userDoc.gender } : {}),
+      ...(userDoc?.batch ? { batch: userDoc.batch } : {}),
+      ...(userDoc?.course ? { programme: userDoc.course } : {}),
+      ...(userDoc?.admission_year ? { admission_year: userDoc.admission_year } : {}),
+    }
 
     // Calculate CGPA
     const validSgpas = results.filter(r => r.sgpa > 0)
@@ -477,27 +555,28 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
       max_marks: r.max_marks || null,
     }))
 
-    // Compute grade distribution and overall percentage from saved subjects
+    // Compute grade distribution and overall percentage — exclude pending subjects
     const gradeDistSaved: Record<string, number> = {}
     const allSubjsSaved = results.flatMap(r => r.subjects || [])
-    for (const sub of allSubjsSaved) {
+    const completedSaved = allSubjsSaved.filter(s => !(s as any).is_pending && (s as any).grade !== '-')
+    for (const sub of completedSaved) {
       const g = (sub as any).grade || 'F'
       gradeDistSaved[g] = (gradeDistSaved[g] || 0) + 1
     }
-    const totalMarksSaved = allSubjsSaved.reduce((a, s) => a + ((s as any).total_marks || 0), 0)
-    const totalMaxSaved = allSubjsSaved.reduce((a, s) => a + ((s as any).max_marks || 100), 0)
+    const totalMarksSaved = completedSaved.reduce((a, s) => a + ((s as any).total_marks ?? 0), 0)
+    const totalMaxSaved = completedSaved.reduce((a, s) => a + ((s as any).max_marks ?? 100), 0)
     const overallPctSaved = totalMaxSaved > 0
       ? parseFloat(((totalMarksSaved / totalMaxSaved) * 100).toFixed(1))
       : 0
 
     ok(res, {
       enrollment_number: enrollmentNumber,
-      student_info: studentInfo,
+      student_info: enrichedStudentInfo,
       semesters,
       cgpa,
       gradeDistribution: gradeDistSaved,
       overallPercentage: overallPctSaved,
-      totalSubjects: allSubjsSaved.length,
+      totalSubjects: completedSaved.length,
       saved: true,
       last_updated: results.reduce((latest, r) => {
         const d = new Date(r.updated_at)
@@ -507,6 +586,86 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('[IPU saved-results]', err)
     fail(res, 'Failed to fetch saved results', 'FETCH_FAILED', 500)
+  }
+})
+
+/* ── POST /api/ipu/change-password ─────────────────────────────────────── */
+router.post('/change-password', async (req: AuthRequest, res) => {
+  const { current_password = '', new_password = '', confirm_password = '' } = req.body || {}
+  if (!current_password || !new_password || !confirm_password) {
+    return fail(res, 'All three password fields are required.', 'MISSING_FIELDS', 400)
+  }
+  if (new_password !== confirm_password) {
+    return fail(res, 'New password and confirm password do not match.', 'VALIDATION_ERROR', 400)
+  }
+  if (new_password.length < 6) {
+    return fail(res, 'New password must be at least 6 characters.', 'VALIDATION_ERROR', 400)
+  }
+
+  const sess = getSession(req.userId!)
+  try {
+    // Try to load the change-password page using the existing session
+    const pageResp = await sess.client.get(IPU_CHANGE_PW_URL, { timeout: 10_000 })
+    const html = pageResp.data as string
+
+    // If redirected to login, session has expired
+    if (html.toLowerCase().includes('j_username') || html.toLowerCase().includes('captchaservlet')) {
+      return fail(res, 'IPU session expired. Please sync your results first to establish an active session, then retry.', 'SESSION_EXPIRED', 401)
+    }
+
+    const $cp = cheerio.load(html)
+    const form = $cp('form').first()
+    if (!form.length) {
+      return fail(res, 'Could not find the change-password form on the IPU portal.', 'FORM_NOT_FOUND', 422)
+    }
+
+    // Collect hidden fields
+    const payload: Record<string, string> = {}
+    form.find('input[type="hidden"]').each((_i, el) => {
+      const name = $cp(el).attr('name')
+      if (name) payload[name] = $cp(el).attr('value') || ''
+    })
+
+    // Detect input field names for old / new / confirm passwords
+    const findField = (...candidates: string[]): string | null => {
+      for (const c of candidates) {
+        const el = form.find(`input[name*="${c}" i]`).first()
+        if (el.length) return el.attr('name') || null
+      }
+      return null
+    }
+    payload[findField('old', 'current', 'existing', 'prev') || 'oldPassword'] = current_password
+    payload[findField('new_pass', 'newpass', 'newpwd', 'new') || 'newPassword'] = new_password
+    payload[findField('confirm', 'retype', 'verify', 'cnf') || 'confirmPassword'] = confirm_password
+
+    const formAction = form.attr('action')?.trim() || ''
+    const actionUrl = formAction ? resolveIpuUrl(formAction) : `${IPU_BASE}/web/student/changepassword.do`
+
+    const submitResp = await sess.client.post(actionUrl, new URLSearchParams(payload).toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      maxRedirects: 5,
+    })
+
+    const respText = submitResp.data as string
+    const respLow = respText.toLowerCase()
+
+    if (respLow.includes('j_username') || respLow.includes('captchaservlet')) {
+      return fail(res, 'IPU session expired during submission. Please sync results first.', 'SESSION_EXPIRED', 401)
+    }
+    if (respLow.includes('incorrect') || respLow.includes('wrong') || respLow.includes('mismatch') || respLow.includes('invalid') || respLow.includes('does not match')) {
+      return fail(res, 'Current password is incorrect.', 'WRONG_PASSWORD', 401)
+    }
+    if (respLow.includes('success') || respLow.includes('changed') || respLow.includes('updated') || respLow.includes('home')) {
+      return ok(res, { message: 'Password changed successfully on the IPU portal.' })
+    }
+    // Ambiguous — likely worked if no error message
+    return ok(res, { message: 'Password change submitted. Please verify by logging in with your new password.' })
+  } catch (e: any) {
+    console.error('[IPU change-password]', e.message)
+    if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'ETIMEDOUT') {
+      return fail(res, `Network error: ${e.message}`, 'NETWORK_ERROR', 502)
+    }
+    fail(res, `Failed to change password: ${e.message}`, 'INTERNAL_ERROR', 500)
   }
 })
 

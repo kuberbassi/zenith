@@ -60,6 +60,7 @@ export const attendanceService = {
   autoFetchIPUResults: (c) => AttendanceService.autoFetchIPUResults(c),
   fetchIPUResults: (p) => AttendanceService.fetchIPUResults(p),
   getIPUCaptcha: () => AttendanceService.getIPUCaptcha(),
+  changeIPUPassword: (p) => AttendanceService.changeIPUPassword(p),
   saveSemesterResult: (r) => AcademicService.saveResults(r),
   deleteSemesterResult: (s) => AcademicService.deleteResults(s),
   getManualCourses: () => AcademicService.getManualCourses(),
