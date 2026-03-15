@@ -58,12 +58,30 @@ router.post('/google', async (req, res) => {
 
     const { sub: google_id, email, name, picture } = payload
 
-    // Upsert user
-    const user = await prisma.user.upsert({
-      where: { google_id },
-      create: { google_id, email: email!, name: name!, picture },
-      update: { email: email!, name: name!, picture },
-    })
+    // Find user by email first (primary identifier)
+    let user = await prisma.user.findUnique({ where: { email: email! } });
+
+    if (user) {
+      // Update existing user with latest Google info
+      user = await prisma.user.update({
+        where: { email: email! },
+        data: { google_id, name: name!, picture },
+      });
+    } else {
+      // Fallback check by Google ID
+      const existingByGoogle = await prisma.user.findUnique({ where: { google_id } });
+      if (existingByGoogle) {
+        user = await prisma.user.update({
+          where: { google_id },
+          data: { email: email!, name: name!, picture },
+        });
+      } else {
+        // Safe to create new user
+        user = await prisma.user.create({
+          data: { google_id, email: email!, name: name!, picture },
+        });
+      }
+    }
 
     // Sign JWT
     const token = jwt.sign({ sub: user.id }, ENV.JWT_SECRET, {
