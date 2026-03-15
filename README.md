@@ -21,7 +21,7 @@ AcadHub is a full-stack student productivity app with a React web client and a N
 
 ## Performance & Optimization
 - **Near-Instant API**: Average response time ~150ms via composite indexing and query optimization.
-- **Transactional Safety**: All critical writes (courses, attendance, imports) are wrapped in Prisma transactions.
+- **Data Integrity**: Critical bulk writes (courses, attendance, imports) safely mapped and processed sequentially to support Neon HTTP Serverless connections.
 - **Caching**: 30s-120s caching layers for dashboard, reports, and analytics.
 - **Search Optimization**: Partial indexing on course titles and subject codes.
 - **Bulk Operations**: Optimized imports/exports with `createMany`.

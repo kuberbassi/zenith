@@ -107,11 +107,11 @@ router.get('/', async (req: AuthRequest, res) => {
 
     let doc = requestedDoc
     if (!doc && subjects.length > 0) {
-      const subjectIds = new Set(subjects.map((s) => s.id))
+      const subjectIds = new Set(subjects.map((s: any) => s.id))
       let best: (typeof allTimetables)[number] | null = null
       let bestScore = 0
       for (const candidate of allTimetables) {
-        const score = scoreScheduleBySubjects(candidate.schedule, subjectIds)
+        const score = scoreScheduleBySubjects(candidate.schedule, subjectIds as Set<string>)
         if (score > bestScore) {
           bestScore = score
           best = candidate
@@ -125,10 +125,10 @@ router.get('/', async (req: AuthRequest, res) => {
       return
     }
 
-    const byId = new Map(subjects.map((s) => [s.id, s]))
-    const byName = new Map(subjects.map((s) => [normalizeKey(s.name), s]))
-    const byCode = new Map(subjects.map((s) => [normalizeKey(s.code), s]))
-    const byAcronym = new Map(subjects.map((s) => [acronymFromName(String(s.name ?? '')), s]))
+    const byId = new Map<string, any>(subjects.map((s: any) => [s.id, s]))
+    const byName = new Map<string, any>(subjects.map((s: any) => [normalizeKey(s.name), s]))
+    const byCode = new Map<string, any>(subjects.map((s: any) => [normalizeKey(s.code), s]))
+    const byAcronym = new Map<string, any>(subjects.map((s: any) => [acronymFromName(String(s.name ?? '')), s]))
     const legacyNameBySubjectRef = new Map<string, string>()
 
     // Recover stale timetable subject IDs (old Mongo ObjectIds) using attendance logs subject_name.
@@ -146,7 +146,7 @@ router.get('/', async (req: AuthRequest, res) => {
       const resolved = byName.get(nameKey)
         || byCode.get(nameKey)
         || byAcronym.get(nameKey)
-        || subjects.find((s) => normalizeKey(s.name).includes(nameKey) || nameKey.includes(normalizeKey(s.name)))
+        || subjects.find((s: any) => normalizeKey(s.name).includes(nameKey) || nameKey.includes(normalizeKey(s.name)))
 
       if (resolved) {
         legacyResolvedById.set(legacyId, {

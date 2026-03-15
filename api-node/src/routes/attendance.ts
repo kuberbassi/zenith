@@ -71,12 +71,12 @@ function scoreScheduleBySubjects(schedule: unknown, subjectIds: Set<string>): nu
   return score
 }
 
-async function recomputeSubjectStats(subjectId: string, userId: string, tx: any = prisma): Promise<void> {
+async function recomputeSubjectStats(subjectId: string, userId: string): Promise<void> {
   const [total, attended] = await Promise.all([
-    tx.attendanceLog.count({ where: { subject_id: subjectId, user_id: userId, status: { in: COUNTED_STATUSES as any[] } } }),
-    tx.attendanceLog.count({ where: { subject_id: subjectId, user_id: userId, status: { in: ATTENDED_STATUSES as any[] } } }),
+    prisma.attendanceLog.count({ where: { subject_id: subjectId, user_id: userId, status: { in: COUNTED_STATUSES as any[] } } }),
+    prisma.attendanceLog.count({ where: { subject_id: subjectId, user_id: userId, status: { in: ATTENDED_STATUSES as any[] } } }),
   ])
-  await tx.subject.update({ where: { id: subjectId }, data: { attended, total } })
+  await prisma.subject.update({ where: { id: subjectId }, data: { attended, total } })
 }
 
 // ─── schemas ──────────────────────────────────────────────────────────────────
@@ -136,8 +136,7 @@ router.post('/mark', async (req: AuthRequest, res) => {
       return
     }
 
-    const { log, substituteLog } = await prisma.$transaction(async (tx) => {
-      const log = await tx.attendanceLog.create({
+      const log = await prisma.attendanceLog.create({
         data: {
           user_id: userId,
           subject_id: subjectId,
@@ -154,13 +153,13 @@ router.post('/mark', async (req: AuthRequest, res) => {
       let substituteLog = null
       if (body.status === 'substituted' && body.substituted_by) {
         const subById = body.substituted_by
-        const subSubject = await tx.subject.findFirst({ where: { id: subById, user_id: userId } })
+        const subSubject = await prisma.subject.findFirst({ where: { id: subById, user_id: userId } })
         if (subSubject) {
-          const existingSubLog = await tx.attendanceLog.findFirst({
+          const existingSubLog = await prisma.attendanceLog.findFirst({
             where: { user_id: userId, subject_id: subById, date: markDate, type: 'substitution_class' },
           })
           if (!existingSubLog) {
-            substituteLog = await tx.attendanceLog.create({
+            substituteLog = await prisma.attendanceLog.create({
               data: {
                 user_id: userId,
                 subject_id: subById,
@@ -175,13 +174,11 @@ router.post('/mark', async (req: AuthRequest, res) => {
           } else {
             substituteLog = existingSubLog
           }
-          await recomputeSubjectStats(subById, userId, tx)
+          await recomputeSubjectStats(subById, userId)
         }
       }
 
-      await recomputeSubjectStats(subjectId, userId, tx)
-      return { log, substituteLog }
-    })
+      await recomputeSubjectStats(subjectId, userId)
 
     const updatedSubject = await prisma.subject.findUnique({ where: { id: subjectId } })
     sysLog(req, userId, 'Attendance Marked', `Marked ${subject.name} as ${body.status} on ${markDate}`).catch(() => { })
@@ -230,11 +227,11 @@ router.get('/logs', async (req: AuthRequest, res) => {
     ])
 
     // Batch-fetch substituted subjects
-    const subIds = [...new Set(logs.filter(l => l.substituted_by).map(l => l.substituted_by!))]
-    const subSubjects = subIds.length ? await prisma.subject.findMany({ where: { id: { in: subIds } } }) : []
-    const subSubjectMap = new Map(subSubjects.map(s => [s.id, s]))
+    const subIds = [...new Set(logs.filter((l: any) => l.substituted_by).map((l: any) => l.substituted_by!))]
+    const subSubjects = subIds.length ? await prisma.subject.findMany({ where: { id: { in: subIds as string[] } } }) : []
+    const subSubjectMap = new Map(subSubjects.map((s: any) => [s.id, s]))
 
-    const enriched = logs.map(l => ({
+    const enriched = logs.map((l: any) => ({
       ...l,
       _id: l.id,
       // Backfill subject_name from join if the stored name is empty (old migrated data)
@@ -277,11 +274,11 @@ router.get('/classes-for-date', async (req: AuthRequest, res) => {
 
     let timetableDoc = timetableDocExact
     if (!timetableDoc && subjects.length > 0) {
-      const subjectIds = new Set(subjects.map((s) => s.id))
+      const subjectIds = new Set(subjects.map((s: any) => s.id))
       let best: (typeof timetableCandidates)[number] | null = null
       let bestScore = 0
       for (const candidate of timetableCandidates) {
-        const score = scoreScheduleBySubjects(candidate.schedule, subjectIds)
+        const score = scoreScheduleBySubjects(candidate.schedule, subjectIds as Set<string>)
         if (score > bestScore) {
           bestScore = score
           best = candidate
@@ -290,13 +287,13 @@ router.get('/classes-for-date', async (req: AuthRequest, res) => {
       if (best && bestScore > 0) timetableDoc = best
     }
 
-    const subjectMap = new Map(subjects.map(s => [s.id, s]))
+    const subjectMap = new Map(subjects.map((s: any) => [s.id, s]))
     type Slot = { subject_id?: string; subjectId?: string; time?: string; type?: string; [k: string]: unknown }
     const schedule = (timetableDoc?.schedule as Record<string, Slot[]> | undefined) ?? {}
 
     const daySlots: Slot[] = [...(schedule[dayName] ?? [])]
-      .filter((s) => getSlotType((s as Record<string, unknown>)) === 'class')
-      .filter((s) => Boolean((s.subject_id ?? s.subjectId ?? '').toString().trim()))
+      .filter((s: any) => getSlotType((s as Record<string, unknown>)) === 'class')
+      .filter((s: any) => Boolean((s.subject_id ?? s.subjectId ?? '').toString().trim()))
       .sort((a, b) => {
         const aStart = String((a as any).start_time ?? (a as any).startTime ?? (a as any).time ?? '')
         const bStart = String((b as any).start_time ?? (b as any).startTime ?? (b as any).time ?? '')
@@ -355,7 +352,7 @@ router.get('/classes-for-date', async (req: AuthRequest, res) => {
 
     const classes = daySlots.map((slot, idx) => {
       const sid = (slot.subject_id ?? slot.subjectId ?? '') as string
-      const subject = subjectMap.get(sid) ?? null
+      const subject = subjectMap.get(sid) as Record<string, unknown> | null
       const log = slotLogMap.get(idx) ?? null
       // Provide a subject_name_fallback for cases where the subject_id is stale/unresolvable
       const subjectNameFallback = subject?.name ?? (slot as any).label ?? (slot as any).name ?? ''
@@ -395,28 +392,27 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
     const wasSubstituted = log.status === 'substituted' && log.substituted_by
     let newSubstitutedBy: string | null | undefined = undefined
 
-    const updatedLog = await prisma.$transaction(async (tx) => {
       // Changing away from substituted → remove companion log
       if (wasSubstituted && body.status && body.status !== 'substituted') {
-        await tx.attendanceLog.deleteMany({
+        await prisma.attendanceLog.deleteMany({
           where: { user_id: userId, subject_id: log.substituted_by!, date: log.date, type: 'substitution_class' },
         })
-        await recomputeSubjectStats(log.substituted_by!, userId, tx)
+        await recomputeSubjectStats(log.substituted_by!, userId)
         newSubstitutedBy = null
       }
 
       // Switching to substituted with a new substituted_by
       if (body.status === 'substituted' && body.substituted_by) {
         const newSubById = body.substituted_by
-        const subSubject = await tx.subject.findFirst({ where: { id: newSubById, user_id: userId } })
+        const subSubject = await prisma.subject.findFirst({ where: { id: newSubById, user_id: userId } })
         if (subSubject) {
           if (wasSubstituted && log.substituted_by) {
-            await tx.attendanceLog.deleteMany({
+            await prisma.attendanceLog.deleteMany({
               where: { user_id: userId, subject_id: log.substituted_by, date: log.date, type: 'substitution_class' },
             })
-            await recomputeSubjectStats(log.substituted_by, userId, tx)
+            await recomputeSubjectStats(log.substituted_by, userId)
           }
-          await tx.attendanceLog.create({
+          await prisma.attendanceLog.create({
             data: {
               user_id: userId,
               subject_id: newSubById,
@@ -428,12 +424,12 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
               semester: log.semester,
             },
           })
-          await recomputeSubjectStats(newSubById, userId, tx)
+          await recomputeSubjectStats(newSubById, userId)
           newSubstitutedBy = newSubById
         }
       }
 
-      const updated = await tx.attendanceLog.update({
+      const updatedLog = await prisma.attendanceLog.update({
         where: { id: logId },
         data: {
           ...(body.status ? { status: body.status as any } : {}),
@@ -443,9 +439,7 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
           ...(newSubstitutedBy !== undefined ? { substituted_by: newSubstitutedBy } : {}),
         },
       })
-      await recomputeSubjectStats(log.subject_id, userId, tx)
-      return updated
-    })
+      await recomputeSubjectStats(log.subject_id, userId)
 
     const updatedSubject = await prisma.subject.findUnique({ where: { id: log.subject_id } })
 
@@ -471,17 +465,15 @@ router.delete('/logs/:logId', async (req: AuthRequest, res) => {
 
     const subjectId = log.subject_id
 
-    await prisma.$transaction(async (tx) => {
       if (log.status === 'substituted' && log.substituted_by) {
-        await tx.attendanceLog.deleteMany({
+        await prisma.attendanceLog.deleteMany({
           where: { user_id: userId, subject_id: log.substituted_by, date: log.date, type: 'substitution_class' },
         })
-        await recomputeSubjectStats(log.substituted_by, userId, tx)
+        await recomputeSubjectStats(log.substituted_by, userId)
       }
 
-      await tx.attendanceLog.delete({ where: { id: logId } })
-      await recomputeSubjectStats(subjectId, userId, tx)
-    })
+      await prisma.attendanceLog.delete({ where: { id: logId } })
+      await recomputeSubjectStats(subjectId, userId)
 
     const updatedSubject = await prisma.subject.findUnique({ where: { id: subjectId } })
 
@@ -545,14 +537,14 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
       byDate[log.date].push(log)
     }
     for (const [d, dlogs] of Object.entries(byDate)) {
-      const total = dlogs.filter(l => COUNTED_STATUSES.includes(l.status as any)).length
-      const attended = dlogs.filter(l => ATTENDED_STATUSES.includes(l.status as any)).length
+      const total = dlogs.filter((l: any) => COUNTED_STATUSES.includes(l.status as any)).length
+      const attended = dlogs.filter((l: any) => ATTENDED_STATUSES.includes(l.status as any)).length
       calendar[d] = {
         logs: dlogs,
         total,
         attended,
         percentage: total > 0 ? Math.round((attended / total) * 1000) / 10 : null,
-        statuses: [...new Set(dlogs.map(l => l.status))],
+        statuses: [...new Set(dlogs.map((l: any) => l.status))],
       }
     }
 
@@ -588,14 +580,14 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
       }),
     ])
 
-    const totalAttended = subjects.reduce((s, x) => s + x.attended, 0)
-    const totalClasses = subjects.reduce((s, x) => s + x.total, 0)
+    const totalAttended = subjects.reduce((s: number, x: any) => s + x.attended, 0)
+    const totalClasses = subjects.reduce((s: number, x: any) => s + x.total, 0)
     const overallAttendance = totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 1000) / 10 : 0
 
     ok(res, {
       overall_attendance: overallAttendance,
-      subjects: subjects.map(s => ({ ...s, _id: s.id })),
-      recent_logs: recentLogs.map(l => ({ ...l, _id: l.id })),
+      subjects: subjects.map((s: any) => ({ ...s, _id: s.id })),
+      recent_logs: recentLogs.map((l: any) => ({ ...l, _id: l.id })),
       total_subjects: subjects.length,
       current_semester: req.user?.current_semester ?? 1,
       user: { name: req.user?.name, email: req.user?.email, picture: req.user?.picture },

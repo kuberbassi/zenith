@@ -30,7 +30,6 @@ import skillsRoutes from './skills.js'
 import dataRoutes from './data.js'
 import ipuRoutes from './ipu.js'
 import scraperRoutes from './scraper.js'
-import resumeRoutes from './resume.js'
 import aiRoutes from './ai.js'
 
 const v1Router = Router()
@@ -46,7 +45,6 @@ v1Router.use('/skills', skillsRoutes)
 v1Router.use('/data', dataRoutes)
 v1Router.use('/ipu', ipuRoutes)
 v1Router.use('/scraper', scraperRoutes)
-v1Router.use('/resume', resumeRoutes)
 v1Router.use('/ai', aiRoutes)
 
 export default v1Router

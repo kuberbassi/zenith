@@ -84,7 +84,7 @@ router.get('/subjects', async (req: AuthRequest, res) => {
             },
             orderBy: { name: 'asc' },
         })
-        ok(res, subjects.map(s => ({ ...s, _id: s.id })))
+        ok(res, subjects.map((s: any) => ({ ...s, _id: s.id })))
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
         console.error('[academic/subjects GET]', err)
@@ -103,7 +103,7 @@ router.get('/full_subjects_data', async (req: AuthRequest, res) => {
                 semester,
             },
         })
-        const enriched = subjects.map(sub => {
+        const enriched = subjects.map((sub: any) => {
             const attended = sub.attended ?? 0
             const total = sub.total ?? 0
             const pct = total > 0 ? Math.round((attended / total) * 1000) / 10 : 0
@@ -263,9 +263,9 @@ router.get('/results', async (req: AuthRequest, res) => {
             orderBy: { semester: 'asc' },
         })
         if (results.length) {
-            const semesters = results.map(r => r.subjects as Array<Record<string, unknown>>)
+            const semesters = results.map((r: any) => r.subjects as Array<Record<string, unknown>>)
             const cgpaCalc = GradeCalculator.calculateCGPA(semesters)
-            ok(res, results.map(r => ({ ...r, _id: r.id, cgpa: cgpaCalc.cgpa })))
+            ok(res, results.map((r: any) => ({ ...r, _id: r.id, cgpa: cgpaCalc.cgpa })))
         } else {
             ok(res, [])
         }
@@ -288,7 +288,7 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
         }
 
         const userDoc = await prisma.user.findUnique({ where: { id: userId } })
-        const rawStudentInfo = results.reduce((acc, row) => {
+        const rawStudentInfo = results.reduce((acc: any, row: any) => {
             const current = (row.student_info ?? {}) as Record<string, unknown>
             return mergePreferredRecord(current, acc)
         }, {} as Record<string, unknown>)
@@ -306,7 +306,7 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
             ...rawStudentInfo,
         }
 
-        const mappedSemesters = results.map(r => ({
+        const mappedSemesters = results.map((r: any) => ({
             semester: String(r.semester),
             semester_num: r.semester,
             semester_label: r.semester_label || `Semester ${r.semester}`,
@@ -316,13 +316,13 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
             max_marks: r.max_marks || null,
         }))
 
-        const semSubjects = results.map(r => r.subjects as Array<Record<string, unknown>>)
+        const semSubjects = results.map((r: any) => r.subjects as Array<Record<string, unknown>>)
         const cgpaCalc = GradeCalculator.calculateCGPA(semSubjects)
 
         const gradeDist: Record<string, number> = {}
         let totalMarks = 0
         let totalMaxMarks = 0
-        results.forEach(r => {
+        results.forEach((r: any) => {
             if (Array.isArray(r.subjects)) {
                 (r.subjects as any[]).forEach((s: any) => {
                     if (s.is_pending || s.grade === '-' || s.total_marks === null) return
@@ -337,9 +337,9 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
         const academicStrength = totalMaxMarks > 0 ? Math.round((totalMarks / totalMaxMarks) * 100) : 0
 
         ok(res, {
-            enrollment_number: results.find(r => r.enrollment_number)?.enrollment_number || userDoc?.enrollment_number || '',
+            enrollment_number: results.find((r: any) => r.enrollment_number)?.enrollment_number || userDoc?.enrollment_number || '',
             student_info: enrichedStudentInfo,
-            last_updated: results.reduce((latest: Date, r) => {
+            last_updated: results.reduce((latest: Date, r: any) => {
                 const d = new Date(r.updated_at)
                 return d > latest ? d : latest
             }, new Date(0)).toISOString(),
@@ -527,7 +527,7 @@ router.get('/courses/manual', async (req: AuthRequest, res) => {
     try {
         const userId = req.userId!
         const courses = await prisma.manualCourse.findMany({ where: { user_id: userId } })
-        ok(res, courses.map(c => formatCourseForClient(c)))
+        ok(res, courses.map((c: any) => formatCourseForClient(c)))
     } catch (err) {
         console.error('[academic/courses/manual GET]', err)
         fail(res, 'Failed to fetch courses', 'FETCH_FAILED', 500)
@@ -539,14 +539,14 @@ router.post('/courses/manual', async (req: AuthRequest, res) => {
         const userId = req.userId!
         const data = req.body
         
-        await prisma.$transaction(async (tx) => {
-            if (Array.isArray(data)) {
-                const items = data.map(c => normalizeCourseForSave(ManualCourseSchema.parse(c)))
-                await tx.manualCourse.deleteMany({ where: { user_id: userId } })
-                
-                // createMany is faster, but we wrap in transaction to prevent partial loss
-                await tx.manualCourse.createMany({
-                    data: items.map(i => ({
+        if (Array.isArray(data)) {
+            const items = data.map((c: any) => normalizeCourseForSave(ManualCourseSchema.parse(c)))
+            await prisma.manualCourse.deleteMany({ where: { user_id: userId } })
+            
+            // Loop for creates as createMany transactions are not supported by Neon HTTP
+            for (const i of items) {
+                await prisma.manualCourse.create({
+                    data: {
                         user_id: userId,
                         name: i.name,
                         platform: i.platform,
@@ -555,24 +555,24 @@ router.post('/courses/manual', async (req: AuthRequest, res) => {
                         url: i.url,
                         notes: i.notes,
                         extra: Object.keys(i.extra).length ? i.extra as any : undefined,
-                    })),
-                })
-            } else {
-                const item = normalizeCourseForSave(ManualCourseSchema.parse(data))
-                await tx.manualCourse.create({
-                    data: { 
-                        user_id: userId, 
-                        name: item.name, 
-                        platform: item.platform, 
-                        status: item.status, 
-                        progress: item.progress, 
-                        url: item.url, 
-                        notes: item.notes, 
-                        extra: Object.keys(item.extra).length ? item.extra as any : undefined 
-                    },
+                    }
                 })
             }
-        })
+        } else {
+            const item = normalizeCourseForSave(ManualCourseSchema.parse(data))
+            await prisma.manualCourse.create({
+                data: { 
+                    user_id: userId, 
+                    name: item.name, 
+                    platform: item.platform, 
+                    status: item.status, 
+                    progress: item.progress, 
+                    url: item.url, 
+                    notes: item.notes, 
+                    extra: Object.keys(item.extra).length ? item.extra as any : undefined 
+                },
+            })
+        }
 
         ok(res, { message: 'Courses saved' })
     } catch (err) {

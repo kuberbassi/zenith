@@ -9,7 +9,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src/",
-    "smoke:api": "node scripts/smoke-backend.mjs"
+    "smoke:api": "node scripts/smoke-backend.mjs",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

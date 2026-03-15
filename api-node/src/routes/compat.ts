@@ -136,8 +136,8 @@ compatHandlers.get('/all_semesters_overview', requireAuth, async (req: AuthReque
       const subjects = await prisma.subject.findMany({ where: { user_id: userId, semester: sem } })
       if (!subjects.length) continue
 
-      const totalAttended = subjects.reduce((sum, sub) => sum + (sub.attended ?? 0), 0)
-      const totalClasses = subjects.reduce((sum, sub) => sum + (sub.total ?? 0), 0)
+      const totalAttended = subjects.reduce((sum: number, sub: any) => sum + (sub.attended ?? 0), 0)
+      const totalClasses = subjects.reduce((sum: number, sub: any) => sum + (sub.total ?? 0), 0)
 
       semesters.push({
         semester: sem,

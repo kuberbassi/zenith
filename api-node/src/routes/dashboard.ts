@@ -27,7 +27,7 @@ router.get('/data', async (req: AuthRequest, res) => {
     ])
     const summary = AttendanceCalculator.getAttendanceSummary(subjects, req.user?.attendance_threshold, req.user?.warning_threshold)
 
-    const enriched = subjects.map((sub) => {
+    const enriched = subjects.map((sub: any) => {
       const pct = AttendanceCalculator.calculatePercentage(sub.attended, sub.total)
       const guard = AttendanceCalculator.calculateBunkGuard(sub.attended, sub.total, sub.target ?? 75)
       return {
@@ -78,7 +78,7 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
     let atRiskCount = 0
     let safeBunksRemaining = 0
 
-    const processedSubjects = subjects.map((sub) => {
+    const processedSubjects = subjects.map((sub: any) => {
       const attended = sub.attended ?? 0
       const total = sub.total ?? 0
       const target = sub.target ?? userTarget
@@ -96,10 +96,10 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
     const overallPct = totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 1000) / 10 : 0
 
     const bestSubject = processedSubjects.length
-      ? processedSubjects.reduce((a, b) => (a.percentage > b.percentage ? a : b))
+      ? processedSubjects.reduce((a: any, b: any) => (a.percentage > b.percentage ? a : b))
       : null
     const worstSubject = processedSubjects.length
-      ? processedSubjects.reduce((a, b) => {
+      ? processedSubjects.reduce((a: any, b: any) => {
         if (a.total === 0) return b
         if (b.total === 0) return a
         return a.percentage < b.percentage ? a : b
@@ -171,11 +171,11 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
       orderBy: { semester: 'asc' },
       select: { semester: true, sgpa: true, subjects: true },
     })
-    const resultSubjects = resultRows.flatMap(row => Array.isArray(row.subjects) ? row.subjects as Array<Record<string, unknown>> : [])
-    const cgpaCalc = resultRows.length ? GradeCalculator.calculateCGPA(resultRows.map(row => row.subjects as Array<Record<string, unknown>>)) : { cgpa: 0 }
-    const completedResultSubjects = resultSubjects.filter(subject => !subject.is_pending && subject.grade !== '-')
+    const resultSubjects = resultRows.flatMap((row: any) => Array.isArray(row.subjects) ? row.subjects as Array<Record<string, unknown>> : [])
+    const cgpaCalc = resultRows.length ? GradeCalculator.calculateCGPA(resultRows.map((row: any) => row.subjects as Array<Record<string, unknown>>)) : { cgpa: 0 }
+    const completedResultSubjects = resultSubjects.filter((subject: any) => !subject.is_pending && subject.grade !== '-')
     const academicScore = completedResultSubjects.length
-      ? Math.round(completedResultSubjects.reduce((sum, subject) => sum + Number(subject.grade_point ?? 0), 0) / completedResultSubjects.length * 10)
+      ? Math.round(completedResultSubjects.reduce((sum: number, subject: any) => sum + Number(subject.grade_point ?? 0), 0) / completedResultSubjects.length * 10)
       : 0
 
     ok(res, {
@@ -218,7 +218,7 @@ router.get('/analytics/day-of-week', async (req: AuthRequest, res) => {
       where: { user_id: userId, semester },
       select: { id: true },
     })
-    const subjectIds = semSubjectIds.map((s) => s.id)
+    const subjectIds = semSubjectIds.map((s: any) => s.id)
 
     if (!subjectIds.length) { ok(res, { days: [] }); return }
 

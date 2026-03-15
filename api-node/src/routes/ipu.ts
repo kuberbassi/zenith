@@ -672,7 +672,7 @@ async function saveResultsToDB(req: AuthRequest, results: {
       student_info: true,
     },
   })
-  const existingStudentInfo = existingResults.reduce((acc, row) => {
+  const existingStudentInfo = existingResults.reduce((acc: any, row: any) => {
     const current = (row.student_info ?? {}) as ResultStudentInfo
     return mergePreferredRecord(current, acc)
   }, {} as ResultStudentInfo)
@@ -1049,7 +1049,7 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
     }
 
       // Build response matching the scraped format
-      const studentInfo = results.reduce((acc, row) => {
+      const studentInfo = results.reduce((acc: any, row: any) => {
         const current = (row.student_info ?? {}) as Record<string, unknown>
         return mergePreferredRecord(current, acc)
       }, {} as Record<string, unknown>)
@@ -1072,12 +1072,12 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
       }
 
     // Calculate CGPA
-    const validSgpas = results.filter(r => r.sgpa > 0)
+    const validSgpas = results.filter((r: any) => r.sgpa > 0)
     const cgpa = validSgpas.length
-      ? parseFloat((validSgpas.reduce((a, r) => a + r.sgpa, 0) / validSgpas.length).toFixed(2))
+      ? parseFloat((validSgpas.reduce((a: number, r: any) => a + r.sgpa, 0) / validSgpas.length).toFixed(2))
       : 0
 
-    const semesters = results.map(r => ({
+    const semesters = results.map((r: any) => ({
       semester: String(r.semester),
       semester_num: r.semester,
       semester_label: r.semester_label || `Semester ${r.semester}`,
@@ -1089,8 +1089,8 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
 
     // Compute grade distribution and overall percentage — exclude pending subjects
     const gradeDistSaved: Record<string, number> = {}
-    const allSubjsSaved = results.flatMap(r => ((r.subjects ?? []) as any[]))
-    const completedSaved = allSubjsSaved.filter(s => !s.is_pending && s.grade !== '-')
+    const allSubjsSaved = results.flatMap((r: any) => ((r.subjects ?? []) as any[]))
+    const completedSaved = allSubjsSaved.filter((s: any) => !s.is_pending && s.grade !== '-')
     for (const sub of completedSaved) {
       const g = sub.grade || 'F'
       gradeDistSaved[g] = (gradeDistSaved[g] || 0) + 1
@@ -1114,7 +1114,7 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
       overallPercentage: overallPctSaved,
       totalSubjects: completedSaved.length,
       saved: true,
-      last_updated: results.reduce((latest, r) => {
+      last_updated: results.reduce((latest: any, r: any) => {
         const d = new Date(r.updated_at)
         return d > latest ? d : latest
       }, new Date(0)).toISOString(),

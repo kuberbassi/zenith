@@ -74,11 +74,11 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
 
     let resolvedTimetable = timetable
     if (!resolvedTimetable && subjects.length > 0) {
-        const subjectIds = new Set(subjects.map((s) => s.id))
+        const subjectIds = new Set(subjects.map((s: any) => s.id))
         let best: (typeof allTimetables)[number] | null = null
         let bestScore = 0
         for (const candidate of allTimetables) {
-            const score = scoreScheduleBySubjects(candidate.schedule, subjectIds)
+            const score = scoreScheduleBySubjects(candidate.schedule, subjectIds as Set<string>)
             if (score > bestScore) {
                 bestScore = score
                 best = candidate
@@ -128,8 +128,8 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
 
         const cgpa = calcCGPA(resultRows).toFixed(2);
         
-        const allSubjects = resultRows.flatMap((row) => Array.isArray(row.subjects) ? row.subjects as Array<Record<string, unknown>> : [])
-        const completed = allSubjects.filter((subject) => !subject.is_pending && subject.grade !== '-' && subject.grade)
+        const allSubjects = resultRows.flatMap((row: any) => Array.isArray(row.subjects) ? row.subjects as Array<Record<string, unknown>> : [])
+        const completed = allSubjects.filter((subject: any) => !subject.is_pending && subject.grade !== '-' && subject.grade)
         
         const academicStrength = completed.length > 0 
             ? Math.round((completed.reduce((acc: number, s: any) => acc + (GRADE_POINTS[s.grade] ?? 0), 0) / (completed.length * 10)) * 100) 
@@ -249,7 +249,7 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         if (todaySlots?.length) {
             lines.push(`## Today's Schedule (${today})`)
             for (const slot of todaySlots) {
-                const subName = subjects.find((s) => s.id === String(slot.subject_id))?.name || String(slot.label || 'Unknown')
+                const subName = subjects.find((s: any) => s.id === String(slot.subject_id))?.name || String(slot.label || 'Unknown')
                 lines.push(`  ${String(slot.start_time || '')} - ${String(slot.end_time || '')}: ${subName} (${String(slot.type || 'Class')})${slot.classroom ? ` @ ${String(slot.classroom)}` : ''}`)
             }
             lines.push('')
@@ -267,7 +267,7 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
 
     if (skills.length) {
         lines.push('## Skill Inventory')
-        lines.push(`  ${skills.map((s) => `${s.name} (${s.level || 'Beginner'})`).join(', ')}`)
+        lines.push(`  ${skills.map((s: any) => `${s.name} (${s.level || 'Beginner'})`).join(', ')}`)
         lines.push('')
     }
 
