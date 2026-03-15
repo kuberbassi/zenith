@@ -5,7 +5,6 @@ import { z } from 'zod'
 import axios, { type AxiosInstance } from 'axios'
 import * as cheerio from 'cheerio'
 import { LRUCache } from 'lru-cache'
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
@@ -43,6 +42,7 @@ interface IpuSession {
   markLoginFailure: () => void
   markLoginSuccess: () => void
   canAttemptLogin: () => { ok: boolean; reason?: string }
+  authenticatedAt?: number
 }
 
 type ResultStudentInfo = Record<string, unknown>
@@ -60,54 +60,11 @@ type PersistableSemester = {
 
 const _sessions = new LRUCache<string, IpuSession>({ max: 100, ttl: 30 * 60 * 1000 })
 
-interface IpuBrowserSession {
-  browser: Browser
-  context: BrowserContext
-  page: Page
-  captchaIssuedAt: number
-  attemptsForCaptcha: number
-  failedLoginAttempts: number
-  authenticatedAt?: number
-}
-
-const _browserSessions = new LRUCache<string, IpuBrowserSession>({ max: 20, ttl: 10 * 60 * 1000 })
-
 function destroySession(userId: string) {
   _sessions.delete(userId)
-  const browserSession = _browserSessions.get(userId)
-  if (browserSession) {
-    void browserSession.context.close().catch(() => null)
-    void browserSession.browser.close().catch(() => null)
-    _browserSessions.delete(userId)
-  }
 }
 
-async function createBrowserSession(userId: string) {
-  destroySession(userId)
-  const browser = await chromium.launch({ headless: true })
-  const context = await browser.newContext({
-    userAgent: HEADERS['User-Agent'],
-    extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
-  })
-  const page = await context.newPage()
-  const session: IpuBrowserSession = {
-    browser,
-    context,
-    page,
-    captchaIssuedAt: 0,
-    attemptsForCaptcha: 0,
-    failedLoginAttempts: 0,
-    authenticatedAt: undefined,
-  }
-  _browserSessions.set(userId, session)
-  return session
-}
-
-function getBrowserSession(userId: string) {
-  return _browserSessions.get(userId)
-}
-
-function isBrowserSessionAuthenticated(session: IpuBrowserSession | undefined) {
+function isSessionAuthenticated(session: IpuSession | undefined) {
   if (!session?.authenticatedAt) return false
   return Date.now() - session.authenticatedAt < 10 * 60 * 1000
 }
@@ -178,7 +135,7 @@ function getSession(userId: string): IpuSession {
       return { ok: true }
     }
 
-    _sessions.set(userId, { client, getCookieString, markCaptchaIssued, markLoginAttempt, markLoginFailure, markLoginSuccess, canAttemptLogin })
+    _sessions.set(userId, { client, getCookieString, markCaptchaIssued, markLoginAttempt, markLoginFailure, markLoginSuccess, canAttemptLogin, authenticatedAt: undefined })
   }
   return _sessions.get(userId)!
 }
@@ -356,68 +313,7 @@ function extractPortalMessage($: cheerio.CheerioAPI): string | null {
   return null
 }
 
-function canAttemptBrowserLogin(session: IpuBrowserSession) {
-  if (!session.captchaIssuedAt || Date.now() - session.captchaIssuedAt > 5 * 60 * 1000) {
-    return { ok: false, reason: 'CAPTCHA expired. Refresh it before trying again.' }
-  }
-  if (session.attemptsForCaptcha >= 1) {
-    return { ok: false, reason: 'This CAPTCHA was already submitted once. Refresh it before retrying so the portal does not count repeated failures.' }
-  }
-  if (session.failedLoginAttempts >= 2) {
-    return { ok: false, reason: 'Portal login retries were blocked locally after multiple failures to protect your account. Wait a bit and fetch a fresh CAPTCHA before retrying.' }
-  }
-  return { ok: true }
-}
 
-async function fetchBrowserResults(page: Page) {
-  const semesters: PersistableSemester[] = []
-
-  for (let sem = 1; sem <= 8; sem++) {
-    const response = await page.goto(`${IPU_RESULTS_URL}?flag=2&euno=${sem}`, { waitUntil: 'domcontentloaded' })
-    if (!response) continue
-    const status = response.status()
-    const contentType = String(response.headers()['content-type'] || '').toLowerCase()
-    const body = await response.text()
-
-    if (status === 401 || status === 403) {
-      throw Object.assign(new Error('Session Expired. Please Login again.'), { code: 'SESSION_EXPIRED' })
-    }
-    try {
-      const parsed = parseIpuResultsPayload(
-        contentType.includes('application/json') ? JSON.parse(body) : body,
-        sem,
-        status,
-        contentType,
-      )
-
-      if (!parsed.subjects.length) continue
-
-      semesters.push({
-        semester: String(parsed.semester),
-        semester_num: parsed.semester,
-        semester_label: `Semester ${parsed.semester}`,
-        subjects: parsed.subjects,
-        sgpa: String(parsed.sgpa),
-        total_credits: parsed.total_credits,
-        total_marks: String(parsed.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.total_marks ?? 0), 0)),
-        max_marks: String(parsed.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.max_marks ?? 100), 0)),
-        student_info: normalizeStudentInfo((parsed as unknown as { student_info?: Record<string, unknown> }).student_info || {}),
-      })
-    } catch (err: any) {
-      if (err?.code === 'NO_RESULTS') {
-        console.log('[IPU browser-results] No results for semester', sem, {
-          status,
-          contentType,
-          preview: body.slice(0, 180),
-        })
-        continue
-      }
-      throw err
-    }
-  }
-
-  return semesters
-}
 
 function buildStudentInfoFromSemesters(semesters: PersistableSemester[]): Record<string, string> {
   return semesters.reduce((acc, semester) => {
@@ -764,15 +660,19 @@ async function saveResultsToDB(req: AuthRequest, results: {
 router.get('/captcha', async (req: AuthRequest, res) => {
   const userId = req.userId!
   try {
-    const session = await createBrowserSession(userId)
-    await session.page.goto(IPU_LOGIN_URL, { waitUntil: 'domcontentloaded' })
-    const html = await session.page.content()
+    destroySession(userId)
+    const session = getSession(userId)
+    const resp = await session.client.get(IPU_LOGIN_URL, { responseType: 'text' })
+    const html = resp.data
     const $ = cheerio.load(html)
-    const captcha = session.page.locator('#captchaImage')
-    if (!await captcha.count()) return fail(res, 'Could not locate CAPTCHA image on the IPU login page.', 'CAPTCHA_NOT_FOUND', 422)
-    const b64 = (await captcha.screenshot({ type: 'png' })).toString('base64')
-    session.captchaIssuedAt = Date.now()
-    session.attemptsForCaptcha = 0
+    
+    const captchaSrc = findCaptchaImg($)
+    if (!captchaSrc) return fail(res, 'Could not locate CAPTCHA image on the IPU login page.', 'CAPTCHA_NOT_FOUND', 422)
+    
+    const imgResp = await session.client.get(captchaSrc, { responseType: 'arraybuffer' })
+    const b64 = Buffer.from(imgResp.data, 'binary').toString('base64')
+    
+    session.markCaptchaIssued()
 
     ok(res, {
       captcha_image: `data:image/png;base64,${b64}`,
@@ -798,20 +698,19 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
   if (!enrollment || !pwd) return fail(res, 'Enrollment number and password are required.', 'MISSING_FIELDS', 400)
 
   try {
-    // 1. Fetch login page
-    const session = await createBrowserSession(req.userId!)
-    await session.page.goto(IPU_LOGIN_URL, { waitUntil: 'domcontentloaded' })
-    const html = await session.page.content()
+    const session = getSession(req.userId!)
+    const resp = await session.client.get(IPU_LOGIN_URL, { responseType: 'text' })
+    const html = resp.data
     const $ = cheerio.load(html)
-
+    
     // 2. Find CAPTCHA
-    const captcha = session.page.locator('#captchaImage')
-    if (!await captcha.count()) return fail(res, 'Could not locate CAPTCHA on login page.', 'CAPTCHA_NOT_FOUND', 422)
-    const b64 = (await captcha.screenshot({ type: 'png' })).toString('base64')
+    const captchaSrc = findCaptchaImg($)
+    if (!captchaSrc) return fail(res, 'Could not locate CAPTCHA on login page.', 'CAPTCHA_NOT_FOUND', 422)
+    const imgResp = await session.client.get(captchaSrc, { responseType: 'arraybuffer' })
+    const b64 = Buffer.from(imgResp.data, 'binary').toString('base64')
 
     // 4. Extract fields
-    session.captchaIssuedAt = Date.now()
-    session.attemptsForCaptcha = 0
+    session.markCaptchaIssued()
 
     // 5. No OCR in Node — always return captcha for manual entry
     ok(res, {
@@ -833,7 +732,7 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
 /* ── POST /api/ipu/fetch-results ──────────────────────────────────────── */
 router.post('/fetch-results', async (req: AuthRequest, res) => {
   const userId = req.userId!
-  const browserSession = getBrowserSession(userId)
+  const browserSession = getSession(userId)
   const { enrollment_number = '', password = '', captcha = '', hidden_fields = {}, field_names = {}, login_action = '' } = req.body || {}
   const enrollment = enrollment_number.trim()
   const pwd = password.trim()
@@ -845,28 +744,31 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
   if (!browserSession) {
     return fail(res, 'CAPTCHA session expired. Refresh it before trying again.', 'SESSION_EXPIRED', 401)
   }
-  const loginSafety = canAttemptBrowserLogin(browserSession)
+  const loginSafety = browserSession.canAttemptLogin()
   if (!loginSafety.ok) {
     return fail(res, loginSafety.reason || 'Portal login blocked for safety.', 'LOGIN_BLOCKED', 429)
   }
 
   try {
-    const page = browserSession.page
     const usernameField = field_names.username || 'username'
     const passwordField = field_names.password || 'passwd'
     const captchaField = field_names.captcha || 'captcha'
     const loginUrl = login_action || IPU_LOGIN_ACTION
-    browserSession.attemptsForCaptcha += 1
+    browserSession.markLoginAttempt()
     console.log('[IPU] Posting login to:', loginUrl)
 
-    await page.locator(`[name="${usernameField}"]`).fill(enrollment)
-    await page.locator(`[name="${passwordField}"]`).fill(pwd)
-    await page.locator(`[name="${captchaField}"]`).fill(cap)
-    const navigation = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null)
-    await page.locator('input[type="submit"], button[type="submit"]').first().click()
-    await navigation
+    const payload = new URLSearchParams()
+    for (const [k, v] of Object.entries(hidden_fields)) payload.append(k, String(v))
+    payload.append(usernameField, enrollment)
+    payload.append(passwordField, pwd)
+    payload.append(captchaField, cap)
+    payload.append('btn_login', 'Login')
 
-    const pageText = await page.content()
+    const loginResp = await browserSession.client.post(loginUrl, payload.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: IPU_LOGIN_URL }
+    })
+    
+    const pageText = String(loginResp.data)
     const pageLower = pageText.toLowerCase()
     const $page = cheerio.load(pageText)
 
@@ -874,19 +776,18 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     const postTitle = $page('title').text().trim()
     const postBodyLen = pageText.length
     console.log(`[IPU] Post-login page: title="${postTitle}", length=${postBodyLen}, status=200`)
-    console.log(`[IPU] Final redirect URL: ${page.url()}`)
 
     // Check for account lockout (BEFORE other checks)
     const lockoutMsg = detectAccountLockout(pageText)
     if (lockoutMsg) {
-      browserSession.failedLoginAttempts += 1
+      browserSession.markLoginFailure()
       console.warn('[IPU] Account lockout detected:', lockoutMsg)
       return fail(res, lockoutMsg, 'ACCOUNT_LOCKED', 423)
     }
 
     // Check for captcha validation failure
     if (pageLower.includes('captcha validation fail') || pageLower.includes('captcha fail')) {
-      browserSession.failedLoginAttempts += 1
+      browserSession.markLoginFailure()
       return fail(res, 'CAPTCHA validation failed. Please try again with a new CAPTCHA.', 'CAPTCHA_FAILED', 401)
     }
 
@@ -906,59 +807,30 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
       }
     })
     if (loginError) {
-      browserSession.failedLoginAttempts += 1
+      browserSession.markLoginFailure()
       return fail(res, loginError, 'LOGIN_FAILED', 401)
     }
 
     if (stillOnLogin) {
-      browserSession.failedLoginAttempts += 1
+      browserSession.markLoginFailure()
       return fail(res, 'Login failed — incorrect credentials or CAPTCHA. Please try again.', 'LOGIN_FAILED', 401)
     }
 
     // Successful login — scrape profile first, then fetch results
-    browserSession.failedLoginAttempts = 0
-    browserSession.attemptsForCaptcha = 0
+    browserSession.markLoginSuccess()
     browserSession.authenticatedAt = Date.now()
     console.log('[IPU] Login successful, scraping profile + fetching JSON API data...')
+    
     let profileInfo: Record<string, string> = {}
     try {
-      const profileResponse = await page.request.get(IPU_PROFILE_URL, {
-        headers: {
-          Referer: IPU_HOME_URL,
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        },
-      })
-      const profileHtml = await profileResponse.text()
-      const embeddedFromRequest = extractEmbeddedProfileDataBlock(profileHtml)
-
-      if (embeddedFromRequest) {
-        profileInfo = extractProfileInfoFromEmbeddedData(embeddedFromRequest)
-        console.log('[IPU Profile] Browser profile fields:', Object.keys(profileInfo))
-      } else {
-        await page.goto(IPU_PROFILE_URL, { waitUntil: 'domcontentloaded' })
-        const profileNode = page.locator('#data')
-        await profileNode.waitFor({ state: 'attached', timeout: 5000 }).catch(() => null)
-        const embeddedJson = ((await profileNode.textContent().catch(() => '')) || '').trim()
-        if (embeddedJson) {
-          profileInfo = extractProfileInfoFromEmbeddedData(embeddedJson)
-          console.log('[IPU Profile] Browser profile fields (fallback):', Object.keys(profileInfo))
-        } else {
-          const liveProfileHtml = await page.content()
-          const title = await page.title().catch(() => '')
-          console.warn('[IPU Profile] Embedded profile data block was not found on profile page.', {
-            url: page.url(),
-            title,
-            hasNrollno: /"nrollno"\s*:/.test(liveProfileHtml) || /"nrollno"\s*:/.test(profileHtml),
-            preview: liveProfileHtml.slice(0, 220),
-          })
-        }
-      }
+      profileInfo = await scrapeIpuProfile(browserSession.client)
     } catch (profileErr: any) {
-      console.warn('[IPU Profile] Browser profile fetch skipped:', profileErr?.message || profileErr)
+      console.warn('[IPU Profile] profile fetch skipped:', profileErr?.message || profileErr)
     }
+    
     let rawSemesters
     try {
-      rawSemesters = await fetchBrowserResults(page)
+      rawSemesters = await fetchAllIpuResultsWithClient(browserSession.client, 8)
     } catch (fetchErr: any) {
       console.error('[IPU results-api]', fetchErr?.message || fetchErr)
       return fail(
@@ -973,9 +845,21 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
       return fail(res, 'No results found on IPU portal.', 'NO_RESULTS', 404)
     }
 
+    const persistableSemesters: PersistableSemester[] = rawSemesters.map(parsed => ({
+      semester: String(parsed.semester),
+      semester_num: parsed.semester,
+      semester_label: `Semester ${parsed.semester}`,
+      subjects: parsed.subjects,
+      sgpa: String(parsed.sgpa),
+      total_credits: parsed.total_credits,
+      total_marks: String(parsed.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.total_marks ?? 0), 0)),
+      max_marks: String(parsed.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.max_marks ?? 100), 0)),
+      student_info: (parsed.student_info || {}) as Record<string, string>,
+    }))
+
     // Deduplicate: the IPU API sometimes returns the same semester data for multiple euno calls
     const seenSemesters = new Set<number>()
-    const uniqueSemesters = rawSemesters.filter(s => {
+    const uniqueSemesters = persistableSemesters.filter(s => {
       if (seenSemesters.has(s.semester_num)) return false
       seenSemesters.add(s.semester_num)
       return true
@@ -1028,8 +912,8 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     }
     fail(res, `Unexpected error: ${e.message}`, 'INTERNAL_ERROR', 500)
   } finally {
-    const currentSession = getBrowserSession(userId)
-    if (!isBrowserSessionAuthenticated(currentSession)) {
+    const currentSession = getSession(userId)
+    if (!isSessionAuthenticated(currentSession)) {
       destroySession(userId)
     }
   }
@@ -1144,15 +1028,14 @@ router.post('/change-password', async (req: AuthRequest, res) => {
     return fail(res, 'New password must include uppercase, lowercase, number, and special character (!@#$%^&*).', 'VALIDATION_ERROR', 400)
   }
 
-  const browserSession = getBrowserSession(req.userId!)
-  if (!isBrowserSessionAuthenticated(browserSession)) {
+  const browserSession = getSession(req.userId!)
+  if (!isSessionAuthenticated(browserSession)) {
     return fail(res, 'Active IPU session expired. Sync results once, then change password within 10 minutes.', 'SESSION_EXPIRED', 401)
   }
 
   try {
-    const page = browserSession!.page
-    await page.goto(IPU_CHANGE_PW_URL, { waitUntil: 'domcontentloaded', timeout: 15_000 })
-    const html = await page.content()
+    const cpResp = await browserSession.client.get(IPU_CHANGE_PW_URL, { timeout: 15_000 })
+    const html = String(cpResp.data)
 
     if (html.toLowerCase().includes('j_username') || html.toLowerCase().includes('captchaservlet')) {
       browserSession!.authenticatedAt = undefined
@@ -1166,10 +1049,10 @@ router.post('/change-password', async (req: AuthRequest, res) => {
     }
 
     // Collect hidden fields
-    const payload: Record<string, string> = {}
+    const payload = new URLSearchParams()
     form.find('input[type="hidden"]').each((_i, el) => {
       const name = $cp(el).attr('name')
-      if (name) payload[name] = $cp(el).attr('value') || ''
+      if (name) payload.append(name, $cp(el).attr('value') || '')
     })
 
     // Detect input field names for old / new / confirm passwords
@@ -1180,15 +1063,14 @@ router.post('/change-password', async (req: AuthRequest, res) => {
       }
       return null
     }
-    payload[findField('old', 'current', 'existing', 'prev') || 'oldPassword'] = current_password
-    payload[findField('new_pass', 'newpass', 'newpwd', 'new') || 'newPassword'] = new_password
-    payload[findField('confirm', 'retype', 'verify', 'cnf') || 'confirmPassword'] = confirm_password
+    payload.append(findField('old', 'current', 'existing', 'prev') || 'oldPassword', current_password)
+    payload.append(findField('new_pass', 'newpass', 'newpwd', 'new') || 'newPassword', new_password)
+    payload.append(findField('confirm', 'retype', 'verify', 'cnf') || 'confirmPassword', confirm_password)
 
     const formAction = form.attr('action')?.trim() || ''
     const actionUrl = formAction ? resolveIpuUrl(formAction) : `${IPU_BASE}/web/ChangePassword`
 
-    const submitResp = await page.request.post(actionUrl, {
-      form: payload,
+    const submitResp = await browserSession.client.post(actionUrl, payload.toString(), {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         Referer: IPU_CHANGE_PW_URL,
@@ -1196,7 +1078,7 @@ router.post('/change-password', async (req: AuthRequest, res) => {
       timeout: 15_000,
     })
 
-    const respText = await submitResp.text()
+    const respText = String(submitResp.data)
     const respLow = respText.toLowerCase()
 
     if (respLow.includes('j_username') || respLow.includes('captchaservlet')) {
@@ -1206,7 +1088,7 @@ router.post('/change-password', async (req: AuthRequest, res) => {
     if (respLow.includes('incorrect') || respLow.includes('wrong') || respLow.includes('mismatch') || respLow.includes('invalid') || respLow.includes('does not match')) {
       return fail(res, 'Current password is incorrect.', 'WRONG_PASSWORD', 401)
     }
-    if (respLow.includes('success') || respLow.includes('changed') || respLow.includes('updated') || (submitResp.status() >= 200 && submitResp.status() < 300 && !respLow.includes('error'))) {
+    if (respLow.includes('success') || respLow.includes('changed') || respLow.includes('updated') || (submitResp.status >= 200 && submitResp.status < 300 && !respLow.includes('error'))) {
       browserSession!.authenticatedAt = undefined
       destroySession(req.userId!)
       return ok(res, { message: 'Password changed successfully on the IPU portal.' })

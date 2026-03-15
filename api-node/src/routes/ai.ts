@@ -148,6 +148,19 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         if (latestSemester) {
             lines.push(`Latest Semester: ${latestSemester.semester} | SGPA: ${latestSgpa.toFixed(2)}`)
         }
+        
+        if (resultRows.length > 0) {
+            lines.push(`All Semesters Marks:`)
+            for (const row of resultRows) {
+                const subs = Array.isArray(row.subjects) ? row.subjects as Array<Record<string, unknown>> : [];
+                if (subs.length > 0) {
+                     lines.push(`  Semester ${row.semester}:`)
+                     for (const sub of subs) {
+                         lines.push(`    ${sub.code || ''} ${sub.name}: ${sub.total_marks ?? '-'} / ${sub.max_marks ?? '-'} (Grade ${sub.grade ?? '-'}, ${sub.is_pending ? 'Pending' : 'Declared'})`)
+                     }
+                }
+            }
+        }
         lines.push('')
     }
 
@@ -243,15 +256,26 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
     }
 
     if (resolvedTimetable?.schedule) {
-        const today = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()]
+        const formatter = new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            weekday: 'long'
+        });
+        const todayStr = formatter.format(new Date());
+
+        lines.push(`Current Timezone Context: Asia/Kolkata`)
+        
         const schedule = resolvedTimetable.schedule as Record<string, Array<Record<string, unknown>>>
-        const todaySlots = schedule[today]
+        const todaySlots = schedule[todayStr]
         if (todaySlots?.length) {
-            lines.push(`## Today's Schedule (${today})`)
+            lines.push(`## Today's Schedule (${todayStr})`)
             for (const slot of todaySlots) {
                 const subName = subjects.find((s: any) => s.id === String(slot.subject_id))?.name || String(slot.label || 'Unknown')
                 lines.push(`  ${String(slot.start_time || '')} - ${String(slot.end_time || '')}: ${subName} (${String(slot.type || 'Class')})${slot.classroom ? ` @ ${String(slot.classroom)}` : ''}`)
             }
+            lines.push('')
+        } else {
+            lines.push(`## Today's Schedule (${todayStr})`)
+            lines.push(`  No classes scheduled for today.`)
             lines.push('')
         }
     }
