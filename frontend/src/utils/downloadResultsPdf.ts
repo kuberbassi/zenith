@@ -181,7 +181,8 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
             const meta = [examSession ? `Exam: ${examSession}` : null, declaredDate ? `Declared: ${declaredDate}` : null]
                 .filter(Boolean)
                 .join(' | ');
-            doc.text(meta, margin, y - 2);
+            doc.text(meta, margin, y + 2.5); // Adjusted Y to lower the text away from the header
+            y += 5; // Give more space after meta
         }
 
         doc.setFillColor(...GRAY_LIGHT);
@@ -208,14 +209,14 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
                 isPending ? 'Pending' : (sub.total_marks ?? '-'),
                 isPending ? '---' : (sub.max_marks ?? 100),
                 sub.grade || '-',
-                sub.status || '-',
+                sub.credits || sub.status || '-', // Show credits if available
             ];
         });
 
         autoTable(doc, {
             startY: y,
             margin: { left: margin, right: margin },
-            head: [['#', 'Paper Code', 'Subject Name', 'Int', 'Ext', 'Total', 'Max', 'Grade', 'Status']],
+            head: [['#', 'Paper Code', 'Subject Name', 'Int', 'Ext', 'Total', 'Max', 'Grade', 'Credits']],
             body: tableBody,
             theme: 'grid',
             headStyles: {

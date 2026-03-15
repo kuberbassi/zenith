@@ -8,6 +8,33 @@ import { ENV } from '../config/env.js'
 const router = Router()
 router.use(requireAuth)
 
+function getSlotType(slot: Record<string, unknown>): string {
+    const explicit = String(slot.type ?? '').trim().toLowerCase()
+    if (explicit) return explicit
+
+    const hasSubjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim().length > 0
+    const hasLabel = String(slot.label ?? slot.name ?? '').trim().length > 0
+    if (!hasSubjectRef && hasLabel) return 'custom'
+
+    return 'class'
+}
+
+function scoreScheduleBySubjects(schedule: unknown, subjectIds: Set<string>): number {
+    if (!schedule || typeof schedule !== 'object') return 0
+    let score = 0
+    for (const slots of Object.values(schedule as Record<string, unknown>)) {
+        if (!Array.isArray(slots)) continue
+        for (const rawSlot of slots) {
+            if (!rawSlot || typeof rawSlot !== 'object') continue
+            const slot = rawSlot as Record<string, unknown>
+            if (getSlotType(slot) !== 'class') continue
+            const subjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim()
+            if (subjectRef && subjectIds.has(subjectRef)) score++
+        }
+    }
+    return score
+}
+
 const ChatSchema = z.object({
     message: z.string().min(1).max(2000),
     history: z.array(z.object({
@@ -21,20 +48,44 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
     const semester = req.user?.current_semester ?? 1
     const recentDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-    const [user, subjects, recentLogs, timetable, courses, prefs, skills, resultRows] = await Promise.all([
+    const [user, subjects, recentLogs, timetable, allTimetables, courses, prefs, skills, resultRows] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId } }),
         prisma.subject.findMany({ where: { user_id: userId, semester } }),
         prisma.attendanceLog.findMany({
-            where: { user_id: userId, semester, date: { gte: recentDate } },
+            where: {
+                user_id: userId,
+                date: { gte: recentDate },
+                OR: [
+                    { semester },
+                    { semester: null },
+                    { subject: { is: { semester } } },
+                ],
+            },
             orderBy: { date: 'desc' },
             take: 50,
         }),
         prisma.timetable.findFirst({ where: { user_id: userId, semester } }),
+        prisma.timetable.findMany({ where: { user_id: userId }, orderBy: { updated_at: 'desc' } }),
         prisma.manualCourse.findMany({ where: { user_id: userId } }),
         prisma.userPreference.findUnique({ where: { user_id: userId } }),
         prisma.skill.findMany({ where: { user_id: userId } }),
         prisma.semesterResult.findMany({ where: { user_id: userId }, orderBy: { semester: 'asc' } }),
     ])
+
+    let resolvedTimetable = timetable
+    if (!resolvedTimetable && subjects.length > 0) {
+        const subjectIds = new Set(subjects.map((s) => s.id))
+        let best: (typeof allTimetables)[number] | null = null
+        let bestScore = 0
+        for (const candidate of allTimetables) {
+            const score = scoreScheduleBySubjects(candidate.schedule, subjectIds)
+            if (score > bestScore) {
+                bestScore = score
+                best = candidate
+            }
+        }
+        if (best && bestScore > 0) resolvedTimetable = best
+    }
 
     const lines: string[] = []
 
@@ -191,9 +242,9 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         lines.push('')
     }
 
-    if (timetable?.schedule) {
+    if (resolvedTimetable?.schedule) {
         const today = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()]
-        const schedule = timetable.schedule as Record<string, Array<Record<string, unknown>>>
+        const schedule = resolvedTimetable.schedule as Record<string, Array<Record<string, unknown>>>
         const todaySlots = schedule[today]
         if (todaySlots?.length) {
             lines.push(`## Today's Schedule (${today})`)

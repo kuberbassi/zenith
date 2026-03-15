@@ -7,7 +7,7 @@ import { ok, fail } from '../utils/response.js'
 const router = Router()
 router.use(requireAuth)
 
-// â”€â”€â”€ Dashboard Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Dashboard Data ──────────────────────────────────────────────────────────
 
 router.get('/data', async (req: AuthRequest, res) => {
   try {
@@ -52,7 +52,7 @@ router.get('/data', async (req: AuthRequest, res) => {
   }
 })
 
-// â”€â”€â”€ Reports Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Reports Data ─────────────────────────────────────────────────────────────
 
 router.get('/reports_data', async (req: AuthRequest, res) => {
   try {
@@ -207,7 +207,7 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
   }
 })
 
-// â”€â”€â”€ Day-of-Week Analytics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Day-of-Week Analytics ────────────────────────────────────────────────────
 
 router.get('/analytics/day-of-week', async (req: AuthRequest, res) => {
   try {
@@ -263,7 +263,7 @@ router.get('/analytics/day-of-week', async (req: AuthRequest, res) => {
   }
 })
 
-// â”€â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Notifications ────────────────────────────────────────────────────────────
 
 router.get('/notifications', async (req: AuthRequest, res) => {
   try {
@@ -292,7 +292,7 @@ router.get('/notifications', async (req: AuthRequest, res) => {
       }
     }
 
-    ok(res, notifications)
+    ok(res, notifications, 200, 30) // 30s cache
   } catch (err) {
     console.error('[dashboard/notifications]', err)
     fail(res, 'Failed to fetch notifications', 'FETCH_FAILED', 500)

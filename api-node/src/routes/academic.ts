@@ -344,15 +344,10 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
                 return d > latest ? d : latest
             }, new Date(0)).toISOString(),
             cgpa: cgpaCalc.cgpa,
-            overallPercentage: totalMaxMarks > 0 ? parseFloat(((totalMarks / totalMaxMarks) * 100).toFixed(1)) : 0,
-            academicStrength,
-            gradeDistribution: gradeDist,
-            totalSubjects: Object.values(gradeDist).reduce((a, b) => a + b, 0),
-            totalMarks,
-            totalMaxMarks,
             semesters: mappedSemesters,
-            saved: true,
-        })
+            gradeDistribution: gradeDist,
+            overallPercentage: academicStrength,
+        }, 200, 30)
     } catch (err) {
         console.error('[academic/results/analytics GET]', err)
         fail(res, 'Failed to fetch analytics', 'FETCH_FAILED', 500)
@@ -397,11 +392,19 @@ router.post('/results/sync', async (req: AuthRequest, res) => {
         const maxMarksSum = processedSubjects.reduce((a, s: any) => a + (parseFloat(s.max_marks) || 100), 0)
         const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
 
-        await prisma.semesterResult.upsert({
-            where: { user_id_semester: { user_id: userId, semester } },
-            create: { user_id: userId, semester, subjects: processedSubjects, sgpa: finalSgpa, total_credits: sgpaCalc.total_credits, student_info: studentInfo, source: 'ipu_scraper', total_marks: String(totalMarksSum), max_marks: String(maxMarksSum), enrollment_number: meta.nrollno || null, owner_email: user?.email || null },
-            update: { subjects: processedSubjects, sgpa: finalSgpa, total_credits: sgpaCalc.total_credits, student_info: studentInfo, source: 'ipu_scraper', total_marks: String(totalMarksSum), max_marks: String(maxMarksSum), enrollment_number: meta.nrollno || null, owner_email: user?.email || null, updated_at: new Date() },
+        const existingResult = await prisma.semesterResult.findFirst({
+            where: { user_id: userId, semester },
         })
+        if (existingResult) {
+            await prisma.semesterResult.update({
+                where: { id: existingResult.id },
+                data: { subjects: processedSubjects, sgpa: finalSgpa, total_credits: sgpaCalc.total_credits, student_info: studentInfo, source: 'ipu_scraper', total_marks: String(totalMarksSum), max_marks: String(maxMarksSum), enrollment_number: meta.nrollno || null, updated_at: new Date() },
+            })
+        } else {
+            await prisma.semesterResult.create({
+                data: { user_id: userId, semester, subjects: processedSubjects, sgpa: finalSgpa, total_credits: sgpaCalc.total_credits, student_info: studentInfo, source: 'ipu_scraper', total_marks: String(totalMarksSum), max_marks: String(maxMarksSum), enrollment_number: meta.nrollno || null },
+            })
+        }
 
         sysLog(req, userId, 'Results Synced', `Fetched results for Semester ${semester} via direct API`).catch(() => { })
         ok(res, { message: 'Results synced successfully', sgpa: finalSgpa, subjects: processedSubjects.length, student_info: studentInfo })
@@ -431,11 +434,19 @@ router.post('/results', async (req: AuthRequest, res) => {
         const totalMarksSum = processedSubjects.reduce((a: number, s: any) => a + (parseFloat(s.total_marks) || 0), 0)
         const maxMarksSum = processedSubjects.reduce((a: number, s: any) => a + (parseFloat(s.max_marks) || 100), 0)
         const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, enrollment_number: true } })
-        await prisma.semesterResult.upsert({
-            where: { user_id_semester: { user_id: userId, semester } },
-            create: { user_id: userId, semester, subjects: processedSubjects, sgpa: sgpaCalc.sgpa, total_credits: sgpaCalc.total_credits, total_marks: totalMarksSum ? String(totalMarksSum) : null, max_marks: maxMarksSum ? String(maxMarksSum) : null, owner_email: user?.email || null, enrollment_number: user?.enrollment_number || null },
-            update: { subjects: processedSubjects, sgpa: sgpaCalc.sgpa, total_credits: sgpaCalc.total_credits, total_marks: totalMarksSum ? String(totalMarksSum) : null, max_marks: maxMarksSum ? String(maxMarksSum) : null, updated_at: new Date() },
+        const existingResultManual = await prisma.semesterResult.findFirst({
+            where: { user_id: userId, semester },
         })
+        if (existingResultManual) {
+            await prisma.semesterResult.update({
+                where: { id: existingResultManual.id },
+                data: { subjects: processedSubjects, sgpa: sgpaCalc.sgpa, total_credits: sgpaCalc.total_credits, total_marks: totalMarksSum ? String(totalMarksSum) : null, max_marks: maxMarksSum ? String(maxMarksSum) : null, updated_at: new Date() },
+            })
+        } else {
+            await prisma.semesterResult.create({
+                data: { user_id: userId, semester, subjects: processedSubjects, sgpa: sgpaCalc.sgpa, total_credits: sgpaCalc.total_credits, total_marks: totalMarksSum ? String(totalMarksSum) : null, max_marks: maxMarksSum ? String(maxMarksSum) : null, enrollment_number: user?.enrollment_number || null },
+            })
+        }
 
         sysLog(req, userId, 'Result Updated', `Semester ${semester} result saved. SGPA: ${sgpaCalc.sgpa}`).catch(() => { })
         ok(res, { sgpa: sgpaCalc.sgpa })
@@ -506,9 +517,9 @@ function formatCourseForClient(c: { id: string; name: string | null; platform: s
         url: c.url ?? '',
         progress,
         notes: c.notes ?? '',
-        instructor: extra.instructor ?? '',
-        enrolledDate: extra.enrolledDate ?? c.created_at.toISOString().slice(0, 10),
-        targetCompletionDate: extra.targetCompletionDate ?? '',
+        instructor: extra.instructor ?? extra.instructor_name ?? '',
+        enrolledDate: extra.enrolledDate ?? extra.enrolled_date ?? c.created_at.toISOString().slice(0, 10),
+        targetCompletionDate: extra.targetCompletionDate ?? extra.target_completion_date ?? '',
     }
 }
 
@@ -527,13 +538,15 @@ router.post('/courses/manual', async (req: AuthRequest, res) => {
     try {
         const userId = req.userId!
         const data = req.body
-        if (Array.isArray(data)) {
-            const items = data.map(c => normalizeCourseForSave(ManualCourseSchema.parse(c)))
-            // Neon HTTP adapter does not support transactions — run ops sequentially
-            await prisma.manualCourse.deleteMany({ where: { user_id: userId } })
-            for (const i of items) {
-                await prisma.manualCourse.create({
-                    data: {
+        
+        await prisma.$transaction(async (tx) => {
+            if (Array.isArray(data)) {
+                const items = data.map(c => normalizeCourseForSave(ManualCourseSchema.parse(c)))
+                await tx.manualCourse.deleteMany({ where: { user_id: userId } })
+                
+                // createMany is faster, but we wrap in transaction to prevent partial loss
+                await tx.manualCourse.createMany({
+                    data: items.map(i => ({
                         user_id: userId,
                         name: i.name,
                         platform: i.platform,
@@ -542,23 +555,42 @@ router.post('/courses/manual', async (req: AuthRequest, res) => {
                         url: i.url,
                         notes: i.notes,
                         extra: Object.keys(i.extra).length ? i.extra as any : undefined,
+                    })),
+                })
+            } else {
+                const item = normalizeCourseForSave(ManualCourseSchema.parse(data))
+                await tx.manualCourse.create({
+                    data: { 
+                        user_id: userId, 
+                        name: item.name, 
+                        platform: item.platform, 
+                        status: item.status, 
+                        progress: item.progress, 
+                        url: item.url, 
+                        notes: item.notes, 
+                        extra: Object.keys(item.extra).length ? item.extra as any : undefined 
                     },
                 })
             }
-        } else {
-            const item = normalizeCourseForSave(ManualCourseSchema.parse(data))
-            await prisma.manualCourse.create({
-                data: { user_id: userId, name: item.name, platform: item.platform, status: item.status, progress: item.progress, url: item.url, notes: item.notes, extra: Object.keys(item.extra).length ? item.extra as any : undefined },
-            })
-        }
+        })
+
         ok(res, { message: 'Courses saved' })
     } catch (err) {
         if (err instanceof z.ZodError) {
             console.error('[academic/courses/manual POST] Zod validation errors:', JSON.stringify(err.errors, null, 2))
             fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return
         }
-        if (err instanceof Error && err.message === 'Course name/title is required') { fail(res, err.message, 'INVALID_PARAMS', 400); return }
-        console.error('[academic/courses/manual POST]', err)
+        if (err instanceof Error && err.message === 'Course name/title is required') { 
+            fail(res, err.message, 'INVALID_PARAMS', 400); return 
+        }
+        
+        // Comprehensive error logging to diagnose the 500 error
+        console.error('[academic/courses/manual POST] Unexpected Error:', err)
+        if (err && typeof err === 'object' && 'code' in err) {
+            console.error('Error Code:', (err as any).code)
+            console.error('Error Meta:', (err as any).meta)
+        }
+        
         fail(res, 'Failed to save courses', 'SAVE_FAILED', 500)
     }
 })

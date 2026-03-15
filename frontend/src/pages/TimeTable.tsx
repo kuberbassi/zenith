@@ -18,6 +18,11 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const normalizeId = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
 
 const findSubjectForSlot = (subjects: any[], slot: any) => {
+    const explicitType = String(slot?.type || '').trim().toLowerCase();
+    const hasSubjectRef = Boolean(normalizeId(slot?.subject_id || slot?.subjectId || slot?.subject?._id || slot?.subject?.id));
+    if (explicitType && explicitType !== 'class') return undefined;
+    if (!explicitType && !hasSubjectRef) return undefined;
+
     const slotSubjectId = normalizeId(slot?.subject_id || slot?.subjectId || slot?.subject?._id || slot?.subject?.id);
     if (slotSubjectId) {
         const matchedById = subjects.find((sub: any) => normalizeId(sub._id || sub.id) === slotSubjectId);

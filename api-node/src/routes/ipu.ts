@@ -682,40 +682,50 @@ async function saveResultsToDB(req: AuthRequest, results: {
   for (const sem of normalizedSemesters) {
     if (!sem.semester_num) continue
 
-    await prisma.semesterResult.upsert({
-      where: { user_id_semester: { user_id: userId, semester: sem.semester_num } },
-      create: {
-        user_id: userId,
-        enrollment_number: results.enrollment_number,
-        semester: sem.semester_num,
-        semester_label: sem.semester_label,
-        subjects: sem.subjects as any,
-        sgpa: parseFloat(sem.sgpa) || 0,
-        total_credits: sem.total_credits,
-        total_marks: sem.total_marks,
-        max_marks: sem.max_marks,
-        student_info: mergedStudentInfo as any,
-        source: 'ipu_scraper',
-      },
-      update: {
-        enrollment_number: results.enrollment_number,
-        semester_label: sem.semester_label,
-        subjects: sem.subjects as any,
-        sgpa: parseFloat(sem.sgpa) || 0,
-        total_credits: sem.total_credits,
-        total_marks: sem.total_marks,
-        max_marks: sem.max_marks,
-        student_info: mergedStudentInfo as any,
-        source: 'ipu_scraper',
-        updated_at: new Date(),
-      },
+    const existingSemResult = await prisma.semesterResult.findFirst({
+      where: { user_id: userId, semester: sem.semester_num },
     })
+    if (existingSemResult) {
+      await prisma.semesterResult.update({
+        where: { id: existingSemResult.id },
+        data: {
+          enrollment_number: results.enrollment_number,
+          semester_label: sem.semester_label,
+          subjects: sem.subjects as any,
+          sgpa: parseFloat(sem.sgpa) || 0,
+          total_credits: sem.total_credits,
+          total_marks: sem.total_marks,
+          max_marks: sem.max_marks,
+          student_info: mergedStudentInfo as any,
+          source: 'ipu_scraper',
+          updated_at: new Date(),
+        },
+      })
+    } else {
+      await prisma.semesterResult.create({
+        data: {
+          user_id: userId,
+          enrollment_number: results.enrollment_number,
+          semester: sem.semester_num,
+          semester_label: sem.semester_label,
+          subjects: sem.subjects as any,
+          sgpa: parseFloat(sem.sgpa) || 0,
+          total_credits: sem.total_credits,
+          total_marks: sem.total_marks,
+          max_marks: sem.max_marks,
+          student_info: mergedStudentInfo as any,
+          source: 'ipu_scraper',
+        },
+      })
+    }
   }
 
   // Update user profile with student info
   const info = results.student_info
   const profileUpdate: Record<string, unknown> = {}
+  
   if (isMeaningfulValue(results.enrollment_number)) profileUpdate.enrollment_number = results.enrollment_number
+  if (isMeaningfulValue(mergedStudentInfo.name)) profileUpdate.name = mergedStudentInfo.name
   if (isMeaningfulValue(mergedStudentInfo.institution)) profileUpdate.college = mergedStudentInfo.institution
   if (isMeaningfulValue(mergedStudentInfo.programme)) {
     profileUpdate.course = mergedStudentInfo.programme
@@ -723,14 +733,25 @@ async function saveResultsToDB(req: AuthRequest, results: {
   }
   if (isMeaningfulValue(mergedStudentInfo.batch)) profileUpdate.batch = mergedStudentInfo.batch
   if (isMeaningfulValue(mergedStudentInfo.admission_year)) profileUpdate.admission_year = mergedStudentInfo.admission_year
-  if (isMeaningfulValue(mergedStudentInfo.name)) profileUpdate.name = mergedStudentInfo.name
-  if (isMeaningfulValue(mergedStudentInfo.mother)) profileUpdate.mother_name = mergedStudentInfo.mother
   if (isMeaningfulValue(mergedStudentInfo.phone)) profileUpdate.phone_number = mergedStudentInfo.phone
   if (isMeaningfulValue(mergedStudentInfo.gender)) profileUpdate.gender = mergedStudentInfo.gender
+  if (isMeaningfulValue(mergedStudentInfo.father)) profileUpdate.father_name = mergedStudentInfo.father
+  if (isMeaningfulValue(mergedStudentInfo.mother)) profileUpdate.mother_name = mergedStudentInfo.mother
+
+  // Also update current_semester if we found results for a higher semester
+  const maxSemInResults = Math.max(...results.semesters.map(s => s.semester_num), 0)
+  if (maxSemInResults > 0) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { current_semester: true } })
+    if (user && maxSemInResults > (user.current_semester ?? 0)) {
+        profileUpdate.current_semester = maxSemInResults
+    }
+  }
 
   if (Object.keys(profileUpdate).length) {
+    console.log(`[IPU] Updating profile for user ${userId}:`, Object.keys(profileUpdate))
     await prisma.user.update({ where: { id: userId }, data: profileUpdate as any })
   }
+
 
   console.log(`[IPU] Saved ${results.semesters.length} semesters to DB for user ${userId}`)
 }
@@ -1262,34 +1283,43 @@ router.post('/sync-results', async (req: AuthRequest, res) => {
 
     const savedSemesters = []
     for (const sem of normalizedFetched) {
-      const doc = await prisma.semesterResult.upsert({
-        where: { user_id_semester: { user_id: userId, semester: sem.semester_num } },
-        create: {
-          user_id: userId,
-          enrollment_number: fetched[0].enrollment_number,
-          semester: sem.semester_num,
-          semester_label: sem.semester_label,
-          subjects: sem.subjects as any,
-          sgpa: parseFloat(sem.sgpa) || 0,
-          total_credits: sem.total_credits,
-          total_marks: sem.total_marks,
-          max_marks: sem.max_marks,
-          student_info: mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any,
-          source: 'ipu_scraper',
-        },
-        update: {
-          enrollment_number: fetched[0].enrollment_number,
-          semester_label: sem.semester_label,
-          subjects: sem.subjects as any,
-          sgpa: parseFloat(sem.sgpa) || 0,
-          total_credits: sem.total_credits,
-          total_marks: sem.total_marks,
-          max_marks: sem.max_marks,
-          student_info: mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any,
-          source: 'ipu_scraper',
-          updated_at: new Date(),
-        },
+      const existingInternalResult = await prisma.semesterResult.findFirst({
+        where: { user_id: userId, semester: sem.semester_num },
       })
+      let doc
+      if (existingInternalResult) {
+        doc = await prisma.semesterResult.update({
+          where: { id: existingInternalResult.id },
+          data: {
+            enrollment_number: fetched[0].enrollment_number,
+            semester_label: sem.semester_label,
+            subjects: sem.subjects as any,
+            sgpa: parseFloat(sem.sgpa) || 0,
+            total_credits: sem.total_credits,
+            total_marks: sem.total_marks,
+            max_marks: sem.max_marks,
+            student_info: mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any,
+            source: 'ipu_scraper',
+            updated_at: new Date(),
+          },
+        })
+      } else {
+        doc = await prisma.semesterResult.create({
+          data: {
+            user_id: userId,
+            enrollment_number: fetched[0].enrollment_number,
+            semester: sem.semester_num,
+            semester_label: sem.semester_label,
+            subjects: sem.subjects as any,
+            sgpa: parseFloat(sem.sgpa) || 0,
+            total_credits: sem.total_credits,
+            total_marks: sem.total_marks,
+            max_marks: sem.max_marks,
+            student_info: mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any,
+            source: 'ipu_scraper',
+          },
+        })
+      }
       savedSemesters.push(doc)
     }
 

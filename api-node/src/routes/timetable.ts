@@ -33,6 +33,33 @@ const acronymFromName = (value: string) =>
     .join('')
     .toLowerCase()
 
+function getNormalizedSlotType(slot: Record<string, unknown>): string {
+  const explicit = String(slot.type ?? '').trim().toLowerCase()
+  if (explicit) return explicit
+
+  const hasSubjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim().length > 0
+  const hasLabel = String(slot.label ?? slot.name ?? '').trim().length > 0
+  if (!hasSubjectRef && hasLabel) return 'custom'
+
+  return 'class'
+}
+
+function scoreScheduleBySubjects(schedule: unknown, subjectIds: Set<string>): number {
+  if (!schedule || typeof schedule !== 'object') return 0
+  let score = 0
+  for (const slots of Object.values(schedule as Record<string, unknown>)) {
+    if (!Array.isArray(slots)) continue
+    for (const rawSlot of slots) {
+      if (!rawSlot || typeof rawSlot !== 'object') continue
+      const slot = rawSlot as Record<string, unknown>
+      if (getNormalizedSlotType(slot) !== 'class') continue
+      const subjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim()
+      if (subjectRef && subjectIds.has(subjectRef)) score++
+    }
+  }
+  return score
+}
+
 function normalizeSlotForSave(slot: Record<string, unknown>) {
   const type = String(slot.type ?? 'class').trim().toLowerCase() || 'class'
   const normalized: Record<string, unknown> = { ...slot, type }
@@ -55,14 +82,43 @@ router.get('/', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
-    const [doc, subjects, logs] = await Promise.all([
-      prisma.timetable.findUnique({ where: { user_id_semester: { user_id: userId, semester } } }),
-      prisma.subject.findMany({ where: { user_id: userId, semester }, select: { id: true, name: true, code: true } }),
+    const [requestedDoc, subjects, logs, allTimetables] = await Promise.all([
+      prisma.timetable.findFirst({
+        where: { user_id: userId, semester },
+      }),
+      prisma.subject.findMany({
+        where: { user_id: userId, semester },
+        select: { id: true, name: true, code: true },
+        orderBy: { name: 'asc' },
+      }),
       prisma.attendanceLog.findMany({
-        where: { user_id: userId, ...(semester ? { semester } : {}) },
+        where: {
+          user_id: userId,
+          OR: [
+            { semester },
+            { semester: null },
+            { subject: { is: { semester } } },
+          ],
+        },
         select: { subject_id: true, subject_name: true },
       }),
+      prisma.timetable.findMany({ where: { user_id: userId }, orderBy: { updated_at: 'desc' } }),
     ])
+
+    let doc = requestedDoc
+    if (!doc && subjects.length > 0) {
+      const subjectIds = new Set(subjects.map((s) => s.id))
+      let best: (typeof allTimetables)[number] | null = null
+      let bestScore = 0
+      for (const candidate of allTimetables) {
+        const score = scoreScheduleBySubjects(candidate.schedule, subjectIds)
+        if (score > bestScore) {
+          bestScore = score
+          best = candidate
+        }
+      }
+      if (best && bestScore > 0) doc = best
+    }
 
     if (!doc) {
       ok(res, {})
@@ -106,7 +162,7 @@ router.get('/', async (req: AuthRequest, res) => {
 
     for (const [day, slots] of Object.entries(schedule)) {
       schedule[day] = (Array.isArray(slots) ? slots : []).map((slot) => {
-        const slotType = String(slot.type ?? 'class').trim().toLowerCase()
+        const slotType = getNormalizedSlotType(slot)
         if (slotType !== 'class') {
           const cleanLabel = String(slot.label ?? slot.name ?? '').trim()
           return {
@@ -149,7 +205,7 @@ router.get('/', async (req: AuthRequest, res) => {
       })
     }
 
-    if (repairedSubjectRefs) {
+    if (repairedSubjectRefs && requestedDoc && requestedDoc.id === doc.id) {
       // Best-effort persistence to avoid repeating legacy ID repair on every request.
       await prisma.timetable.update({ where: { id: doc.id }, data: { schedule: JSON.parse(JSON.stringify(schedule)) } }).catch(() => null)
     }
@@ -166,11 +222,14 @@ router.post('/', async (req: AuthRequest, res) => {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
     const schedule = req.body.schedule ?? {}
-    await prisma.timetable.upsert({
-      where: { user_id_semester: { user_id: userId, semester } },
-      create: { user_id: userId, semester, schedule },
-      update: { schedule },
+    const existing = await prisma.timetable.findFirst({
+      where: { user_id: userId, semester },
     })
+    if (existing) {
+      await prisma.timetable.update({ where: { id: existing.id }, data: { schedule } })
+    } else {
+      await prisma.timetable.create({ data: { user_id: userId, semester, schedule } })
+    }
     sysLog(req, userId, 'Schedule Updated', `User updated timetable for Semester ${semester}.`).catch(() => { })
     ok(res, { message: 'Timetable updated' })
   } catch (err) {
@@ -185,11 +244,14 @@ router.post('/structure', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
-    await prisma.timetable.upsert({
-      where: { user_id_semester: { user_id: userId, semester } },
-      create: { user_id: userId, semester, schedule: {}, periods: req.body },
-      update: { periods: req.body },
+    const existing = await prisma.timetable.findFirst({
+      where: { user_id: userId, semester },
     })
+    if (existing) {
+      await prisma.timetable.update({ where: { id: existing.id }, data: { periods: req.body } })
+    } else {
+      await prisma.timetable.create({ data: { user_id: userId, semester, schedule: {}, periods: req.body } })
+    }
     ok(res, { message: 'Timetable structure saved' })
   } catch (err) {
     console.error('[timetable/structure]', err)
@@ -209,7 +271,7 @@ router.post('/slot', async (req: AuthRequest, res) => {
 
     if (!slotData.id && !slotData._id) slotData.id = randomUUID()
 
-    const doc = await prisma.timetable.findUnique({ where: { user_id_semester: { user_id: userId, semester } } })
+    const doc = await prisma.timetable.findFirst({ where: { user_id: userId, semester } })
     if (!doc) {
       await prisma.timetable.create({ data: { user_id: userId, semester, schedule: JSON.parse(JSON.stringify({ [day]: [slotData] })) } })
     } else {
@@ -242,7 +304,7 @@ router.put('/slot/:slotId', async (req: AuthRequest, res) => {
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
     const updates = normalizeSlotForSave(req.body as Record<string, unknown>)
 
-    const doc = await prisma.timetable.findUnique({ where: { user_id_semester: { user_id: userId, semester } } })
+    const doc = await prisma.timetable.findFirst({ where: { user_id: userId, semester } })
     if (!doc || !doc.schedule) { fail(res, 'Timetable not found', 'NOT_FOUND', 404); return }
 
     const schedule = JSON.parse(JSON.stringify(doc.schedule)) as Record<string, Array<Record<string, unknown>>>
@@ -277,7 +339,7 @@ router.delete('/slot/:slotId', async (req: AuthRequest, res) => {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
 
-    const doc = await prisma.timetable.findUnique({ where: { user_id_semester: { user_id: userId, semester } } })
+    const doc = await prisma.timetable.findFirst({ where: { user_id: userId, semester } })
     if (!doc || !doc.schedule) { fail(res, 'Timetable not found', 'NOT_FOUND', 404); return }
 
     const schedule = JSON.parse(JSON.stringify(doc.schedule)) as Record<string, Array<Record<string, unknown>>>

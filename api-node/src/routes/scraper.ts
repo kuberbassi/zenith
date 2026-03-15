@@ -167,23 +167,31 @@ router.get('/notices', async (req, res) => {
   if (forceRefresh || expired) {
     if (!refreshing) {
       refreshing = true
+      console.log('[notices] Cache expired or force refresh. Starting background refresh...')
       void backgroundRefresh()
-    }
-    if (!cache.length) {
-      try {
-        const fresh = await scrapeIPUNotices()
-        if (fresh.length) {
-          cache = fresh
-          lastUpdated = Date.now()
-        }
-      } catch {
-      }
     }
   }
 
-  let notices = cache
-  if (categoryFilter) notices = notices.filter((n) => n.category === categoryFilter)
-  ok(res, notices)
+  if (cache.length > 0) {
+    let notices = cache
+    if (categoryFilter) notices = notices.filter((n) => n.category === categoryFilter)
+    ok(res, notices)
+    return
+  }
+
+  // Fallback ONLY if cache is totally empty and we haven't started a refresh or it's first run
+  try {
+    const fresh = await scrapeIPUNotices()
+    if (fresh.length) {
+      cache = fresh
+      lastUpdated = Date.now()
+    }
+    let notices = cache
+    if (categoryFilter) notices = notices.filter((n) => n.category === categoryFilter)
+    ok(res, notices)
+  } catch {
+    ok(res, [])
+  }
 })
 
 router.get('/stats', async (_req, res) => {

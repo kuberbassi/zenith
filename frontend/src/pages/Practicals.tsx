@@ -40,48 +40,56 @@ const Practicals: React.FC = () => {
 
     const handleUpdate = async (id: string | any, updates: { total?: number; completed?: number; hardcopy?: boolean }) => {
         const subjectId = String(id);
+        const previous = [...subjects];
+        setSubjects((prev: Subject[]) => prev.map(sub => {
+            const subId = String(sub._id || (sub as any).id);
+            if (subId === subjectId) {
+                const current = sub.practicals || { total: 10, completed: 0, hardcopy: false };
+                return {
+                    ...sub, practicals: {
+                        ...current, ...updates,
+                        total: updates.total ?? current.total,
+                        completed: updates.completed ?? current.completed,
+                        hardcopy: updates.hardcopy ?? current.hardcopy
+                    }
+                };
+            }
+            return sub;
+        }));
         try {
             await attendanceService.updatePracticals(subjectId, updates);
-            setSubjects((prev: Subject[]) => prev.map(sub => {
-                const subId = String(sub._id || (sub as any).id);
-                if (subId === subjectId) {
-                    const current = sub.practicals || { total: 10, completed: 0, hardcopy: false };
-                    return {
-                        ...sub, practicals: {
-                            ...current, ...updates,
-                            total: updates.total ?? current.total,
-                            completed: updates.completed ?? current.completed,
-                            hardcopy: updates.hardcopy ?? current.hardcopy
-                        }
-                    };
-                }
-                return sub;
-            }));
             showToast('success', 'Records Updated');
-        } catch { showToast('error', 'Update Error'); }
+        } catch {
+            setSubjects(previous);
+            showToast('error', 'Update Error');
+        }
     };
 
     const handleAssignmentUpdate = async (id: string | any, updates: { total?: number; completed?: number; hardcopy?: boolean }) => {
         const subjectId = String(id);
+        const previous = [...subjects];
+        setSubjects((prev: Subject[]) => prev.map(sub => {
+            const subId = String(sub._id || (sub as any).id);
+            if (subId === subjectId) {
+                const current = sub.assignments || { total: 4, completed: 0 };
+                return {
+                    ...sub, assignments: {
+                        ...current, ...updates,
+                        total: updates.total ?? current.total,
+                        completed: updates.completed ?? current.completed,
+                        hardcopy: updates.hardcopy ?? (current as any).hardcopy
+                    }
+                };
+            }
+            return sub;
+        }));
         try {
             await attendanceService.updateAssignments(subjectId, updates);
-            setSubjects((prev: Subject[]) => prev.map(sub => {
-                const subId = String(sub._id || (sub as any).id);
-                if (subId === subjectId) {
-                    const current = sub.assignments || { total: 4, completed: 0 };
-                    return {
-                        ...sub, assignments: {
-                            ...current, ...updates,
-                            total: updates.total ?? current.total,
-                            completed: updates.completed ?? current.completed,
-                            hardcopy: updates.hardcopy ?? (current as any).hardcopy
-                        }
-                    };
-                }
-                return sub;
-            }));
             showToast('success', 'Assignments Updated');
-        } catch { showToast('error', 'Update Error'); }
+        } catch {
+            setSubjects(previous);
+            showToast('error', 'Update Error');
+        }
     };
 
     const filteredSubjects = subjects.filter(sub => {
