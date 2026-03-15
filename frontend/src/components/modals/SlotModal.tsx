@@ -42,12 +42,18 @@ const SlotModal: React.FC<SlotModalProps> = ({ isOpen, onClose, onSuccess, slot,
     const handleSave = async () => {
         try {
             setLoading(true);
+            const normalizedType = String(formData.type || 'class').toLowerCase();
+            const isClassType = normalizedType === 'class';
+            const startTime = period?.startTime || period?.start_time || slot?.start_time || (slot as any)?.startTime;
+            const endTime = period?.endTime || period?.end_time || slot?.end_time || (slot as any)?.endTime;
             const slotData = {
                 ...formData,
-                subject_id: formData.subject_id ? String(formData.subject_id) : '',
+                type: normalizedType,
+                subject_id: isClassType && formData.subject_id ? String(formData.subject_id) : '',
+                label: isClassType ? (formData.label || '') : String(formData.label || slot?.label || ''),
                 day: day || slot?.day,
-                start_time: period?.startTime || slot?.start_time,
-                end_time: period?.endTime || slot?.end_time,
+                start_time: startTime,
+                end_time: endTime,
                 semester
             };
 

@@ -216,6 +216,22 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
         setDetailSubstitutedBy('');
     };
 
+    const scheduledOrder = new Map<string, number>();
+    groupConsecutiveClasses(scheduledClasses).forEach((row: any, idx: number) => {
+        const sid = String(row?.subject_id || row?.subjectId || row?._id || row?.id || '');
+        if (sid && !scheduledOrder.has(sid)) scheduledOrder.set(sid, idx);
+    });
+    const sortedAttendanceLogs = [...attendanceLogs].sort((a: any, b: any) => {
+        const aSid = String(a?.subject_id || a?.subjectId || '');
+        const bSid = String(b?.subject_id || b?.subjectId || '');
+        const aOrder = scheduledOrder.has(aSid) ? (scheduledOrder.get(aSid) as number) : Number.MAX_SAFE_INTEGER;
+        const bOrder = scheduledOrder.has(bSid) ? (scheduledOrder.get(bSid) as number) : Number.MAX_SAFE_INTEGER;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        const aTs = String(a?.timestamp || '');
+        const bTs = String(b?.timestamp || '');
+        return aTs.localeCompare(bTs);
+    });
+
 
 
     return (
@@ -322,11 +338,11 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                     <line x1="8" y1="2" x2="8" y2="6"></line>
                                     <line x1="3" y1="10" x2="21" y2="10"></line>
                                 </svg>
-                                All Marked Records ({attendanceLogs.length})
+                                All Marked Records ({sortedAttendanceLogs.length})
                             </h3>
-                            {attendanceLogs.length > 0 ? (
+                            {sortedAttendanceLogs.length > 0 ? (
                                 <div className="space-y-2">
-                                    {attendanceLogs.map((log: any, idx: number) => {
+                                    {sortedAttendanceLogs.map((log: any, idx: number) => {
                                         const logSubjectId = String(log.subject_id || '');
 
                                         // Find subject by matching IDs
@@ -358,9 +374,6 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                                         <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${statusColor}`}>
                                                             {String(log.status).toUpperCase()}
                                                         </span>
-                                                        {log.type && log.type !== 'Lecture' && (
-                                                            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-white/5 text-white/40">{log.type}</span>
-                                                        )}
                                                         {log.notes && (
                                                             <span className="text-xs text-white/50">• {log.notes}</span>
                                                         )}

@@ -19,7 +19,6 @@ const STATIC_REWRITES: Record<string, { path: string; method?: string }> = {
   '/api/update_profile': { path: '/api/profile', method: 'PUT' },
   '/api/upload_pfp': { path: '/api/profile/upload_pfp' },
   '/api/preferences': { path: '/api/profile/preferences' },
-  '/api/holidays': { path: '/api/timetable/holidays' },
   '/api/backups': { path: '/api/data/backups' },
   '/api/system_logs': { path: '/api/profile/logs' },
   '/api/semester_results': { path: '/api/academic/results' },
@@ -38,7 +37,6 @@ const PARAM_REWRITES: Array<{
   { pattern: /^\/api\/logs\/([^/?]+)/, to: (m) => `/api/attendance/logs/${m[1]}` },
   { pattern: /^\/api\/restore_backup\/([^/?]+)/, to: (m) => `/api/data/restore_backup/${m[1]}` },
   { pattern: /^\/api\/semester_results\/([^/?]+)/, to: (m) => `/api/academic/results/${m[1]}` },
-  { pattern: /^\/api\/holidays\/([^/?]+)/, to: (m) => `/api/timetable/holidays/${m[1]}` },
   { pattern: /^\/api\/courses\/manual\/([^/?]+)/, to: (m) => `/api/academic/courses/manual/${m[1]}` },
   { pattern: /^\/api\/approve_leave\/([^/?]+)/, to: (m) => `/api/attendance/approve_leave/${m[1]}` },
 ]

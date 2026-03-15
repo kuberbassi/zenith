@@ -19,7 +19,6 @@ interface Course {
     progress: number;
     enrolledDate: string;
     targetCompletionDate?: string;
-    certificateUrl?: string;
     instructor?: string;
     notes?: string;
 }
@@ -32,7 +31,6 @@ const normalizeCourse = (raw: any): Course => ({
     progress: Number(raw?.progress ?? raw?.percentage ?? 0),
     enrolledDate: String(raw?.enrolledDate || raw?.created_at || new Date().toISOString().split('T')[0]).slice(0, 10),
     targetCompletionDate: raw?.targetCompletionDate ? String(raw.targetCompletionDate).slice(0, 10) : undefined,
-    certificateUrl: raw?.certificateUrl ? String(raw.certificateUrl) : undefined,
     instructor: raw?.instructor ? String(raw.instructor) : undefined,
     notes: raw?.notes ? String(raw.notes) : undefined,
 });
@@ -73,11 +71,12 @@ const Courses: React.FC = () => {
         } catch { showToast('error', 'Sync Failed'); }
     };
 
-    const saveCourses = async (newCourses: Course[]) => {
+    const saveCourses = async (newCourses: Course[], previousCourses?: Course[]) => {
         try {
             await attendanceService.saveManualCourses(newCourses);
             await loadCourses();
         } catch {
+            if (previousCourses) setCourses(previousCourses);
             showToast('error', 'Save Failed');
         }
     };
@@ -96,20 +95,27 @@ const Courses: React.FC = () => {
 
     const handleDeleteCourse = async (id: string) => {
         if (!confirm('Permanent Erasure: Delete this course?')) return;
+        const previous = courses;
         const updated = courses.filter(c => getCourseId(c) !== id);
-        await saveCourses(updated);
+        setCourses(updated);
+        await saveCourses(updated, previous);
         showToast('success', 'Course Purged');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingCourse) {
+            const previous = courses;
             const updated = courses.map(c => getCourseId(c) === getCourseId(editingCourse) ? { ...c, ...formData } : c);
-            await saveCourses(updated);
+            setCourses(updated);
+            await saveCourses(updated, previous);
             showToast('success', 'Profile Updated');
         } else {
+            const previous = courses;
             const newCourse = { ...formData, _id: Date.now().toString() } as Course;
-            await saveCourses([...courses, newCourse]);
+            const next = [...courses, newCourse];
+            setCourses(next);
+            await saveCourses(next, previous);
             showToast('success', 'Course Initialized');
         }
         setIsModalOpen(false);
@@ -139,7 +145,7 @@ const Courses: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04]">
                                 <Award size={14} className="text-blue-400" />
-                                <span className="text-[11px] font-black text-white/40 uppercase tracking-widest">{completedCourses.length} Mastery Certs</span>
+                                <span className="text-[11px] font-black text-white/40 uppercase tracking-widest">{completedCourses.length} Completed Tracks</span>
                             </div>
                         </div>
                     </div>
@@ -193,12 +199,12 @@ const Courses: React.FC = () => {
                 </section>
             )}
 
-            {/* ── Mastery Archive ───────────────────────────────────────── */}
+            {/* ── Completed Tracks ──────────────────────────────────────── */}
             {completedCourses.length > 0 && (
                 <section>
                     <div className="flex items-center gap-3 mb-8 px-2">
                         <div className="h-px flex-1 bg-white/[0.04]" />
-                        <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-blue-400/40">Mastery Archive</h2>
+                        <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-blue-400/40">Completed Tracks</h2>
                         <div className="h-px flex-1 bg-white/[0.04]" />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -212,7 +218,7 @@ const Courses: React.FC = () => {
                                     </div>
                                 </div>
                                 <h4 className="text-xs font-black text-white/80 line-clamp-2 uppercase tracking-tight mb-4">{course.title}</h4>
-                                <button onClick={() => window.open(course.url, '_blank')} className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 hover:text-blue-300 transition-all text-left flex items-center gap-2">Verify Credential <ExternalLink size={10} /></button>
+                                <button onClick={() => window.open(course.url, '_blank')} className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 hover:text-blue-300 transition-all text-left flex items-center gap-2">Open Course <ExternalLink size={10} /></button>
                             </div>
                         ))}
                     </div>

@@ -62,7 +62,6 @@ model User {
   attendance_logs  AttendanceLog[]
   semester_results SemesterResult[]
   manual_courses   ManualCourse[]
-  holidays         Holiday[]
   timetables       Timetable[]
   system_logs      SystemLog[]
   user_backups     UserBackup[]
@@ -168,19 +167,6 @@ model ManualCourse {
 
   @@index([user_id])
   @@map("manual_courses")
-}
-
-model Holiday {
-  id         String   @id @default(cuid())
-  user_id    String
-  date       String
-  name       String
-  created_at DateTime @default(now())
-
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id, date])
-  @@map("holidays")
 }
 
 model Timetable {

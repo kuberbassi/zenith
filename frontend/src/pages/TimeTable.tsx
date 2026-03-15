@@ -102,6 +102,11 @@ const normalizeTimeMatch = (t: string) => {
     } catch { return t.trim(); }
 };
 
+const getPeriodStartTime = (period: any) => String(period?.startTime || period?.start_time || '').trim();
+const getPeriodName = (period: any) => String(period?.name || period?.label || '').trim();
+const getSlotStartTime = (slot: any) => String(slot?.start_time || slot?.startTime || '').trim();
+const getSlotEndTime = (slot: any) => String(slot?.end_time || slot?.endTime || '').trim();
+
 const TimeTable: React.FC = () => {
     const { currentSemester } = useSemester();
     const { showToast } = useToast();
@@ -132,8 +137,10 @@ const TimeTable: React.FC = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const data = await attendanceService.getTimetable(currentSemester);
-            const subjectsData = await attendanceService.getSubjects(currentSemester);
+            const [data, subjectsData] = await Promise.all([
+                attendanceService.getTimetable(currentSemester),
+                attendanceService.getSubjects(currentSemester),
+            ]);
             setTimetable(data.schedule || {});
             setPeriods(data.periods || []);
             setSubjects(subjectsData || []);
@@ -155,7 +162,7 @@ const TimeTable: React.FC = () => {
     const handleEditSlot = (slot: any) => {
         setSelectedSlot(slot);
         setSelectedDay(slot.day);
-        setSelectedPeriod(periods.find((p: any) => p.startTime === slot.start_time));
+        setSelectedPeriod(periods.find((p: any) => normalizeTimeMatch(getPeriodStartTime(p)) === normalizeTimeMatch(getSlotStartTime(slot))));
         setIsSlotModalOpen(true);
     };
 
@@ -211,12 +218,12 @@ const TimeTable: React.FC = () => {
                             {periods.map((period: any) => (
                                 <React.Fragment key={period.id}>
                                     <div className="flex flex-col justify-center items-center px-1 py-2 border-b border-r border-white/[0.06] bg-white/[0.01]">
-                                        <span className="text-blue-400 font-black text-[9px] leading-none tracking-tight">{period.name}</span>
-                                        <span className="text-[8px] font-bold text-white/25 mt-0.5 leading-none">{period.startTime}</span>
+                                        <span className="text-blue-400 font-black text-[9px] leading-none tracking-tight">{getPeriodName(period)}</span>
+                                        <span className="text-[8px] font-bold text-white/25 mt-0.5 leading-none">{getPeriodStartTime(period)}</span>
                                     </div>
                                     {DAYS.map(day => {
                                         const daySlots = timetable[day] || [];
-                                        const slot = daySlots.find((s: any) => normalizeTimeMatch(s.start_time) === normalizeTimeMatch(period.startTime));
+                                        const slot = daySlots.find((s: any) => normalizeTimeMatch(getSlotStartTime(s)) === normalizeTimeMatch(getPeriodStartTime(period)));
                                         const subject = slot ? findSubjectForSlot(subjects, slot) : undefined;
                                         const isBreak = slot?.type?.toLowerCase() === 'break';
 
@@ -250,15 +257,15 @@ const TimeTable: React.FC = () => {
                                 <div className="h-px flex-1 bg-gradient-to-r from-white/[0.08] to-transparent" />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {([...(timetable[day] || [])]).sort((a: any, b: any) => parseTimeForSort(a.start_time) - parseTimeForSort(b.start_time)).map((slot: any, idx: number) => {
+                                {([...(timetable[day] || [])]).sort((a: any, b: any) => parseTimeForSort(getSlotStartTime(a)) - parseTimeForSort(getSlotStartTime(b))).map((slot: any, idx: number) => {
                                     const subject = findSubjectForSlot(subjects, slot);
                                     return (
                                         <motion.div key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }} onClick={() => handleEditSlot(slot)} className="p-6 rounded-[2rem] border border-white/[0.06] bg-[#0a0a0a] flex items-center justify-between group hover:border-blue-500/20 transition-all shadow-xl">
                                             <div className="flex items-center gap-6">
                                                 <div className="w-14 h-14 rounded-2xl bg-white/5 flex flex-col items-center justify-center border border-white/5 group-hover:bg-blue-500/10 group-hover:border-blue-500/20 transition-all">
-                                                    <span className="text-[10px] font-black text-white/40 group-hover:text-blue-400 transition-colors uppercase tracking-tighter leading-none">{slot.start_time}</span>
+                                                    <span className="text-[10px] font-black text-white/40 group-hover:text-blue-400 transition-colors uppercase tracking-tighter leading-none">{getSlotStartTime(slot)}</span>
                                                     <div className="w-4 h-px bg-white/10 my-1 group-hover:bg-blue-500/20" />
-                                                    <span className="text-[10px] font-black text-white/40 group-hover:text-blue-400 transition-colors uppercase tracking-tighter leading-none">{slot.end_time}</span>
+                                                    <span className="text-[10px] font-black text-white/40 group-hover:text-blue-400 transition-colors uppercase tracking-tighter leading-none">{getSlotEndTime(slot)}</span>
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">

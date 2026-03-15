@@ -21,7 +21,7 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
     const semester = req.user?.current_semester ?? 1
     const recentDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-    const [user, subjects, recentLogs, timetable, holidays, courses, prefs, skills, resultRows, projects, experiences, certifications] = await Promise.all([
+    const [user, subjects, recentLogs, timetable, courses, prefs, skills, resultRows] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId } }),
         prisma.subject.findMany({ where: { user_id: userId, semester } }),
         prisma.attendanceLog.findMany({
@@ -30,14 +30,10 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
             take: 50,
         }),
         prisma.timetable.findFirst({ where: { user_id: userId, semester } }),
-        prisma.holiday.findMany({ where: { user_id: userId }, orderBy: { date: 'asc' } }),
         prisma.manualCourse.findMany({ where: { user_id: userId } }),
         prisma.userPreference.findUnique({ where: { user_id: userId } }),
         prisma.skill.findMany({ where: { user_id: userId } }),
         prisma.semesterResult.findMany({ where: { user_id: userId }, orderBy: { semester: 'asc' } }),
-        prisma.project.findMany({ where: { user_id: userId } }),
-        prisma.experience.findMany({ where: { user_id: userId } }),
-        prisma.certification.findMany({ where: { user_id: userId } }),
     ])
 
     const lines: string[] = []
@@ -210,15 +206,6 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
     }
 
     const today = new Date().toISOString().slice(0, 10)
-    const upcomingHolidays = holidays.filter((holiday) => holiday.date >= today)
-    if (upcomingHolidays.length) {
-        lines.push('## Upcoming Holidays')
-        for (const holiday of upcomingHolidays.slice(0, 5)) {
-            lines.push(`  ${holiday.date}: ${holiday.name}`)
-        }
-        lines.push('')
-    }
-
     if (courses.length) {
         lines.push('## Online Courses & Certifications')
         for (const course of courses) {
@@ -243,34 +230,6 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         }
     }
 
-    if (projects.length) {
-        lines.push('## Projects')
-        for (const p of projects) {
-            lines.push(`  - ${p.name} [${p.current ? 'Current' : 'Completed'}]: ${p.description}`)
-            if (p.technologies && Array.isArray(p.technologies)) {
-                lines.push(`    Tech: ${p.technologies.join(', ')}`)
-            }
-        }
-        lines.push('')
-    }
-
-    if (experiences.length) {
-        lines.push('## Experience')
-        for (const e of experiences) {
-            lines.push(`  - ${e.role} at ${e.company} [${e.current ? 'Present' : e.end_date}]`)
-            if (e.description) lines.push(`    ${e.description}`)
-        }
-        lines.push('')
-    }
-
-    if (certifications.length) {
-        lines.push('## Certifications')
-        for (const c of certifications) {
-            lines.push(`  - ${c.name} by ${c.issuer}`)
-        }
-        lines.push('')
-    }
-
     return lines.join('\n') || 'No data available for this user yet.'
 }
 
@@ -283,7 +242,12 @@ router.post('/chat', async (req: AuthRequest, res) => {
             return
         }
 
-        const context = await buildFullContext(req)
+        let context = 'Context temporarily unavailable.'
+        try {
+            context = await buildFullContext(req)
+        } catch (contextErr) {
+            console.error('[ai/chat] context build failed:', contextErr)
+        }
 
         const systemPrompt = `You are AcadHub Assistant, a high-performance AI academic strategist built into the AcadHub platform.
 
@@ -298,7 +262,7 @@ ${context}
 1. TRUTH ANCHOR: Never estimate, calculate, or hallucinate academic metrics. Quote the exact numbers from the Subjects and Attendance and Overall Attendance sections.
 2. PRECISION REPORTING: If the data shows Math: 10/12 = 83.3%, then the attendance is exactly 83.3%.
 3. STRATEGIC CALCULATIONS: Use the pre-computed -> Need X more or -> Can safely skip Y values only. Do not perform these calculations yourself.
-4. HOLISTIC AWARENESS: Discuss online courses, certifications, and skills as core components of their profile. Acknowledge their progress and skill levels.
+4. HOLISTIC AWARENESS: Discuss online courses and skills as core components of their profile.
 5. TIMETABLE PRECISION: When asked about the schedule, use the Today's Schedule data provided for the specific day.
 6. AT-RISK IDENTIFICATION: Proactively mention subjects marked with At Risk or Critical if attendance is discussed.
 
@@ -313,7 +277,7 @@ ${context}
 - Summarize overall semester performance.
 - Explain result analytics, CGPA, SGPA, declared dates, and academic strength using the provided Result Analytics data.
 - Advise on skip and attend requirements based on target thresholds.
-- Detail upcoming schedule, holidays, and assignment status.
+- Detail upcoming schedule and assignment status.
 - Analyze skill inventory and course progress.`
 
         const messages = [
@@ -322,20 +286,27 @@ ${context}
             { role: 'user' as const, content: body.message },
         ]
 
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${ENV.GROQ_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages,
-                max_tokens: 600,
-                temperature: 0.4,
-                top_p: 0.85,
-            }),
-        })
+        let response: Response
+        try {
+            response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${ENV.GROQ_API_KEY}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'llama-3.3-70b-versatile',
+                    messages,
+                    max_tokens: 600,
+                    temperature: 0.4,
+                    top_p: 0.85,
+                }),
+            })
+        } catch (providerErr) {
+            console.error('[ai/chat] provider network error:', providerErr)
+            fail(res, 'AI provider is unreachable right now. Please try again.', 'AI_PROVIDER_UNREACHABLE', 502)
+            return
+        }
 
         if (!response.ok) {
             const error = await response.text()

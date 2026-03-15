@@ -20,6 +20,19 @@ function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+function parseTimeToMinutes(raw: string): number {
+  const input = String(raw ?? '').trim()
+  if (!input) return Number.MAX_SAFE_INTEGER
+  const m = input.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
+  if (!m) return Number.MAX_SAFE_INTEGER
+  let hours = parseInt(m[1], 10)
+  const minutes = parseInt(m[2], 10)
+  const ampm = m[3].toUpperCase()
+  if (ampm === 'PM' && hours < 12) hours += 12
+  if (ampm === 'AM' && hours === 12) hours = 0
+  return hours * 60 + minutes
+}
+
 async function recomputeSubjectStats(subjectId: string, userId: string): Promise<void> {
   const [total, attended] = await Promise.all([
     prisma.attendanceLog.count({ where: { subject_id: subjectId, user_id: userId, status: { in: COUNTED_STATUSES as any[] } } }),
@@ -105,11 +118,25 @@ router.post('/mark', async (req: AuthRequest, res) => {
       const subById = body.substituted_by
       const subSubject = await prisma.subject.findFirst({ where: { id: subById, user_id: userId } })
       if (subSubject) {
-        substituteLog = await prisma.attendanceLog.upsert({
+        const existingSubLog = await prisma.attendanceLog.findUnique({
           where: { user_id_subject_id_date_type: { user_id: userId, subject_id: subById, date: markDate, type: 'substitution_class' } },
-          create: { user_id: userId, subject_id: subById, subject_name: subSubject.name, date: markDate, status: 'present', type: 'substitution_class', notes: `Substitution for ${subject.name}`, semester },
-          update: {},
         })
+        if (existingSubLog) {
+          substituteLog = existingSubLog
+        } else {
+          substituteLog = await prisma.attendanceLog.create({
+            data: {
+              user_id: userId,
+              subject_id: subById,
+              subject_name: subSubject.name,
+              date: markDate,
+              status: 'present',
+              type: 'substitution_class',
+              notes: `Substitution for ${subject.name}`,
+              semester,
+            },
+          })
+        }
         await recomputeSubjectStats(subById, userId)
       }
     }
@@ -212,11 +239,13 @@ router.get('/classes-for-date', async (req: AuthRequest, res) => {
     const schedule = (timetableDoc?.schedule as Record<string, Slot[]> | undefined) ?? {}
 
     const daySlots: Slot[] = [...(schedule[dayName] ?? [])]
-      .filter(s => {
-        const t = (s.type ?? '').toLowerCase()
-        return !['break', 'free', 'lunch'].includes(t)
+      .filter((s) => String(s.type ?? 'class').trim().toLowerCase() === 'class')
+      .filter((s) => Boolean((s.subject_id ?? s.subjectId ?? '').toString().trim()))
+      .sort((a, b) => {
+        const aStart = String((a as any).start_time ?? (a as any).startTime ?? (a as any).time ?? '')
+        const bStart = String((b as any).start_time ?? (b as any).startTime ?? (b as any).time ?? '')
+        return parseTimeToMinutes(aStart) - parseTimeToMinutes(bStart)
       })
-      .filter(s => s.subject_id || s.subjectId)
 
     const regularLogs: typeof logsForDate = []
     const substitutionLogs: typeof logsForDate = []

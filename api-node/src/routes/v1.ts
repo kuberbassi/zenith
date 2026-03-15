@@ -10,7 +10,7 @@
  *   /api/v1/attendance/*    — Attendance marking, logs, calendar, classes
  *   /api/v1/academic/*      — Subjects, results, courses (academic domain)
  *   /api/v1/dashboard/*     — Dashboard data, reports, analytics, notifications
- *   /api/v1/timetable/*     — Timetable, holidays, slots
+ *   /api/v1/timetable/*     — Timetable and slots
  *   /api/v1/profile/*       — User profile, preferences, biometric, system logs
  *   /api/v1/skills/*        — Skills tracker
  *   /api/v1/data/*          — Export, import, backup, restore, delete

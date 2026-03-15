@@ -5,11 +5,41 @@ import type {
     Subject,
     TimetableSchedule,
     Preferences,
-    Holiday,
     SystemLog,
     AcademicRecord,
     SemesterResult
 } from '@/types';
+
+const extractApiData = <T>(response: any, fallback: T): T => {
+    const body = response?.data;
+    if (body && typeof body === 'object' && 'data' in body) {
+        return (body.data ?? fallback) as T;
+    }
+    return (body ?? fallback) as T;
+};
+
+const CACHE_TTL_MS = 12_000;
+const requestCache = new Map<string, { expiresAt: number; data: unknown }>();
+
+const getCached = <T>(key: string): T | null => {
+    const entry = requestCache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+        requestCache.delete(key);
+        return null;
+    }
+    return entry.data as T;
+};
+
+const setCached = (key: string, data: unknown, ttlMs: number = CACHE_TTL_MS) => {
+    requestCache.set(key, { expiresAt: Date.now() + ttlMs, data });
+};
+
+const clearCacheByPrefix = (prefix: string) => {
+    for (const key of requestCache.keys()) {
+        if (key.startsWith(prefix)) requestCache.delete(key);
+    }
+};
 
 export const attendanceService = {
     // Preferences & Profile
@@ -150,7 +180,7 @@ export const attendanceService = {
                     _id: String(subjId),
                     subject_id: String(subjId),
                     name: subj.name || slot.name || c.subject_name || slot.label || 'Unknown',
-                    time: slot.time || '',
+                    time: slot.time || ((slot.start_time || slot.startTime) ? `${slot.start_time || slot.startTime}${(slot.end_time || slot.endTime) ? ` - ${slot.end_time || slot.endTime}` : ''}` : ''),
                     type: slot.type || 'Lecture',
                     semester: subj.semester || slot.semester,
                     marked: c.marked || false,
@@ -169,8 +199,21 @@ export const attendanceService = {
 
     // Subjects
     getSubjects: async (semester: number = 1): Promise<Subject[]> => {
+        const cacheKey = `subjects:${semester}`;
+        const cached = getCached<Subject[]>(cacheKey);
+        if (cached) return cached;
+
         const response = await api.get(`/api/academic/subjects?semester=${semester}`);
-        return response.data.data;
+        const payload = extractApiData<any>(response, []);
+        if (Array.isArray(payload)) {
+            setCached(cacheKey, payload);
+            return payload as Subject[];
+        }
+        if (Array.isArray(payload?.subjects)) {
+            setCached(cacheKey, payload.subjects);
+            return payload.subjects as Subject[];
+        }
+        return [];
     },
 
     getFullSubjectsData: async (semester: number = 1): Promise<Subject[]> => {
@@ -200,10 +243,12 @@ export const attendanceService = {
             professor,
             classroom
         });
+        clearCacheByPrefix('subjects:');
     },
 
     deleteSubject: async (subjectId: string): Promise<void> => {
         await api.delete(`/api/academic/subjects/${subjectId}`);
+        clearCacheByPrefix('subjects:');
     },
 
     updateSubjectDetails: async (
@@ -216,6 +261,7 @@ export const attendanceService = {
             professor,
             classroom,
         });
+        clearCacheByPrefix('subjects:');
     },
 
     updateSubjectFullDetails: async (
@@ -224,6 +270,7 @@ export const attendanceService = {
     ): Promise<void> => {
 
         await api.put(`/api/academic/subjects/${subjectId}`, data);
+        clearCacheByPrefix('subjects:');
     },
 
     updateAttendanceCount: async (
@@ -236,6 +283,7 @@ export const attendanceService = {
             attended,
             total,
         });
+        clearCacheByPrefix('subjects:');
     },
 
     updatePracticals: async (
@@ -256,28 +304,43 @@ export const attendanceService = {
 
     // Timetable
     getTimetable: async (semester: number = 1): Promise<{ schedule: TimetableSchedule; periods?: any[] }> => {
+        const cacheKey = `timetable:${semester}`;
+        const cached = getCached<{ schedule: TimetableSchedule; periods?: any[] }>(cacheKey);
+        if (cached) return cached;
+
         const response = await api.get(`/api/timetable?semester=${semester}`);
-        return response.data.data;
+        const payload = extractApiData<any>(response, {});
+        const mapped = {
+            schedule: payload?.schedule || {},
+            periods: Array.isArray(payload?.periods) ? payload.periods : [],
+        };
+        setCached(cacheKey, mapped);
+        return mapped;
     },
 
     saveTimetable: async (schedule: TimetableSchedule, semester: number = 1): Promise<void> => {
         await api.post(`/api/timetable?semester=${semester}`, { schedule });
+        requestCache.delete(`timetable:${semester}`);
     },
 
     saveTimetableStructure: async (periods: any[], semester: number = 1): Promise<void> => {
         await api.post(`/api/timetable/structure?semester=${semester}`, periods);
+        requestCache.delete(`timetable:${semester}`);
     },
 
     addTimetableSlot: async (slotData: any, semester: number = 1): Promise<void> => {
         await api.post(`/api/timetable/slot?semester=${semester}`, slotData);
+        requestCache.delete(`timetable:${semester}`);
     },
 
     updateTimetableSlot: async (slotId: string, slotData: any, semester: number = 1): Promise<void> => {
         await api.put(`/api/timetable/slot/${slotId}?semester=${semester}`, slotData);
+        requestCache.delete(`timetable:${semester}`);
     },
 
     deleteTimetableSlot: async (slotId: string, semester: number = 1): Promise<void> => {
         await api.delete(`/api/timetable/slot/${slotId}?semester=${semester}`);
+        requestCache.delete(`timetable:${semester}`);
     },
 
     getLogsForDate: async (date: string) => {
@@ -289,23 +352,6 @@ export const attendanceService = {
     getDayOfWeekAnalytics: async (semester: number = 1) => {
         const response = await api.get(`/api/dashboard/analytics/day-of-week?semester=${semester}`);
         return response.data.data;
-    },
-
-
-
-
-
-    getHolidays: async (): Promise<Holiday[]> => {
-        const response = await api.get('/api/timetable/holidays');
-        return response.data.data;
-    },
-
-    addHoliday: async (date: string, name: string): Promise<void> => {
-        await api.post('/api/timetable/holidays', { date, name });
-    },
-
-    deleteHoliday: async (holidayId: string): Promise<void> => {
-        await api.delete(`/api/timetable/holidays/${holidayId}`);
     },
 
     // Medical leaves (not yet ported to Node — return empty stubs)
@@ -436,12 +482,26 @@ export const attendanceService = {
 
     // Manual Course Manager
     getManualCourses: async () => {
+        const cacheKey = 'manualCourses';
+        const cached = getCached<any[]>(cacheKey);
+        if (cached) return cached;
+
         const response = await api.get('/api/academic/courses/manual');
-        return response.data.data;
+        const payload = extractApiData<any>(response, []);
+        if (Array.isArray(payload)) {
+            setCached(cacheKey, payload);
+            return payload;
+        }
+        if (Array.isArray(payload?.courses)) {
+            setCached(cacheKey, payload.courses);
+            return payload.courses;
+        }
+        return [];
     },
 
     saveManualCourses: async (courses: any[]) => {
         const response = await api.post('/api/academic/courses/manual', courses);
+        requestCache.delete('manualCourses');
         return response.data;
     },
 

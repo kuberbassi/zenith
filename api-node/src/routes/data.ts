@@ -39,13 +39,12 @@ type UserData = {
   manual_courses: unknown[]
   user_preferences: unknown[]
   skills: unknown[]
-  holidays: unknown[]
   system_logs: unknown[]
   user_profile?: unknown
 }
 
 async function collectUserData(userId: string): Promise<UserData> {
-  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, holidays, system_logs] = await Promise.all([
+  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs] = await Promise.all([
     prisma.subject.findMany({ where: { user_id: userId } }),
     prisma.attendanceLog.findMany({ where: { user_id: userId } }),
     prisma.timetable.findMany({ where: { user_id: userId } }),
@@ -53,10 +52,9 @@ async function collectUserData(userId: string): Promise<UserData> {
     prisma.manualCourse.findMany({ where: { user_id: userId } }),
     prisma.userPreference.findMany({ where: { user_id: userId } }),
     prisma.skill.findMany({ where: { user_id: userId } }),
-    prisma.holiday.findMany({ where: { user_id: userId } }),
     prisma.systemLog.findMany({ where: { user_id: userId }, orderBy: { timestamp: 'desc' }, take: 500 }),
   ])
-  return { subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, holidays, system_logs }
+  return { subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs }
 }
 
 // ─── Export ──────────────────────────────────────────────────────────────────
@@ -109,7 +107,6 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       prisma.manualCourse.deleteMany({ where: { user_id: userId } }),
       prisma.userPreference.deleteMany({ where: { user_id: userId } }),
       prisma.skill.deleteMany({ where: { user_id: userId } }),
-      prisma.holiday.deleteMany({ where: { user_id: userId } }),
       prisma.systemLog.deleteMany({ where: { user_id: userId } }),
     ])
 
@@ -219,6 +216,7 @@ router.post('/import_data', async (req: AuthRequest, res) => {
           progress: Number(c.progress ?? c.percentage ?? 0),
           url: c.url ?? null,
           notes: c.notes ?? null,
+          extra: c.extra ?? null,
         })),
       }).catch(() => null)
     }
@@ -248,19 +246,7 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       }).catch(() => null)
     }
 
-    // 9. Holidays
-    if (importData.holidays?.length) {
-      await prisma.holiday.createMany({
-        data: (importData.holidays as any[]).map(h => ({
-          id: randomUUID(),
-          user_id: userId,
-          date: String(h.date ?? ''),
-          name: String(h.name ?? ''),
-        })),
-      }).catch(() => null)
-    }
-
-    // 10. Restore profile
+    // 9. Restore profile
     if (importData.user_profile) {
       const profile = { ...(importData.user_profile as Record<string, unknown>) }
       delete profile.id; delete profile._id; delete profile.email; delete profile.google_id
@@ -306,7 +292,7 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
     })
 
     // Wipe all collections
-    const [s, al, t, sr, mc, up, sk, h, sl] = await Promise.all([
+    const [s, al, t, sr, mc, up, sk, sl] = await Promise.all([
       prisma.subject.deleteMany({ where: { user_id: userId } }),
       // attendance_logs cascade-deleted with subjects — but also delete orphans
       prisma.attendanceLog.deleteMany({ where: { user_id: userId } }),
@@ -315,11 +301,10 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
       prisma.manualCourse.deleteMany({ where: { user_id: userId } }),
       prisma.userPreference.deleteMany({ where: { user_id: userId } }),
       prisma.skill.deleteMany({ where: { user_id: userId } }),
-      prisma.holiday.deleteMany({ where: { user_id: userId } }),
       prisma.systemLog.deleteMany({ where: { user_id: userId } }),
     ])
 
-    const summary = { subjects: s.count, attendance_logs: al.count, timetable: t.count, semester_results: sr.count, manual_courses: mc.count, user_preferences: up.count, skills: sk.count, holidays: h.count, system_logs: sl.count }
+    const summary = { subjects: s.count, attendance_logs: al.count, timetable: t.count, semester_results: sr.count, manual_courses: mc.count, user_preferences: up.count, skills: sk.count, system_logs: sl.count }
 
     await prisma.user.update({ where: { id: userId }, data: { course: null, college: null, current_semester: 1, batch: null, picture: null } })
 
@@ -376,7 +361,6 @@ router.post('/restore_backup/:backupId', async (req: AuthRequest, res) => {
       prisma.manualCourse.deleteMany({ where: { user_id: userId } }),
       prisma.userPreference.deleteMany({ where: { user_id: userId } }),
       prisma.skill.deleteMany({ where: { user_id: userId } }),
-      prisma.holiday.deleteMany({ where: { user_id: userId } }),
       prisma.systemLog.deleteMany({ where: { user_id: userId } }),
     ])
 
@@ -414,10 +398,6 @@ router.post('/restore_backup/:backupId', async (req: AuthRequest, res) => {
     if (data.skills?.length) {
       await prisma.skill.createMany({ data: (data.skills as any[]).map(s => ({ id: randomUUID(), user_id: userId, name: String(s.name ?? ''), category: s.category ?? null, level: s.level ?? null, progress: Number(s.progress ?? 0), notes: s.notes ?? '' })) }).catch(() => null)
     }
-    if (data.holidays?.length) {
-      await prisma.holiday.createMany({ data: (data.holidays as any[]).map(h => ({ id: randomUUID(), user_id: userId, date: String(h.date ?? ''), name: String(h.name ?? '') })) }).catch(() => null)
-    }
-
     ok(res, { message: 'Backup restored successfully' })
   } catch (err) {
     console.error('[data/restore]', err)

@@ -120,13 +120,6 @@ export interface Skill {
     notes?: string;
 }
 
-export interface Holiday {
-    _id: string;
-    owner_email: string;
-    date: string;
-    name: string;
-}
-
 export interface TimetableSlot {
     _id?: string;
     id?: string;       // backend stores slots with 'id' field

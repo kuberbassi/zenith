@@ -80,7 +80,7 @@ router.get('/subjects', async (req: AuthRequest, res) => {
         const subjects = await prisma.subject.findMany({
             where: {
                 user_id: userId,
-                ...(semester === 1 ? { OR: [{ semester: 1 }, { semester: null as any }] } : { semester }),
+                semester,
             },
             orderBy: { name: 'asc' },
         })
@@ -100,7 +100,7 @@ router.get('/full_subjects_data', async (req: AuthRequest, res) => {
         const subjects = await prisma.subject.findMany({
             where: {
                 user_id: userId,
-                ...(semester === 1 ? { OR: [{ semester: 1 }, { semester: null as any }] } : { semester }),
+                semester,
             },
         })
         const enriched = subjects.map(sub => {
@@ -477,7 +477,6 @@ const ManualCourseSchema = z.object({
     instructor: z.string().max(200).nullish(),
     enrolledDate: z.string().nullish(),
     targetCompletionDate: z.string().nullish(),
-    certificateUrl: z.string().nullish(),
     notes: z.string().max(1000).nullish(),
 })
 
@@ -491,7 +490,6 @@ function normalizeCourseForSave(raw: z.infer<typeof ManualCourseSchema>) {
     if (raw.instructor) extra.instructor = raw.instructor
     if (raw.enrolledDate) extra.enrolledDate = raw.enrolledDate
     if (raw.targetCompletionDate) extra.targetCompletionDate = raw.targetCompletionDate
-    if (raw.certificateUrl) extra.certificateUrl = raw.certificateUrl
     return { name: courseName, platform, status: computedStatus, progress, url: raw.url || null, notes: raw.notes || '', extra }
 }
 
@@ -511,7 +509,6 @@ function formatCourseForClient(c: { id: string; name: string | null; platform: s
         instructor: extra.instructor ?? '',
         enrolledDate: extra.enrolledDate ?? c.created_at.toISOString().slice(0, 10),
         targetCompletionDate: extra.targetCompletionDate ?? '',
-        certificateUrl: extra.certificateUrl ?? '',
     }
 }
 
@@ -579,7 +576,6 @@ router.put('/courses/manual/:id', async (req: AuthRequest, res) => {
         if (raw.instructor !== undefined) newExtra.instructor = raw.instructor ?? ''
         if (raw.enrolledDate !== undefined) newExtra.enrolledDate = raw.enrolledDate ?? ''
         if (raw.targetCompletionDate !== undefined) newExtra.targetCompletionDate = raw.targetCompletionDate ?? ''
-        if (raw.certificateUrl !== undefined) newExtra.certificateUrl = raw.certificateUrl ?? ''
 
         const progress = raw.progress ?? raw.percentage ?? existing.progress
         const computedStatus = raw.status ?? (progress >= 100 ? 'completed' : progress > 0 ? 'in_progress' : 'not_started')

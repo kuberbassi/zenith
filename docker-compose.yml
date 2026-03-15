@@ -1,24 +1,24 @@
-version: '3.8'
-
 services:
-  # Python Backend
   backend:
     build:
-      context: .
-      dockerfile: api/Dockerfile
+      context: ./api-node
+      dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "5001:5001"
     env_file: .env
     environment:
-      - FLASK_ENV=development
-      - MONGO_URI=${MONGO_URI}
+      - NODE_ENV=development
+      - PORT=5001
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - ALLOWED_ORIGINS=http://localhost:3000
 
-  # React Frontend
   frontend:
     build:
       context: ./frontend
       args:
-        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+        - VITE_API_BASE_URL=http://localhost:5001
     ports:
       - "3000:80"
     depends_on:
