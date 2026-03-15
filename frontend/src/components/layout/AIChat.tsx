@@ -39,6 +39,7 @@ const SUGGESTIONS = [
     'Which subjects can I skip?',
     'How\'s my attendance overall?',
     'What\'s my schedule today?',
+    'Explain my result analytics',
     'Help me improve my grades',
 ];
 

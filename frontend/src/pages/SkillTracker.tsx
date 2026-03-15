@@ -11,6 +11,7 @@ import Select from '@/components/ui/Select';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useToast } from '@/components/ui/Toast';
 import { skillsService, type Skill } from '@/services/skills.service';
+import api from '@/services/api';
 
 const SKILL_CATEGORIES = [
     'Technical', 'Creative', 'Language', 'Professional', 'Life', 'Other'
@@ -32,7 +33,7 @@ const SkillTracker: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [filter, setFilter] = useState('all');
+    const [filter, setFilter] = useState(() => localStorage.getItem('acadhub_skills_filter') || 'all');
 
     usePageMeta({
         title: 'Skill Tracker | AcadHub',
@@ -50,7 +51,7 @@ const SkillTracker: React.FC = () => {
             setLoading(true);
             const data = await skillsService.getSkills();
             const skillsList = Array.isArray(data) ? data : (data as any).skills || [];
-            setSkills(skillsList.map((s: any) => ({ ...s, _id: s._id?.$oid || s._id })));
+            setSkills(skillsList.map((s: any) => ({ ...s, _id: s._id || s.id })));
         } catch (error) {
             showToast('error', 'Sync Failed');
         } finally {
@@ -116,7 +117,7 @@ const SkillTracker: React.FC = () => {
 
             <div className="mb-10 flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 {['all', ...SKILL_CATEGORIES].map(cat => (
-                    <button key={cat} onClick={() => setFilter(cat)} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
+                    <button key={cat} onClick={() => { setFilter(cat); localStorage.setItem('acadhub_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
                         {cat}
                     </button>
                 ))}
@@ -156,8 +157,8 @@ const SkillTracker: React.FC = () => {
                                                 </div>
                                                 <Sparkles size={14} className="text-blue-500/20 group-hover:text-blue-400 transition-colors" />
                                             </div>
-                                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden p-0.5 border border-white/[0.04]">
-                                                <motion.div initial={{ width: 0 }} animate={{ width: `${skill.progress}%` }} className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400" />
+                                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden border border-white/[0.04]">
+                                                <motion.div initial={{ width: 0 }} animate={{ width: `${skill.progress}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400" />
                                             </div>
                                         </div>
                                     </div>

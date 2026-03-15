@@ -133,7 +133,7 @@ export interface TimetableSlot {
     day: string;
     start_time: string; // HH:MM
     end_time: string;   // HH:MM
-    subject_id?: any;   // Can be string or {$oid: string}
+    subject_id?: string;
     type?: 'class' | 'break' | 'free' | 'custom';
     label?: string;     // Optional override label
     professor?: string;
@@ -171,6 +171,18 @@ export interface ReportsData {
         worst_subject_name: string;
         worst_subject_percent: string;
         total_absences: number;
+        overall_percentage?: number;
+        attendance_streak?: number;
+        at_risk_count?: number;
+        total_subjects?: number;
+        target_threshold?: number;
+        safe_bunks_remaining?: number;
+        consistency_score?: number;
+        attendance_momentum?: number;
+        achievement_level?: string;
+        focus_label?: string;
+        cgpa?: number;
+        academic_score?: number;
     };
     subject_breakdown: any[];
     heatmap_data?: Record<string, string[]>;

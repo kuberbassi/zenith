@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence, motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
 import {
+    Chart as ChartJS, CategoryScale, LinearScale, BarElement,
+    PointElement, LineElement, Tooltip, Legend, Filler
+} from 'chart.js';
+import {
     AlertTriangle, TrendingUp, Trash2, Edit2,
     Plus, Zap, Target,
-    Activity, ShieldCheck
+    Activity, ShieldCheck, CheckCircle2
 } from 'lucide-react';
 
 import AddSubjectModal from '@/components/modals/AddSubjectModal';
@@ -15,11 +19,10 @@ import AttendanceModal from '@/components/modals/AttendanceModal';
 import { useToast } from '@/components/ui/Toast';
 import { attendanceService } from '@/services/attendance.service';
 import Sparkles from '@/components/ui/Sparkles';
+import { LazyBarChartWrapper, LazyLineChartWrapper } from '@/components/ui/LazyCharts';
 
 import Skeleton from '@/components/ui/Skeleton';
-
-import DashboardRadarChart from './DashboardRadarChart';
-import AttendanceTrendChart from './AttendanceTrendChart';
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend, Filler);
 
 
 
@@ -85,7 +88,7 @@ const GlowRing: React.FC<{ pct: number; size?: number }> = ({ pct, size = 220 })
 
 /* ── Small Progress Ring ────────────────────────────────────────── */
 const ProgressRing: React.FC<{ pct: number; size?: number; strokeWidth?: number; color: string }> = ({
-    pct, size = 60, strokeWidth = 4, color
+    pct, size = 68, strokeWidth = 5, color
 }) => {
     const r = (size - strokeWidth) / 2;
     const circ = 2 * Math.PI * r;
@@ -156,6 +159,75 @@ const Dashboard: React.FC = () => {
         });
     };
 
+    const att = dashboardData?.overall_attendance || 0;
+    const subjects = dashboardData?.subjects || [];
+    const totalClasses = subjects.reduce((a, c) => a + (c.total || 0), 0) || 0;
+    const safeCount = subjects.filter(s => (s.attendance_percentage || 0) >= targetThreshold).length || 0;
+    const riskCount = subjects.filter(s => (s.attendance_percentage || 0) < targetThreshold).length || 0;
+    const subjectCount = dashboardData?.total_subjects || subjects.length || 0;
+    const totalAttended = subjects.reduce((sum, subject) => sum + (subject.attended || 0), 0);
+    const safeBunks = subjects.reduce((sum, subject) => sum + classesCanSkip(subject.attended || 0, subject.total || 0), 0);
+    const mostCriticalSubject = [...subjects]
+        .filter(subject => (subject.total || 0) > 0)
+        .sort((a, b) => (a.attendance_percentage || 0) - (b.attendance_percentage || 0))[0];
+    const weakestSubjects = [...subjects]
+        .filter(subject => (subject.total || 0) > 0)
+        .sort((a, b) => (a.attendance_percentage || 0) - (b.attendance_percentage || 0))
+        .slice(0, 6);
+
+    const pressureChartData = useMemo(() => ({
+        labels: weakestSubjects.map(subject => subject.code || subject.name?.slice(0, 14) || 'Subject'),
+        datasets: [{
+            label: 'Attendance %',
+            data: weakestSubjects.map(subject => Math.round(subject.attendance_percentage || 0)),
+            backgroundColor: weakestSubjects.map(subject => (subject.attendance_percentage || 0) < targetThreshold ? 'rgba(239,68,68,0.75)' : 'rgba(59,130,246,0.75)'),
+            borderRadius: 10,
+        }],
+    }), [weakestSubjects, targetThreshold]);
+
+    const pressureChartOptions = useMemo(() => ({
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10, weight: '700' as const } } },
+            y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.35)', callback: (value: number) => `${value}%` } },
+        },
+    }), []);
+
+    const recentTrendData = useMemo(() => {
+        const grouped = (dashboardData?.recent_logs || []).reduce((acc: Record<string, { attended: number; total: number }>, log: any) => {
+            if (!log?.date) return acc;
+            if (!acc[log.date]) acc[log.date] = { attended: 0, total: 0 };
+            acc[log.date].total += 1;
+            if (['present', 'late', 'approved_medical', 'substituted'].includes(log.status)) acc[log.date].attended += 1;
+            return acc;
+        }, {});
+        const labels = Object.keys(grouped).sort().slice(-10);
+        return {
+            labels: labels.map(date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+            datasets: [{
+                label: 'Daily attendance',
+                data: labels.map(date => {
+                    const entry = grouped[date];
+                    return entry.total > 0 ? Math.round((entry.attended / entry.total) * 100) : 0;
+                }),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59,130,246,0.12)',
+                fill: true,
+                tension: 0.35,
+                pointRadius: 3,
+                pointHoverRadius: 4,
+            }],
+        };
+    }, [dashboardData?.recent_logs]);
+
+    const trendChartOptions = useMemo(() => ({
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10, weight: '700' as const } } },
+            y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.35)', callback: (value: number) => `${value}%` } },
+        },
+    }), []);
+
     if (loading) {
         return (
             <div className="space-y-4 pb-32 max-w-[1320px] mx-auto px-5">
@@ -167,13 +239,6 @@ const Dashboard: React.FC = () => {
             </div>
         );
     }
-
-    const att = dashboardData?.overall_attendance || 0;
-    const subjects = dashboardData?.subjects || [];
-    const totalClasses = subjects.reduce((a, c) => a + (c.total || 0), 0) || 0;
-    const safeCount = subjects.filter(s => (s.attendance_percentage || 0) >= targetThreshold).length || 0;
-    const riskCount = subjects.filter(s => (s.attendance_percentage || 0) < targetThreshold).length || 0;
-    const subjectCount = dashboardData?.total_subjects || subjects.length || 0;
 
     return (
         <motion.div
@@ -253,26 +318,68 @@ const Dashboard: React.FC = () => {
             </motion.section>
 
             {/* ── Charts Section ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-6">
-                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-2 rounded-[2rem] bg-[#0a0a0a] border border-white/[0.06] p-6 min-h-[340px] flex flex-col relative overflow-hidden group">
-                    <div className="flex items-center justify-between mb-3 relative z-10">
-                        <div className="flex items-center gap-2">
-                            <Sparkles size={14} className="text-blue-500/40" />
-                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Aptitude Matrix</span>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-6">
+                {[
+                    {
+                        label: 'Overall Attendance',
+                        value: `${att.toFixed(1)}%`,
+                        detail: `${totalAttended}/${totalClasses} classes attended`,
+                        tone: 'text-blue-400',
+                        icon: <Activity size={15} />
+                    },
+                    {
+                        label: 'Immediate Risk',
+                        value: String(riskCount),
+                        detail: mostCriticalSubject ? `Focus ${mostCriticalSubject.name}` : 'No critical subject right now',
+                        tone: riskCount > 0 ? 'text-red-400' : 'text-white/70',
+                        icon: <AlertTriangle size={15} />
+                    },
+                    {
+                        label: 'Safe Bunks',
+                        value: String(safeBunks),
+                        detail: 'Miss only these without falling under target',
+                        tone: 'text-emerald-400',
+                        icon: <CheckCircle2 size={15} />
+                    },
+                    {
+                        label: 'On-Track Subjects',
+                        value: `${safeCount}/${subjectCount}`,
+                        detail: `${Math.round(subjectCount > 0 ? (safeCount / subjectCount) * 100 : 0)}% above threshold`,
+                        tone: 'text-blue-300',
+                        icon: <ShieldCheck size={15} />
+                    },
+                ].map((card) => (
+                    <motion.div key={card.label} variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="rounded-[2rem] bg-[#0a0a0a] border border-white/[0.06] p-6">
+                        <div className="flex items-center justify-between mb-5">
+                            <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{card.label}</span>
+                            <span className={`${card.tone} opacity-80`}>{card.icon}</span>
                         </div>
+                        <p className={`text-4xl font-black tracking-tighter ${card.tone}`}>{card.value}</p>
+                        <p className="mt-3 text-xs text-white/35">{card.detail}</p>
+                    </motion.div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-6">
+                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-2 rounded-[2rem] bg-[#0a0a0a] border border-white/[0.06] p-6 min-h-[340px] flex flex-col">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Sparkles size={14} className="text-red-400/50" />
+                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Attention Required</span>
                     </div>
-                    <div className="flex-1 scale-110">
-                        <DashboardRadarChart subjects={subjects.map(s => ({ ...s, attendance_percentage: s.attendance_percentage || s.attendance?.percentage || 0 }))} />
+                    <p className="text-sm text-white/45 mb-4">Only the weakest subjects are shown here so you know where to act first.</p>
+                    <div className="flex-1">
+                        <LazyBarChartWrapper height="260px" data={pressureChartData} options={pressureChartOptions} />
                     </div>
                 </motion.div>
 
-                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-3 rounded-[2rem] bg-[#0a0a0a] border border-white/[0.06] p-6 min-h-[340px] flex flex-col relative overflow-hidden group">
-                    <div className="flex items-center gap-2 mb-3 relative z-10">
+                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-3 rounded-[2rem] bg-[#0a0a0a] border border-white/[0.06] p-6 min-h-[340px] flex flex-col">
+                    <div className="flex items-center gap-2 mb-3">
                         <TrendingUp size={14} className="text-blue-500/40" />
-                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Temporal Engagement</span>
+                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Stability Trend</span>
                     </div>
-                    <div className="absolute inset-x-0 bottom-0 h-[80%]">
-                        <AttendanceTrendChart logs={dashboardData?.recent_logs || []} />
+                    <p className="text-sm text-white/45 mb-4">Last 10 attendance days. Use this to spot drift early, not to admire charts.</p>
+                    <div className="flex-1">
+                        <LazyLineChartWrapper height="260px" data={recentTrendData} options={trendChartOptions} />
                     </div>
                 </motion.div>
             </div>
@@ -314,14 +421,14 @@ const Dashboard: React.FC = () => {
                                         <div className="flex items-start justify-between mb-5">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-white/5 text-white/40 uppercase tracking-widest">{subject.code || 'CODE'}</span>
+                                                    <span className="text-[10px] font-black px-2 py-1 rounded bg-white/5 text-white/45 uppercase tracking-widest">{subject.code || 'CODE'}</span>
                                                 </div>
-                                                <h3 className="text-sm font-bold text-white truncate max-w-[180px] uppercase tracking-tight">{subject.name}</h3>
+                                                <h3 className="text-lg font-black text-white truncate max-w-[220px] uppercase tracking-tight">{subject.name}</h3>
                                             </div>
-                                            <div className="relative w-12 h-12">
-                                                <ProgressRing pct={pct} size={48} color={accent} strokeWidth={3} />
+                                            <div className="relative w-[68px] h-[68px] grid place-items-center">
+                                                <ProgressRing pct={pct} size={68} color={accent} strokeWidth={5} />
                                                 <div className="absolute inset-0 flex items-center justify-center">
-                                                    <span className="text-[10px] font-black text-white">{Math.round(pct)}</span>
+                                                    <span className="text-base font-black text-white leading-none">{Math.round(pct)}%</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -329,13 +436,13 @@ const Dashboard: React.FC = () => {
                                         <div className="grid grid-cols-2 gap-2 mb-4 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.03]">
                                             <div className="text-center border-r border-white/[0.04]">
                                                 <p className="text-[8px] font-black text-white/20 uppercase tracking-widest mb-1">Attended / Total</p>
-                                                <p className="text-xs font-bold text-white/80">{subject.attended || 0} / {subject.total || 0}</p>
+                                                <p className="text-sm font-bold text-white/85">{subject.attended || 0} / {subject.total || 0}</p>
                                             </div>
                                             <div className="text-center">
                                                 <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${isCritical ? 'text-red-500/60' : 'text-blue-500/60'}`}>
                                                     {isCritical ? 'Need' : 'Can Skip'}
                                                 </p>
-                                                <p className={`text-xs font-bold ${isCritical ? 'text-red-400' : 'text-blue-400'}`}>
+                                                <p className={`text-sm font-bold ${isCritical ? 'text-red-400' : 'text-blue-400'}`}>
                                                     {isCritical ? needed : canSkip}
                                                 </p>
                                             </div>

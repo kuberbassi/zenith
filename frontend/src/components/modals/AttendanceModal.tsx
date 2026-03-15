@@ -327,20 +327,11 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                             {attendanceLogs.length > 0 ? (
                                 <div className="space-y-2">
                                     {attendanceLogs.map((log: any, idx: number) => {
-                                        // Robust ID Extraction Helper
-                                        const getSafeId = (val: any) => {
-                                            if (!val) return '';
-                                            if (typeof val === 'string') return val;
-                                            if (typeof val === 'object') return val.$oid || String(val);
-                                            return String(val);
-                                        };
+                                        const logSubjectId = String(log.subject_id || '');
 
-                                        const logSubjectId = getSafeId(log.subject_id);
-
-                                        // Find subject by matching robust IDs
+                                        // Find subject by matching IDs
                                         const logSubject = allSubjects.find((s: any) => {
-                                            const sId = getSafeId(s._id || s.id);
-                                            return sId === logSubjectId;
+                                            return String(s._id || s.id) === logSubjectId;
                                         });
 
                                         const statusColors: any = {
@@ -354,7 +345,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                         };
                                         const statusColor = statusColors[log.status] || 'text-white/60 bg-white/5';
 
-                                        const logId = getSafeId(log._id);
+                                        const logId = String(log._id || log.id || idx);
 
                                         return (
                                             <div
@@ -367,6 +358,9 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                                         <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${statusColor}`}>
                                                             {String(log.status).toUpperCase()}
                                                         </span>
+                                                        {log.type && log.type !== 'Lecture' && (
+                                                            <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-white/5 text-white/40">{log.type}</span>
+                                                        )}
                                                         {log.notes && (
                                                             <span className="text-xs text-white/50">• {log.notes}</span>
                                                         )}
@@ -451,8 +445,7 @@ const SubjectRow = ({
                             return sId !== currentId;
                         });
                         const selectedSub = filteredSubjects.find((s: any) => {
-                            const rawId = s._id || s.id;
-                            const sId = (rawId && typeof rawId === 'object' && rawId.$oid) ? rawId.$oid : String(rawId);
+                            const sId = String(s._id || s.id);
                             return sId === detailSubstitutedBy;
                         });
                         return (
@@ -583,17 +576,10 @@ const groupConsecutiveClasses = (classes: any[]) => {
     let currentGroup: any = null;
 
     sortedClasses.forEach((slot) => {
-        // Robust ID Extraction
-        const getSafeId = (val: any) => {
-            if (!val) return '';
-            if (typeof val === 'object') return val.$oid || val.toString();
-            return String(val);
-        };
+        const slotId = String(slot._id || slot.id || '');
+        const subjectId = String(slot.subject_id || slot.subjectId || '');
 
-        const slotId = getSafeId(slot._id || slot.id);
-        const subjectId = getSafeId(slot.subject_id || slot.subjectId);
-
-        const currentGroupSubId = currentGroup ? getSafeId(currentGroup.subject_id || currentGroup.subjectId) : null;
+        const currentGroupSubId = currentGroup ? String(currentGroup.subject_id || currentGroup.subjectId || '') : null;
 
         // Merge Condition:
         // 1. Same Subject ID (if present)
@@ -675,8 +661,7 @@ const SubstitutionDropdown = ({ subjects, value, selectedName, onChange }: {
                         Select Subject...
                     </button>
                     {subjects.map((s: any) => {
-                        const rawId = s._id || s.id;
-                        const sId = (rawId && typeof rawId === 'object' && rawId.$oid) ? rawId.$oid : String(rawId);
+                        const sId = String(s._id || s.id);
                         const isSelected = sId === value;
                         return (
                             <button

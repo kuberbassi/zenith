@@ -1,0 +1,1 @@
+﻿import { config } from 'dotenv'; config(); import { Pool } from '@neondatabase/serverless'; const pool = new Pool({ connectionString: process.env.DATABASE_URL }); pool.query('SELECT count(*) FROM subjects').then(r => console.log('Subjects:', r.rows[0].count)).catch(console.error).finally(()=>pool.end());

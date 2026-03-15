@@ -9,11 +9,10 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
-import api from '@/services/api';
 import { attendanceService } from '@/services/attendance.service';
 
 interface Course {
-    _id?: string | { $oid: string };
+    _id?: string;
     title: string;
     platform: 'coursera' | 'udemy' | 'youtube' | 'edx' | 'linkedin' | 'college' | 'custom';
     url: string;
@@ -25,12 +24,21 @@ interface Course {
     notes?: string;
 }
 
+const normalizeCourse = (raw: any): Course => ({
+    _id: String(raw?._id || raw?.id || ''),
+    title: String(raw?.title || raw?.name || '').trim(),
+    platform: (raw?.platform || raw?.provider || 'custom') as Course['platform'],
+    url: String(raw?.url || ''),
+    progress: Number(raw?.progress ?? raw?.percentage ?? 0),
+    enrolledDate: String(raw?.enrolledDate || raw?.created_at || new Date().toISOString().split('T')[0]).slice(0, 10),
+    targetCompletionDate: raw?.targetCompletionDate ? String(raw.targetCompletionDate).slice(0, 10) : undefined,
+    certificateUrl: raw?.certificateUrl ? String(raw.certificateUrl) : undefined,
+    instructor: raw?.instructor ? String(raw.instructor) : undefined,
+    notes: raw?.notes ? String(raw.notes) : undefined,
+});
+
 function getCourseId(course: Course): string {
-    const id = course._id;
-    if (!id) return '';
-    if (typeof id === 'string') return id;
-    if (typeof id === 'object' && '$oid' in id) return id.$oid;
-    return String(id);
+    return course._id || '';
 }
 
 const PLATFORMS = [
@@ -61,14 +69,17 @@ const Courses: React.FC = () => {
     const loadCourses = async () => {
         try {
             const data = await attendanceService.getManualCourses();
-            if (data) setCourses(data);
+            setCourses(Array.isArray(data) ? data.map(normalizeCourse).filter((c: Course) => c.title || c.url) : []);
         } catch { showToast('error', 'Sync Failed'); }
     };
 
     const saveCourses = async (newCourses: Course[]) => {
-        setCourses(newCourses);
-        try { await api.post('/api/academic/courses/manual', newCourses); }
-        catch { showToast('error', 'Save Failed'); }
+        try {
+            await attendanceService.saveManualCourses(newCourses);
+            await loadCourses();
+        } catch {
+            showToast('error', 'Save Failed');
+        }
     };
 
     const handleAddCourse = () => {
@@ -83,22 +94,22 @@ const Courses: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleDeleteCourse = (id: string) => {
+    const handleDeleteCourse = async (id: string) => {
         if (!confirm('Permanent Erasure: Delete this course?')) return;
         const updated = courses.filter(c => getCourseId(c) !== id);
-        saveCourses(updated);
+        await saveCourses(updated);
         showToast('success', 'Course Purged');
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (editingCourse) {
             const updated = courses.map(c => getCourseId(c) === getCourseId(editingCourse) ? { ...c, ...formData } : c);
-            saveCourses(updated);
+            await saveCourses(updated);
             showToast('success', 'Profile Updated');
         } else {
             const newCourse = { ...formData, _id: Date.now().toString() } as Course;
-            saveCourses([...courses, newCourse]);
+            await saveCourses([...courses, newCourse]);
             showToast('success', 'Course Initialized');
         }
         setIsModalOpen(false);
@@ -156,7 +167,7 @@ const Courses: React.FC = () => {
                                                 <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${plat.color} text-white text-[9px] font-black uppercase tracking-widest`}><P_Icon size={12} /> {plat.label}</div>
                                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={() => handleEditCourse(course)} className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] text-white/20 hover:text-white hover:bg-white/5"><Edit2 size={12} /></button>
-                                                    <button onClick={() => handleDeleteCourse(getCourseId(course))} className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] text-white/20 hover:text-red-500 hover:bg-red-500/5"><Trash2 size={12} /></button>
+                                                    <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] text-white/20 hover:text-red-500 hover:bg-red-500/5"><Trash2 size={12} /></button>
                                                 </div>
                                             </div>
                                             <h3 className="text-xl font-black text-white/90 mb-2 truncate group-hover:text-white transition-colors uppercase tracking-tight">{course.title}</h3>
@@ -170,7 +181,7 @@ const Courses: React.FC = () => {
                                                 <Button variant="secondary" onClick={() => window.open(course.url, '_blank')} className="flex-1 h-11 rounded-xl border-white/[0.04] text-[10px] font-black uppercase tracking-widest">Open</Button>
                                                 <Button variant="primary" onClick={() => {
                                                     const updated = courses.map(c => getCourseId(c) === getCourseId(course) ? { ...c, progress: Math.min(100, c.progress + 10) } : c);
-                                                    saveCourses(updated);
+                                                    void saveCourses(updated);
                                                 }} className="flex-1 h-11 rounded-xl shadow-lg shadow-blue-500/20 text-[10px] font-black uppercase tracking-widest">+10% Sync</Button>
                                             </div>
                                         </div>
@@ -197,7 +208,7 @@ const Courses: React.FC = () => {
                                     <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20"><Award size={16} /></div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100">
                                         <button onClick={() => handleEditCourse(course)} className="p-1.5 text-white/20 hover:text-white transition-colors"><Edit2 size={12} /></button>
-                                        <button onClick={() => handleDeleteCourse(getCourseId(course))} className="p-1.5 text-white/20 hover:text-red-500 transition-colors"><Trash2 size={12} /></button>
+                                        <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-1.5 text-white/20 hover:text-red-500 transition-colors"><Trash2 size={12} /></button>
                                     </div>
                                 </div>
                                 <h4 className="text-xs font-black text-white/80 line-clamp-2 uppercase tracking-tight mb-4">{course.title}</h4>

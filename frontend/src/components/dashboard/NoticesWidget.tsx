@@ -10,6 +10,19 @@ interface Notice {
     date: string;
 }
 
+function formatNoticeDate(date: string) {
+    if (!date) return 'Date unavailable';
+    const parts = String(date).split('-');
+    if (parts.length === 3) {
+        const [dd, mm, yyyy] = parts;
+        const parsed = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        }
+    }
+    return date;
+}
+
 const NoticesWidget: React.FC = () => {
     const { data: noticesData, isLoading: loading, refetch } = useNotices();
     const notices = (noticesData as Notice[]) || [];
@@ -73,7 +86,7 @@ const NoticesWidget: React.FC = () => {
                                     <div className="flex items-center gap-2 mt-3">
                                         <div className="h-1 w-1 rounded-full bg-primary/50" />
                                         <p className="text-[10px] uppercase tracking-wider font-semibold text-on-surface-variant/70">
-                                            {notice.date.replace('2061', '2026')}
+                                            {formatNoticeDate(notice.date)}
                                         </p>
                                     </div>
                                 </div>
@@ -128,7 +141,7 @@ const NoticesWidget: React.FC = () => {
                                     </div>
                                     <div className="flex items-center gap-2 mt-2">
                                         <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
-                                            {notice.date.replace('2061', '2026')}
+                                            {formatNoticeDate(notice.date)}
                                         </span>
                                     </div>
                                 </a>

@@ -11,6 +11,28 @@ interface Notice {
     date: string;
 }
 
+const parseNoticeDate = (raw: string) => {
+    if (!raw) return 0;
+    const normalized = raw.trim();
+    const dmy = normalized.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+    if (dmy) {
+        const day = Number(dmy[1]);
+        const month = Number(dmy[2]);
+        let year = Number(dmy[3]);
+        if (year < 100) year += 2000;
+        const value = new Date(year, month - 1, day).getTime();
+        return Number.isNaN(value) ? 0 : value;
+    }
+    const generic = new Date(normalized).getTime();
+    return Number.isNaN(generic) ? 0 : generic;
+};
+
+const formatNoticeDate = (raw: string) => {
+    const ts = parseNoticeDate(raw);
+    if (!ts) return 'Date unavailable';
+    return new Date(ts).toLocaleDateString('en-GB');
+};
+
 const Notifications: React.FC = () => {
     const [notices, setNotices] = useState<Notice[]>([]);
     const [loading, setLoading] = useState(true);
@@ -28,18 +50,7 @@ const Notifications: React.FC = () => {
             setLoading(true);
             setError(false);
             const data = await attendanceService.getNotices();
-            const parseDate = (d: string) => {
-                if (!d) return 0;
-                const p = d.split('-');
-                if (p.length === 3) {
-                    const currentYear = new Date().getFullYear();
-                    let year = parseInt(p[2], 10);
-                    if (year > currentYear + 2) year = currentYear;
-                    return new Date(`${year}-${p[1]}-${p[0]}`).getTime();
-                }
-                return new Date(d).getTime() || 0;
-            };
-            const sorted = (data || []).slice().sort((a: Notice, b: Notice) => parseDate(b.date) - parseDate(a.date));
+            const sorted = (data || []).slice().sort((a: Notice, b: Notice) => parseNoticeDate(b.date) - parseNoticeDate(a.date));
             setNotices(sorted);
         } catch (error) {
             console.error('Failed to load notices', error);
@@ -126,7 +137,7 @@ const Notifications: React.FC = () => {
                                                     <span className="h-1 w-1 rounded-full bg-white/10" />
                                                     <div className="flex items-center gap-1.5 text-[9px] font-black text-white/20 uppercase tracking-widest">
                                                         <Calendar size={10} />
-                                                        {item.date.replace('2061', '2026')}
+                                                        {formatNoticeDate(item.date)}
                                                     </div>
                                                 </div>
                                                 <h3 className="font-bold text-sm md:text-base text-white/80 group-hover:text-white transition-colors line-clamp-2 leading-tight uppercase tracking-tight">

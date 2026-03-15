@@ -1,0 +1,314 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  approved_medical
+  medical
+  duty
+  substituted
+  cancelled
+}
+
+enum ResultSource {
+  manual
+  ipu_scraper
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id                   String   @id @default(cuid())
+  google_id            String   @unique
+  email                String   @unique
+  name                 String
+  picture              String?
+  branch               String?
+  course               String?
+  college              String?
+  batch                String?
+  enrollment_number    String?
+  mother_name          String?
+  gender               String?
+  phone_number         String?
+  admission_year       String?
+  headline             String?
+  linkedin_url         String?
+  github_url           String?
+  portfolio_url        String?
+  current_semester     Int      @default(1)
+  target_attendance    Int      @default(75)
+  attendance_threshold Int      @default(75)
+  warning_threshold    Int      @default(76)
+  biometrics           Json     @default("{}")
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  subjects         Subject[]
+  attendance_logs  AttendanceLog[]
+  semester_results SemesterResult[]
+  manual_courses   ManualCourse[]
+  holidays         Holiday[]
+  timetables       Timetable[]
+  system_logs      SystemLog[]
+  user_backups     UserBackup[]
+  user_preference  UserPreference?
+  skills           Skill[]
+  projects         Project[]
+  experiences      Experience[]
+  certifications   Certification[]
+
+  @@map("users")
+}
+
+model Subject {
+  id          String   @id @default(cuid())
+  user_id     String
+  name        String
+  code        String   @default("")
+  professor   String   @default("")
+  classroom   String   @default("")
+  semester    Int      @default(1)
+  type        String   @default("theory")
+  credits     Int?
+  attended    Int      @default(0)
+  total       Int      @default(0)
+  target      Int      @default(75)
+  categories  String[]
+  practicals  Json?
+  assignments Json?
+  syllabus    String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user            User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  attendance_logs AttendanceLog[]
+
+  @@index([user_id])
+  @@index([user_id, semester])
+  @@index([user_id, name])
+  @@map("subjects")
+}
+
+model AttendanceLog {
+  id             String           @id @default(cuid())
+  user_id        String
+  subject_id     String
+  subject_name   String
+  date           String
+  status         AttendanceStatus
+  type           String           @default("Lecture")
+  notes          String?
+  semester       Int?
+  substituted_by String?
+  timestamp      DateTime         @default(now())
+
+  user    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subject_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, subject_id, date, type])
+  @@index([user_id, date])
+  @@index([user_id, subject_id])
+  @@index([user_id, semester, date])
+  @@map("attendance_logs")
+}
+
+model SemesterResult {
+  id                String       @id @default(cuid())
+  user_id           String
+  owner_email       String?
+  enrollment_number String?
+  semester          Int
+  semester_label    String?
+  subjects          Json         @default("[]")
+  sgpa              Float        @default(0)
+  total_credits     Int          @default(0)
+  total_marks       String?
+  max_marks         String?
+  student_info      Json?
+  source            ResultSource @default(manual)
+  updated_at        DateTime     @default(now()) @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, semester])
+  @@index([user_id])
+  @@index([owner_email])
+  @@index([enrollment_number])
+  @@map("semester_results")
+}
+
+model ManualCourse {
+  id         String   @id @default(cuid())
+  user_id    String
+  name       String?
+  platform   String?
+  status     String?
+  progress   Int      @default(0)
+  url        String?
+  notes      String?
+  extra      Json?
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("manual_courses")
+}
+
+model Holiday {
+  id         String   @id @default(cuid())
+  user_id    String
+  date       String
+  name       String
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, date])
+  @@map("holidays")
+}
+
+model Timetable {
+  id         String   @id @default(cuid())
+  user_id    String
+  semester   Int      @default(1)
+  schedule   Json     @default("{}")
+  periods    Json?
+  updated_at DateTime @default(now()) @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, semester])
+  @@index([user_id])
+  @@map("timetable")
+}
+
+model SystemLog {
+  id          String   @id @default(cuid())
+  user_id     String
+  action      String
+  description String
+  ip          String?
+  user_agent  String?
+  timestamp   DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, timestamp])
+  @@map("system_logs")
+}
+
+model UserBackup {
+  id          String   @id @default(cuid())
+  user_id     String
+  backup_type String   @default("pre_delete_auto")
+  data        Json     @default("{}")
+  created_at  DateTime @default(now())
+  expires_at  DateTime
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([expires_at])
+  @@map("user_backups")
+}
+
+model UserPreference {
+  id          String   @id @default(cuid())
+  user_id     String   @unique
+  preferences Json     @default("{}")
+  updated_at  DateTime @default(now()) @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Skill {
+  id         String   @id @default(cuid())
+  user_id    String
+  name       String
+  category   String?
+  level      String?
+  progress   Int      @default(0)
+  notes      String   @default("")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("skills")
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  user_id      String
+  name         String
+  description  String
+  url          String?
+  github_url   String?
+  start_date   String?
+  end_date     String?
+  current      Boolean  @default(false)
+  technologies String[]
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("projects")
+}
+
+model Experience {
+  id          String   @id @default(cuid())
+  user_id     String
+  company     String
+  role        String
+  start_date  String
+  end_date    String?
+  current     Boolean  @default(false)
+  description String?
+  location    String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("experiences")
+}
+
+model Certification {
+  id            String   @id @default(cuid())
+  user_id       String
+  name          String
+  issuer        String
+  issue_date    String?
+  url           String?
+  credential_id String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("certifications")
+}
+

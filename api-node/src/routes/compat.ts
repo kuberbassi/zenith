@@ -1,162 +1,56 @@
-/**
- * Flask Compatibility Layer
- *
- * URL-rewriting middleware + custom handlers for legacy Flask-style flat
- * endpoints used by the mobile app (v2.x).
- *
- * How it works:
- *   1. `flaskRewrite` middleware intercepts requests at app-root level
- *   2. Rewrites Flask-style URLs (e.g. /api/dashboard_data → /api/dashboard/data)
- *   3. The existing v1 routes handle the rewritten URL — zero logic duplication
- *   4. `compatHandlers` provides actual handlers for endpoints with no v1 equivalent
- *
- * This lets the mobile app work without ANY client-side changes while
- * we migrate it to the v1 API.
- */
-
 import { Router, type Request, type Response, type NextFunction } from 'express'
-import { Types } from 'mongoose'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
-import { Subject } from '../models/Subject.js'
-import { AttendanceLog, ATTENDED_STATUSES, COUNTED_STATUSES } from '../models/AttendanceLog.js'
+import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
-import { uf, ownership } from '../utils/userFilter.js'
 
-/* ══════════════════════════════════════════════════════════════
- *  STATIC REWRITE TABLE
- *
- *  Simple path → path rewrites.  Query strings are preserved.
- * ══════════════════════════════════════════════════════════════ */
+const ATTENDED_STATUSES = ['present', 'late', 'approved_medical', 'substituted']
+const COUNTED_STATUSES = ['present', 'absent', 'late', 'approved_medical', 'medical', 'duty', 'substituted']
 
 const STATIC_REWRITES: Record<string, { path: string; method?: string }> = {
-  // Auth
-  '/api/current_user':          { path: '/api/auth/me' },
-
-  // Dashboard
-  '/api/dashboard_data':        { path: '/api/dashboard/data' },
-  '/api/reports_data':          { path: '/api/dashboard/reports_data' },
-
-  // Attendance
-  '/api/attendance_logs':       { path: '/api/attendance/logs' },
-  '/api/mark_attendance':       { path: '/api/attendance/mark' },
-  '/api/calendar_data':         { path: '/api/attendance/calendar_data' },
-  '/api/classes_for_date':      { path: '/api/attendance/classes-for-date' },
-
-  // Subjects (flat → academic grouped)
-  '/api/full_subjects_data':    { path: '/api/academic/full_subjects_data' },
-
-  // Analytics
+  '/api/current_user': { path: '/api/auth/me' },
+  '/api/dashboard_data': { path: '/api/dashboard/data' },
+  '/api/reports_data': { path: '/api/dashboard/reports_data' },
+  '/api/attendance_logs': { path: '/api/attendance/logs' },
+  '/api/mark_attendance': { path: '/api/attendance/mark' },
+  '/api/calendar_data': { path: '/api/attendance/calendar_data' },
+  '/api/classes_for_date': { path: '/api/attendance/classes-for-date' },
+  '/api/full_subjects_data': { path: '/api/academic/full_subjects_data' },
   '/api/analytics/day_of_week': { path: '/api/dashboard/analytics/day-of-week' },
-
-  // Profile
-  '/api/update_profile':        { path: '/api/profile', method: 'PUT' },
-  '/api/upload_pfp':            { path: '/api/profile/upload_pfp' },
-
-  // Preferences
-  '/api/preferences':           { path: '/api/profile/preferences' },
-
-  // Holidays (only exact /api/holidays — parameterized handled below)
-  '/api/holidays':              { path: '/api/timetable/holidays' },
-
-  // Data / Backups
-  '/api/backups':               { path: '/api/data/backups' },
-
-  // System Logs
-  '/api/system_logs':           { path: '/api/profile/logs' },
-
-  // Results (only exact /api/semester_results)
-  '/api/semester_results':      { path: '/api/academic/results' },
-
-  // Courses (only exact /api/courses/manual)
-  '/api/courses/manual':        { path: '/api/academic/courses/manual' },
-
-  // Scraper / Notifications
-  '/api/notices':               { path: '/api/scraper/notices' },
-  '/api/notifications':         { path: '/api/dashboard/notifications' },
+  '/api/update_profile': { path: '/api/profile', method: 'PUT' },
+  '/api/upload_pfp': { path: '/api/profile/upload_pfp' },
+  '/api/preferences': { path: '/api/profile/preferences' },
+  '/api/holidays': { path: '/api/timetable/holidays' },
+  '/api/backups': { path: '/api/data/backups' },
+  '/api/system_logs': { path: '/api/profile/logs' },
+  '/api/semester_results': { path: '/api/academic/results' },
+  '/api/courses/manual': { path: '/api/academic/courses/manual' },
+  '/api/notices': { path: '/api/scraper/notices' },
+  '/api/notifications': { path: '/api/dashboard/notifications' },
 }
-
-/* ══════════════════════════════════════════════════════════════
- *  PARAMETERIZED REWRITE RULES
- *
- *  For paths with dynamic segments (e.g. /api/subject_details/:id).
- *  Uses regex to extract parameters.
- * ══════════════════════════════════════════════════════════════ */
 
 const PARAM_REWRITES: Array<{
   pattern: RegExp
   to: (match: RegExpExecArray) => string
   method?: string
 }> = [
-  // /api/subject_details/:id → /api/academic/subjects/:id
-  {
-    pattern: /^\/api\/subject_details\/([^/?]+)/,
-    to: (m) => `/api/academic/subjects/${m[1]}`,
-  },
-  // POST /api/edit_attendance/:id → PUT /api/attendance/logs/:id
-  {
-    pattern: /^\/api\/edit_attendance\/([^/?]+)/,
-    to: (m) => `/api/attendance/logs/${m[1]}`,
-    method: 'PUT',
-  },
-  // /api/logs/:id → /api/attendance/logs/:id  (DELETE)
-  {
-    pattern: /^\/api\/logs\/([^/?]+)/,
-    to: (m) => `/api/attendance/logs/${m[1]}`,
-  },
-  // /api/restore_backup/:id → /api/data/restore_backup/:id
-  {
-    pattern: /^\/api\/restore_backup\/([^/?]+)/,
-    to: (m) => `/api/data/restore_backup/${m[1]}`,
-  },
-  // /api/semester_results/:semester → /api/academic/results/:semester
-  {
-    pattern: /^\/api\/semester_results\/([^/?]+)/,
-    to: (m) => `/api/academic/results/${m[1]}`,
-  },
-  // /api/holidays/:id → /api/timetable/holidays/:id
-  {
-    pattern: /^\/api\/holidays\/([^/?]+)/,
-    to: (m) => `/api/timetable/holidays/${m[1]}`,
-  },
-  // /api/courses/manual/:id → /api/academic/courses/manual/:id
-  {
-    pattern: /^\/api\/courses\/manual\/([^/?]+)/,
-    to: (m) => `/api/academic/courses/manual/${m[1]}`,
-  },
-  // /api/approve_leave/:id (not implemented yet — will 404 gracefully)
-  {
-    pattern: /^\/api\/approve_leave\/([^/?]+)/,
-    to: (m) => `/api/attendance/approve_leave/${m[1]}`,
-  },
+  { pattern: /^\/api\/subject_details\/([^/?]+)/, to: (m) => `/api/academic/subjects/${m[1]}` },
+  { pattern: /^\/api\/edit_attendance\/([^/?]+)/, to: (m) => `/api/attendance/logs/${m[1]}`, method: 'PUT' },
+  { pattern: /^\/api\/logs\/([^/?]+)/, to: (m) => `/api/attendance/logs/${m[1]}` },
+  { pattern: /^\/api\/restore_backup\/([^/?]+)/, to: (m) => `/api/data/restore_backup/${m[1]}` },
+  { pattern: /^\/api\/semester_results\/([^/?]+)/, to: (m) => `/api/academic/results/${m[1]}` },
+  { pattern: /^\/api\/holidays\/([^/?]+)/, to: (m) => `/api/timetable/holidays/${m[1]}` },
+  { pattern: /^\/api\/courses\/manual\/([^/?]+)/, to: (m) => `/api/academic/courses/manual/${m[1]}` },
+  { pattern: /^\/api\/approve_leave\/([^/?]+)/, to: (m) => `/api/attendance/approve_leave/${m[1]}` },
 ]
 
-/* ══════════════════════════════════════════════════════════════
- *  REWRITE MIDDLEWARE
- *
- *  Mount at app root level BEFORE route mounts:
- *    app.use(flaskRewrite)
- *
- *  Works because app.use(fn) at root level preserves req.url
- *  changes across subsequent app.use() calls.
- * ══════════════════════════════════════════════════════════════ */
-
-export function flaskRewrite(
-  req: Request,
-  _res: Response,
-  next: NextFunction,
-): void {
-  // Only process /api/* requests (skip /health, static, etc.)
+export function flaskRewrite(req: Request, _res: Response, next: NextFunction): void {
   if (!req.url.startsWith('/api/')) { next(); return }
-
-  // Skip already-versioned URLs (/api/v1/*, /api/v2/*)
   if (/^\/api\/v\d+\//.test(req.url)) { next(); return }
 
-  // Split path from query string
   const qsIdx = req.url.indexOf('?')
   const path = qsIdx >= 0 ? req.url.slice(0, qsIdx) : req.url
   const queryString = qsIdx >= 0 ? req.url.slice(qsIdx) : ''
 
-  // 1) Try static rewrite (O(1) lookup)
   const staticRule = STATIC_REWRITES[path]
   if (staticRule) {
     req.url = staticRule.path + queryString
@@ -165,7 +59,6 @@ export function flaskRewrite(
     return
   }
 
-  // 2) Try parameterized rewrite (short array scan)
   for (const rule of PARAM_REWRITES) {
     const match = rule.pattern.exec(path)
     if (match) {
@@ -176,20 +69,11 @@ export function flaskRewrite(
     }
   }
 
-  // 3) No rewrite — pass through unchanged
   next()
 }
 
-/* ══════════════════════════════════════════════════════════════
- *  CUSTOM HANDLERS
- *
- *  Routes that have NO v1 equivalent and need actual logic.
- *  Mount at: app.use('/api', compatHandlers)
- * ══════════════════════════════════════════════════════════════ */
-
 export const compatHandlers = Router()
 
-/** POST /api/mark_all_attendance — batch-mark multiple subjects at once */
 compatHandlers.post('/mark_all_attendance', requireAuth, async (req: AuthRequest, res) => {
   try {
     const { subject_ids, status, date } = req.body as {
@@ -202,34 +86,39 @@ compatHandlers.post('/mark_all_attendance', requireAuth, async (req: AuthRequest
       return
     }
 
-    const userId = new Types.ObjectId(req.userId!)
+    const userId = req.userId!
     let marked = 0
 
     for (const sid of subject_ids) {
-      const subject = await Subject.findOne({ _id: sid, ...uf(req) }).lean()
+      const subject = await prisma.subject.findFirst({ where: { id: sid, user_id: userId } })
       if (!subject) continue
 
-      await AttendanceLog.create({
-        ...ownership(req),
-        subject_id: new Types.ObjectId(sid),
-        status,
-        date,
-        subject_name: subject.name,
-        semester: subject.semester,
-      })
+      try {
+        await prisma.attendanceLog.create({
+          data: {
+            user_id: userId,
+            subject_id: sid,
+            status: status as never,
+            date,
+            subject_name: subject.name,
+            semester: subject.semester,
+          },
+        })
+      } catch (err: any) {
+        if (err.code === 'P2002') continue
+        throw err
+      }
 
-      // Recompute counts using canonical status lists
-      const present = await AttendanceLog.countDocuments({
-        subject_id: new Types.ObjectId(sid),
-        user_id: userId,
-        status: { $in: ATTENDED_STATUSES },
-      })
-      const total = await AttendanceLog.countDocuments({
-        subject_id: new Types.ObjectId(sid),
-        user_id: userId,
-        status: { $in: COUNTED_STATUSES },
-      })
-      await Subject.updateOne({ _id: sid }, { $set: { attended: present, total } })
+      const [present, total] = await Promise.all([
+        prisma.attendanceLog.count({
+          where: { subject_id: sid, user_id: userId, status: { in: ATTENDED_STATUSES as never[] } },
+        }),
+        prisma.attendanceLog.count({
+          where: { subject_id: sid, user_id: userId, status: { in: COUNTED_STATUSES as never[] } },
+        }),
+      ])
+
+      await prisma.subject.update({ where: { id: sid }, data: { attended: present, total } })
       marked++
     }
 
@@ -240,31 +129,24 @@ compatHandlers.post('/mark_all_attendance', requireAuth, async (req: AuthRequest
   }
 })
 
-/** GET /api/all_semesters_overview — attendance overview across semesters */
 compatHandlers.get('/all_semesters_overview', requireAuth, async (req: AuthRequest, res) => {
   try {
+    const userId = req.userId!
     const semesters: Array<Record<string, unknown>> = []
 
     for (let sem = 1; sem <= 8; sem++) {
-      const subjects = await Subject.find({ ...uf(req), semester: sem }).lean()
+      const subjects = await prisma.subject.findMany({ where: { user_id: userId, semester: sem } })
       if (!subjects.length) continue
 
-      let totalAttended = 0
-      let totalClasses = 0
-
-      for (const sub of subjects) {
-        totalAttended += sub.attended ?? 0
-        totalClasses += sub.total ?? 0
-      }
+      const totalAttended = subjects.reduce((sum, sub) => sum + (sub.attended ?? 0), 0)
+      const totalClasses = subjects.reduce((sum, sub) => sum + (sub.total ?? 0), 0)
 
       semesters.push({
         semester: sem,
         total_subjects: subjects.length,
         total_attended: totalAttended,
         total_classes: totalClasses,
-        attendance_percentage: totalClasses > 0
-          ? Math.round((totalAttended / totalClasses) * 1000) / 10
-          : 0,
+        attendance_percentage: totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 1000) / 10 : 0,
       })
     }
 
@@ -275,7 +157,6 @@ compatHandlers.get('/all_semesters_overview', requireAuth, async (req: AuthReque
   }
 })
 
-/** Stub routes for unimplemented Flask features (return empty data) */
 compatHandlers.get('/pending_leaves', requireAuth, (_req, res) => {
   ok(res, [])
 })

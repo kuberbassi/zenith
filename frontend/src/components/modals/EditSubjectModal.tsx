@@ -47,10 +47,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
             });
 
             // Fetch latest details
-            const rawId = subject.id || subject._id;
-            const id = (typeof rawId === 'object' && rawId !== null)
-                ? (rawId.$oid || rawId.toString())
-                : rawId;
+            const id = subject.id || subject._id;
 
             if (id) fetchDetails(id);
         }
@@ -91,10 +88,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
 
         setLoading(true);
         try {
-            const rawId = subject.id || subject._id;
-            const id = (typeof rawId === 'object' && rawId !== null)
-                ? (rawId.$oid || rawId.toString())
-                : rawId;
+            const id = subject.id || subject._id;
 
             // Update full details including attendance count
             await attendanceService.updateSubjectFullDetails(id, formData);

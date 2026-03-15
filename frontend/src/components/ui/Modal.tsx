@@ -21,16 +21,26 @@ const Modal: React.FC<ModalProps> = ({
     className = '',
 }) => {
     const contentRef = useRef<HTMLDivElement>(null);
+    // Stable ref so keyDown handler never causes effect re-runs
+    const onCloseRef = useRef(onClose);
+    useEffect(() => { onCloseRef.current = onClose; });
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Close on Escape
             if (e.key === 'Escape') {
-                onClose();
+                onCloseRef.current();
                 return;
             }
 
-            // Arrow key scrolling for modal content
+            // Arrow key scrolling — only when focus is NOT inside an input/textarea/select
+            const target = e.target as HTMLElement;
+            const isEditable = target instanceof HTMLInputElement ||
+                target instanceof HTMLTextAreaElement ||
+                target instanceof HTMLSelectElement ||
+                target.isContentEditable;
+            if (isEditable) return;
+
             const content = contentRef.current;
             if (!content) return;
 
@@ -70,15 +80,13 @@ const Modal: React.FC<ModalProps> = ({
         if (isOpen) {
             document.addEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'hidden';
-            // Focus the modal for accessibility
-            contentRef.current?.focus();
         }
 
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'unset';
         };
-    }, [isOpen, onClose]);
+    }, [isOpen]); // only re-run when modal opens/closes, NOT on onClose identity change
 
     const sizeClasses = {
         sm: 'max-w-md',

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { attendanceService } from '@/services/attendance.service';
+import api from '@/services/api';
 import { useSemester } from '@/contexts/SemesterContext';
 import { useToast } from '@/components/ui/Toast';
 import Button from '@/components/ui/Button';
@@ -14,18 +15,91 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+const normalizeId = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
+
+const findSubjectForSlot = (subjects: any[], slot: any) => {
+    const slotSubjectId = normalizeId(slot?.subject_id || slot?.subjectId || slot?.subject?._id || slot?.subject?.id);
+    if (slotSubjectId) {
+        const matchedById = subjects.find((sub: any) => normalizeId(sub._id || sub.id) === slotSubjectId);
+        if (matchedById) return matchedById;
+    }
+
+    const subjectField = slot?.subject;
+    if (typeof subjectField === 'string' && subjectField.trim()) {
+        const needle = subjectField.trim().toLowerCase();
+        const matchedByName = subjects.find((sub: any) => String(sub?.name || '').trim().toLowerCase() === needle);
+        if (matchedByName) return matchedByName;
+    }
+
+    if (subjectField && typeof subjectField === 'object') {
+        const subObj = subjectField as Record<string, unknown>;
+        const objId = normalizeId(subObj._id || subObj.id);
+        if (objId) {
+            const matchedByObjId = subjects.find((sub: any) => normalizeId(sub._id || sub.id) === objId);
+            if (matchedByObjId) return matchedByObjId;
+        }
+        const objName = String(subObj.name || '').trim().toLowerCase();
+        if (objName) {
+            const matchedByObjName = subjects.find((sub: any) => String(sub?.name || '').trim().toLowerCase() === objName);
+            if (matchedByObjName) return matchedByObjName;
+        }
+    }
+
+    const slotLabel = String(
+        slot?.label
+        || slot?.subject_name
+        || slot?.subjectName
+        || slot?.name
+        || slot?.subject?.name
+        || slot?.subject?.code
+        || ''
+    ).trim().toLowerCase();
+    if (!slotLabel) return undefined;
+
+    return subjects.find((sub: any) => {
+        const subName = String(sub?.name || '').trim().toLowerCase();
+        const subCode = String(sub?.code || '').trim().toLowerCase();
+        
+        if (subName === slotLabel || subCode === slotLabel) return true;
+        
+        const acronym = subName.split(/\s+/).map(w => w[0]).join('');
+        if (acronym === slotLabel) return true;
+        
+        if (subName.includes(slotLabel) || subCode.includes(slotLabel) || slotLabel.includes(subCode)) return true;
+
+        return false;
+    });
+};
+
 const parseTimeForSort = (time12h: string) => {
     if (!time12h) return 0;
     try {
         const parts = time12h.split(' ');
-        if (parts.length !== 2) return 0;
-        const [time, modifier] = parts;
+        const time = parts[0];
+        const modifier = parts[1] || '';
         let [hours, minutes] = time.split(':');
         let h = parseInt(hours, 10);
-        if (h === 12) h = 0;
-        if (modifier.toLowerCase() === 'pm') h += 12;
+        if (modifier) {
+            if (h === 12) h = 0;
+            if (modifier.toLowerCase() === 'pm') h += 12;
+        }
         return h * 60 + parseInt(minutes, 10);
     } catch { return 0; }
+};
+
+const normalizeTimeMatch = (t: string) => {
+    if (!t) return '';
+    try {
+        const parts = t.trim().split(' ');
+        if (parts.length === 1 && t.includes(':')) {
+            let [hours, minutes] = t.split(':');
+            let h = parseInt(hours, 10);
+            let ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            return `${h.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+        }
+        return t.trim().toUpperCase();
+    } catch { return t.trim(); }
 };
 
 const TimeTable: React.FC = () => {
@@ -35,7 +109,9 @@ const TimeTable: React.FC = () => {
     const [subjects, setSubjects] = useState<any[]>([]);
     const [periods, setPeriods] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState<'grid' | 'list'>('grid');
+    const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('acadhub_timetable_view') as 'grid' | 'list') || 'grid');
+
+    const handleSetView = (v: 'grid' | 'list') => { setView(v); localStorage.setItem('acadhub_timetable_view', v); api.post('/api/profile/preferences', { timetable_view: v }).catch(() => {}); };
 
     usePageMeta({
         title: 'Timetable | AcadHub',
@@ -107,10 +183,10 @@ const TimeTable: React.FC = () => {
 
                     <div className="flex flex-wrap justify-center gap-4">
                         <div className="flex bg-[#050508] p-1.5 rounded-2xl border border-white/[0.04]">
-                            <button onClick={() => setView('grid')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'grid' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/20 hover:text-white/40'}`}>
+                            <button onClick={() => handleSetView('grid')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'grid' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/20 hover:text-white/40'}`}>
                                 <LayoutGrid size={14} className="inline mr-2" /> Grid
                             </button>
-                            <button onClick={() => setView('list')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/20 hover:text-white/40'}`}>
+                            <button onClick={() => handleSetView('list')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/20 hover:text-white/40'}`}>
                                 <List size={14} className="inline mr-2" /> Sequence
                             </button>
                         </div>
@@ -140,8 +216,8 @@ const TimeTable: React.FC = () => {
                                     </div>
                                     {DAYS.map(day => {
                                         const daySlots = timetable[day] || [];
-                                        const slot = daySlots.find((s: any) => s.start_time === period.startTime);
-                                        const subject = subjects.find((sub: any) => sub._id === (slot?.subject_id?.$oid || slot?.subject_id));
+                                        const slot = daySlots.find((s: any) => normalizeTimeMatch(s.start_time) === normalizeTimeMatch(period.startTime));
+                                        const subject = slot ? findSubjectForSlot(subjects, slot) : undefined;
                                         const isBreak = slot?.type?.toLowerCase() === 'break';
 
                                         return (
@@ -149,7 +225,7 @@ const TimeTable: React.FC = () => {
                                                 {slot ? (
                                                     <motion.div onClick={() => handleEditSlot(slot)} whileHover={{ scale: 1.02 }} className={`h-full w-full rounded-lg p-2 flex flex-col justify-center items-center text-center cursor-pointer transition-all ${isBreak ? 'bg-white/[0.02] opacity-40 hover:opacity-60' : 'bg-blue-500/5 hover:bg-blue-500/10'}`}>
                                                         <span className={`text-[7px] font-bold uppercase tracking-wider opacity-60 ${isBreak ? 'text-white/40' : 'text-blue-400'}`}>{slot.type}</span>
-                                                        <span className={`text-[10px] font-black uppercase tracking-tight leading-tight mt-0.5 ${isBreak ? 'text-white/40' : 'text-white'}`}>{subject?.name || slot.label || (isBreak ? 'Break' : '—')}</span>
+                                                        <span className={`text-[10px] font-black uppercase tracking-tight leading-tight mt-0.5 ${isBreak ? 'text-white/40' : 'text-white'}`}>{subject?.name || slot.subject_name || slot.subjectName || slot.label || slot.name || (isBreak ? 'Break' : '—')}</span>
                                                         {slot.classroom && <span className="text-[7px] font-bold text-white/15 uppercase tracking-wider mt-0.5 leading-none">{slot.classroom}</span>}
                                                     </motion.div>
                                                 ) : (
@@ -175,7 +251,7 @@ const TimeTable: React.FC = () => {
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {([...(timetable[day] || [])]).sort((a: any, b: any) => parseTimeForSort(a.start_time) - parseTimeForSort(b.start_time)).map((slot: any, idx: number) => {
-                                    const subject = subjects.find(sub => sub._id === (slot?.subject_id?.$oid || slot?.subject_id));
+                                    const subject = findSubjectForSlot(subjects, slot);
                                     return (
                                         <motion.div key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }} onClick={() => handleEditSlot(slot)} className="p-6 rounded-[2rem] border border-white/[0.06] bg-[#0a0a0a] flex items-center justify-between group hover:border-blue-500/20 transition-all shadow-xl">
                                             <div className="flex items-center gap-6">
@@ -194,7 +270,7 @@ const TimeTable: React.FC = () => {
                                                             </>
                                                         )}
                                                     </div>
-                                                    <h3 className="text-sm font-black text-white uppercase tracking-tight group-hover:text-blue-400 transition-colors">{subject?.name || slot.label || (slot.type?.toLowerCase() === 'break' ? 'Rest Interval' : 'Operational Unit')}</h3>
+                                                    <h3 className="text-sm font-black text-white uppercase tracking-tight group-hover:text-blue-400 transition-colors">{subject?.name || slot.subject_name || slot.subjectName || slot.label || slot.name || (slot.type?.toLowerCase() === 'break' ? 'Rest Interval' : 'Operational Unit')}</h3>
                                                 </div>
                                             </div>
                                             <Edit3 size={16} className="text-white/10 group-hover:text-blue-500 transition-colors" />

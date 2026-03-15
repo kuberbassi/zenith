@@ -4,10 +4,10 @@ import { motion } from 'framer-motion';
 import {
     Chart as ChartJS,
     CategoryScale, LinearScale, BarElement, PointElement, LineElement,
-    ArcElement, RadialLinearScale, Filler, Tooltip as ChartTooltip, Legend,
+    ArcElement, Filler, Tooltip as ChartTooltip, Legend,
     type ChartOptions,
 } from 'chart.js';
-import { Bar, Radar, Doughnut } from 'react-chartjs-2';
+import { Bar, Doughnut } from 'react-chartjs-2';
 import {
     Eye, EyeOff, RefreshCw, Zap, GraduationCap, TrendingUp, BarChart3,
     ShieldCheck, Activity, BookOpen, PieChart, KeyRound, X, Download
@@ -20,7 +20,7 @@ import CircularProgress from '@/components/ui/CircularProgress';
 
 ChartJS.register(
     CategoryScale, LinearScale, BarElement, PointElement, LineElement,
-    ArcElement, RadialLinearScale, Filler, ChartTooltip, Legend,
+    ArcElement, Filler, ChartTooltip, Legend,
 );
 
 /*  Grade utilities  */
@@ -67,6 +67,72 @@ function formatDate(iso: string | null): string {
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function parseNumeric(value: unknown): number | null {
+    if (value === null || value === undefined || value === '' || value === '-') return null;
+    const num = typeof value === 'number' ? value : parseFloat(String(value));
+    return Number.isNaN(num) ? null : num;
+}
+
+function getSubjectMarks(subject: any) {
+    const internal = parseNumeric(subject.internal ?? subject.internal_theory) ?? 0;
+    const external = parseNumeric(subject.external ?? subject.external_theory) ?? 0;
+    const total = parseNumeric(subject.total_marks ?? subject.marks);
+    const maxMarks = parseNumeric(subject.max_marks) ?? 100;
+    return {
+        internal,
+        external,
+        total: total ?? (internal + external),
+        hasExplicitTotal: total !== null,
+        maxMarks,
+    };
+}
+
+function getSubjectDisplayMark(value: unknown): string {
+    if (value === null || value === undefined || value === '') return '-';
+    const text = String(value).trim();
+    return text || '-';
+}
+
+function formatDeclaredDate(value: unknown): string | null {
+    if (!value) return null;
+    const parsed = new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function buildBatchLabel(info: any): string {
+    const raw = String(info?.batch || '').trim();
+    if (!raw) return '---';
+    if (/^\d{4}-\d{2}$/.test(raw)) return raw;
+    if (/^\d{4}$/.test(raw)) {
+        const start = Number(raw);
+        return `${start}-${String((start + 4) % 100).padStart(2, '0')}`;
+    }
+    return raw;
+}
+
+function normalizeProfileInfo(info: any) {
+    return {
+        name: info?.name || info?.stname || '',
+        roll_no: info?.roll_no || info?.nrollno || info?.enrollment_number || '',
+        father: info?.father || '',
+        mother: info?.mother || '',
+        gender: info?.gender || '',
+        email: info?.email || '',
+        phone: info?.phone || info?.mobno || '',
+        batch: info?.batch || info?.byoa || '',
+        admission_year: info?.admission_year || info?.yoa || '',
+        institution: info?.institution || info?.iname || '',
+        programme: info?.programme || info?.prgname || '',
+    };
+}
+
+function getSubjectPercentage(subject: any) {
+    const { total, maxMarks } = getSubjectMarks(subject);
+    if (!maxMarks) return 0;
+    return Math.round((total / maxMarks) * 100);
 }
 
 /*  Types  */
@@ -166,7 +232,12 @@ const Results: React.FC = () => {
             setCpwError('All fields are required.'); return;
         }
         if (cpwNew !== cpwConfirm) { setCpwError('Passwords do not match.'); return; }
-        if (cpwNew.length < 6) { setCpwError('New password must be at least 6 characters.'); return; }
+        if (cpwNew === cpwCurrent) { setCpwError('New password must be different from the current password.'); return; }
+        if (cpwNew.length < 8) { setCpwError('New password must be at least 8 characters.'); return; }
+        if (!/[A-Z]/.test(cpwNew) || !/[a-z]/.test(cpwNew) || !/[0-9]/.test(cpwNew) || !/[!@#$%^&*]/.test(cpwNew)) {
+            setCpwError('Use uppercase, lowercase, number, and one special character from !@#$%^&*.');
+            return;
+        }
         setCpwError(null); setCpwLoading(true);
         try {
             const res: any = await attendanceService.changeIPUPassword({
@@ -176,7 +247,7 @@ const Results: React.FC = () => {
             setShowCPwModal(false);
             setCpwCurrent(''); setCpwNew(''); setCpwConfirm('');
         } catch (e: any) {
-            setCpwError(e?.response?.data?.error || 'Failed to change password. Sync results first to establish a session.');
+            setCpwError(e?.response?.data?.error || 'Failed to change password. Sync results first, then change it within 10 minutes.');
         } finally { setCpwLoading(false); }
     }
 
@@ -211,7 +282,7 @@ const Results: React.FC = () => {
     }
 
     async function refreshCaptcha() {
-        if (captchaLoading) return;
+        if (captchaLoading || fetching) return;
         setCaptchaLoading(true); setCaptchaCode('');
         try {
             const data: any = await attendanceService.getIPUCaptcha();
@@ -228,6 +299,7 @@ const Results: React.FC = () => {
     }
 
     async function handleFetchResults() {
+        if (fetching) return;
         if (!captchaCode.trim()) { setError('Please enter CAPTCHA.'); return; }
         setError(null); setFetching(true);
         try {
@@ -249,11 +321,13 @@ const Results: React.FC = () => {
             const status = e?.response?.status;
             const msg = e?.response?.data?.error || 'Failed to fetch.';
             setError(msg);
+            setCaptchaCode('');
             // 423 = account locked — stop immediately, never refresh captcha
             if (status === 423) {
                 setStep('form');
                 setPassword('');
             }
+            if (status === 401 || status === 429) showToast('error', 'Use a fresh CAPTCHA before retrying.');
             // For other failures (wrong captcha/creds) just show the error.
             // User can click ↻ to manually get a new CAPTCHA.
         } finally { setFetching(false); }
@@ -269,80 +343,139 @@ const Results: React.FC = () => {
         const allSubjects = sems.flatMap((s: any) => s.subjects || []);
         const totalCredits = sems.reduce((a: number, s: any) =>
             a + (s.subjects || []).reduce((b: number, sub: any) => b + (parseFloat(sub.credits || '0') || 0), 0), 0);
-        const totalMarks = allSubjects.reduce((a: number, s: any) =>
-            a + (parseFloat(s.marks || '0') || (parseFloat(s.internal || '0') + parseFloat(s.external || '0'))), 0);
-        const totalMaxMarks = allSubjects.reduce((a: number, s: any) => a + (parseFloat(s.max_marks || '100')), 0);
+        const completedSubjects = allSubjects.filter((s: any) => !s.is_pending && s.grade !== '-');
+        const totalMarks = completedSubjects.reduce((a: number, s: any) => a + getSubjectMarks(s).total, 0);
+        const totalMaxMarks = completedSubjects.reduce((a: number, s: any) => a + getSubjectMarks(s).maxMarks, 0);
         const passRate = allSubjects.length
             ? Math.round((allSubjects.filter((s: any) => (GRADE_POINTS[s.grade] ?? 0) >= 4).length / allSubjects.length) * 100)
             : 0;
-        return { cgpa, passRate, totalSubjects: allSubjects.length, totalMarks, totalMaxMarks, totalCredits };
+        const academicScore = allSubjects.length
+            ? Math.round((allSubjects.reduce((acc: number, s: any) => acc + (GRADE_POINTS[s.grade] ?? 0), 0) / (allSubjects.length * 10)) * 100)
+            : 0;
+        return { cgpa, passRate, totalSubjects: allSubjects.length, totalMarks, totalMaxMarks, totalCredits, completedSubjects: completedSubjects.length, academicScore };
     }, [results]);
 
     const semMetrics = useMemo(() => {
         if (!results?.semesters?.length || selectedSem === 'overall') return null;
-        const sem = results.semesters.find((s: any) => s.semester === selectedSem);
+        const sem = results.semesters.find((s: any) => String(s.semester_num ?? s.semester) === String(selectedSem));
         if (!sem) return null;
         const subjects = sem.subjects || [];
         const sgpa = sem.sgpa ? parseFloat(sem.sgpa) : calcSGPA(subjects);
         const totalCredits = subjects.reduce((a: number, s: any) => a + (parseFloat(s.credits || '0') || 0), 0);
-        const totalMarks = subjects.reduce((a: number, s: any) =>
-            a + (parseFloat(s.marks || '0') || (parseFloat(s.internal || '0') + parseFloat(s.external || '0'))), 0);
-        const totalMaxMarks = subjects.reduce((a: number, s: any) => a + (parseFloat(s.max_marks || '100')), 0);
+        const completedSubjects = subjects.filter((s: any) => !s.is_pending && s.grade !== '-');
+        const totalMarks = completedSubjects.reduce((a: number, s: any) => a + getSubjectMarks(s).total, 0);
+        const totalMaxMarks = completedSubjects.reduce((a: number, s: any) => a + getSubjectMarks(s).maxMarks, 0);
         const passRate = subjects.length
             ? Math.round((subjects.filter((s: any) => (GRADE_POINTS[s.grade] ?? 0) >= 4).length / subjects.length) * 100)
             : 0;
-        return { sgpa, passRate, totalSubjects: subjects.length, totalMarks, totalMaxMarks, totalCredits };
+        const pendingSubjects = subjects.filter((s: any) => s.is_pending || s.grade === '-').length;
+        return { sgpa, passRate, totalSubjects: subjects.length, totalMarks, totalMaxMarks, totalCredits, pendingSubjects };
     }, [results, selectedSem]);
 
     const currentMetrics = selectedSem === 'overall' ? metrics : semMetrics;
+    const profileInfo = normalizeProfileInfo(results?.student_info || {});
+    const displayBatch = buildBatchLabel(profileInfo);
+    const academicStrength = selectedSem === 'overall'
+        ? (results?.academicStrength ?? metrics?.academicScore ?? 0)
+        : Math.round((currentMetrics?.totalMarks ?? 0) / Math.max(currentMetrics?.totalMaxMarks ?? 1, 1) * 100);
 
     const currentSubjects = useMemo(() => {
         if (!results?.semesters) return [];
         if (selectedSem === 'overall') return results.semesters.flatMap((s: any) => s.subjects || []).slice(0, 20);
-        return results.semesters.find((s: any) => s.semester === selectedSem)?.subjects || [];
+        return results.semesters.find((s: any) => String(s.semester_num ?? s.semester) === String(selectedSem))?.subjects || [];
     }, [results, selectedSem]);
+
+    const currentSemesterMeta = useMemo(() => {
+        if (!results?.semesters?.length || selectedSem === 'overall') return null;
+        const semester = results.semesters.find((s: any) => String(s.semester_num ?? s.semester) === String(selectedSem));
+        const subjects = semester?.subjects || [];
+        const declaredDate = subjects.find((subject: any) => subject?.declared_date)?.declared_date || null;
+        const examSession = subjects.find((subject: any) => subject?.exam_session)?.exam_session || null;
+        if (!declaredDate && !examSession) return null;
+        return {
+            declaredDate: formatDeclaredDate(declaredDate),
+            examSession: examSession ? String(examSession) : null,
+        };
+    }, [results, selectedSem]);
+
+    const chartSubjects = useMemo(() =>
+        currentSubjects
+            .filter((s: any) => !s.is_pending)
+            .slice(0, selectedSem === 'overall' ? 10 : 12),
+    [currentSubjects, selectedSem]);
+
+    const performanceSummary = useMemo(() => {
+        if (!chartSubjects.length) return null;
+        const ranked = [...chartSubjects].sort((a: any, b: any) => getSubjectPercentage(b) - getSubjectPercentage(a));
+        return {
+            strongest: ranked[0],
+            weakest: ranked[ranked.length - 1],
+            distinctionCount: chartSubjects.filter((subject: any) => getSubjectPercentage(subject) >= 75).length,
+            pendingCount: currentSubjects.filter((subject: any) => subject.is_pending || subject.grade === '-').length,
+        };
+    }, [chartSubjects, currentSubjects]);
 
     /*  Chart data  */
     const barChartData = useMemo(() => ({
-        labels: currentSubjects.slice(0, 12).map((s: any) => s.code || s.name?.substring(0, 8) || '?'),
+        labels: chartSubjects.map((s: any) => s.code || s.name?.substring(0, 10) || '?'),
         datasets: [
-            { label: 'Marks', data: currentSubjects.slice(0, 12).map((s: any) => parseFloat(s.marks || '0') || (parseFloat(s.internal || '0') + parseFloat(s.external || '0'))), backgroundColor: accentColor, borderRadius: 6 },
+            {
+                label: 'Score %',
+                data: chartSubjects.map((s: any) => getSubjectPercentage(s)),
+                backgroundColor: chartSubjects.map((s: any) => {
+                    const pct = getSubjectPercentage(s);
+                    if (pct >= 75) return '#3b82f6';
+                    if (pct >= 60) return '#22c55e';
+                    if (pct >= 50) return '#f59e0b';
+                    return '#ef4444';
+                }),
+                borderRadius: 8,
+            },
         ],
-    }), [currentSubjects]);
+    }), [chartSubjects]);
 
     const barChartOptions: ChartOptions<'bar'> = {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
             x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } },
-            y: { grid: { color: gridColor }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 }, maxTicksLimit: 5 } },
+            y: { min: 0, max: 100, grid: { color: gridColor }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 }, maxTicksLimit: 5 } },
         },
     };
 
-    const radarOptions: ChartOptions<'radar'> = {
+    const marksBreakdownData = useMemo(() => ({
+        labels: chartSubjects.map((s: any) => s.code || s.name?.substring(0, 10) || '?'),
+        datasets: [
+            {
+                label: 'Internal',
+                data: chartSubjects.map((s: any) => getSubjectMarks(s).internal),
+                backgroundColor: 'rgba(59, 130, 246, 0.85)',
+                borderRadius: 6,
+            },
+            {
+                label: 'External',
+                data: chartSubjects.map((s: any) => getSubjectMarks(s).external),
+                backgroundColor: 'rgba(255,255,255,0.18)',
+                borderRadius: 6,
+            },
+        ],
+    }), [chartSubjects]);
+
+    const marksBreakdownOptions: ChartOptions<'bar'> = {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-            r: {
-                grid: { color: 'rgba(255,255,255,0.05)' },
-                angleLines: { color: 'rgba(255,255,255,0.05)' },
-                pointLabels: { color: 'rgba(255,255,255,0.3)', font: { size: 8 } },
-                ticks: { display: false, count: 5 },
+        plugins: {
+            legend: {
+                labels: {
+                    color: 'rgba(255,255,255,0.45)',
+                    font: { size: 10 },
+                },
             },
         },
+        scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } },
+            y: { stacked: true, grid: { color: gridColor }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 }, maxTicksLimit: 5 } },
+        },
     };
-
-    const radarChartData = useMemo(() => ({
-        labels: currentSubjects.slice(0, 8).map((s: any) => s.code || s.name?.substring(0, 8) || '?'),
-        datasets: [{
-            label: 'Performance',
-            data: currentSubjects.slice(0, 8).map((s: any) => {
-                const tot = parseFloat(s.marks || '0') || (parseFloat(s.internal || '0') + parseFloat(s.external || '0'));
-                return Math.round((tot / 100) * 100);
-            }),
-            backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: accentColor, borderWidth: 2, pointRadius: 2,
-        }],
-    }), [currentSubjects]);
 
     /* Grade Distribution Chart (Doughnut) */
     const gradeDistributionData = useMemo(() => {
@@ -390,6 +523,26 @@ const Results: React.FC = () => {
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                     className="max-w-md mx-auto mt-10"
                 >
+                    <div className="mb-4 rounded-3xl border border-amber-500/25 bg-amber-500/[0.06] p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-2xl border border-amber-500/20 bg-amber-500/10 flex items-center justify-center">
+                                <ShieldCheck size={18} className="text-amber-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-black text-white">Password Information</h3>
+                                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-300/60">Portal safety guidance</p>
+                            </div>
+                        </div>
+                        <ul className="space-y-2 text-sm leading-6 text-white/70">
+                            <li>Default password is your father&apos;s full name in capital letters.</li>
+                            <li>Include spaces exactly as registered on the IPU portal.</li>
+                            <li className="text-red-300">3 wrong attempts can temporarily lock your account.</li>
+                        </ul>
+                        <div className="mt-4 border-t border-white/10 pt-4 text-sm leading-6 text-white/55">
+                            Your credentials are never stored on our servers. They are only used for the live IPU session needed to fetch results.
+                        </div>
+                    </div>
+
                     <div className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] p-8 shadow-2xl" style={{ boxShadow: '0 0 40px rgba(59,130,246,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                         <div className="flex items-center gap-4 mb-8">
                             <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
@@ -450,7 +603,7 @@ const Results: React.FC = () => {
                                 <h2 className="text-xl font-black text-white tracking-tight">Security Check</h2>
                                 <p className="text-xs text-white/30 font-medium">Verify human identity</p>
                             </div>
-                            <button onClick={refreshCaptcha} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 active:scale-95 transition-transform">
+                            <button disabled={captchaLoading || fetching} onClick={refreshCaptcha} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed">
                                 <RefreshCw size={16} className={captchaLoading ? 'animate-spin' : ''} />
                             </button>
                         </div>
@@ -461,7 +614,8 @@ const Results: React.FC = () => {
                             }
                         </div>
                         <form onSubmit={(e) => { e.preventDefault(); handleFetchResults(); }}>
-                            <input value={captchaCode} onChange={e => setCaptchaCode(e.target.value)} placeholder="Type CAPTCHA..." className={`${inputCls} mb-4 text-center tracking-[0.4em] font-black uppercase`} required />
+                            <input disabled={fetching} value={captchaCode} onChange={e => setCaptchaCode(e.target.value)} placeholder="Enter code exactly as shown" className={`${inputCls} mb-3 text-center tracking-[0.2em] font-black disabled:opacity-60`} autoCapitalize="none" autoCorrect="off" spellCheck={false} required />
+                            <p className="mb-4 text-[11px] text-amber-400/70">CAPTCHA is case-sensitive and single-use. Refresh before every retry.</p>
                             <div className="flex gap-2">
                                 <Button type="button" onClick={() => setStep('form')} variant="secondary" className="flex-1 justify-center rounded-xl bg-white/5 border border-white/5 text-white/40 text-[10px] font-black uppercase tracking-widest">Back</Button>
                                 <Button type="submit" isLoading={fetching} className="flex-1 justify-center rounded-xl bg-blue-500 text-white font-black tracking-widest uppercase text-[10px] shadow-lg shadow-blue-500/20">Verify</Button>
@@ -488,8 +642,8 @@ const Results: React.FC = () => {
                                     <ShieldCheck size={18} className="text-blue-400" />
                                     <span className="text-[11px] font-black text-white/20 uppercase tracking-[0.2em]">Verified Academic Record</span>
                                 </div>
-                                <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-2">{results.student_info?.name || user?.name}</h1>
-                                <p className="text-blue-400/60 font-medium tracking-wide mb-8">{results.student_info?.programme} &bull; Batch {results.student_info?.batch}</p>
+                                <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-2">{profileInfo?.name || user?.name}</h1>
+                                <p className="text-blue-400/60 font-medium tracking-wide mb-8">{profileInfo?.programme || 'Programme unavailable'} &bull; Batch {displayBatch}</p>
 
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
                                     <div>
@@ -498,35 +652,35 @@ const Results: React.FC = () => {
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Batch</p>
-                                        <p className="text-sm font-bold text-white/70">{results.student_info?.batch || '---'}</p>
+                                        <p className="text-sm font-bold text-white/70">{displayBatch}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Admission Year</p>
-                                        <p className="text-sm font-bold text-white/70">{results.student_info?.admission_year || '---'}</p>
+                                        <p className="text-sm font-bold text-white/70">{profileInfo?.admission_year || '---'}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Gender</p>
-                                        <p className="text-sm font-bold text-white/70">{results.student_info?.gender || '---'}</p>
+                                        <p className="text-sm font-bold text-white/70">{profileInfo?.gender || '---'}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Father's Name</p>
-                                        <p className="text-sm font-bold text-white/70">{results.student_info?.father || '---'}</p>
+                                        <p className="text-sm font-bold text-white/70">{profileInfo?.father || '---'}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Mother's Name</p>
-                                        <p className="text-sm font-bold text-white/70">{results.student_info?.mother || '---'}</p>
+                                        <p className="text-sm font-bold text-white/70">{profileInfo?.mother || '---'}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Phone</p>
-                                        <p className="text-sm font-bold text-white/70">{results.student_info?.phone || '---'}</p>
+                                        <p className="text-sm font-bold text-white/70">{profileInfo?.phone || '---'}</p>
                                     </div>
                                     <div>
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Email</p>
-                                        <p className="text-sm font-bold text-white/70 truncate">{results.student_info?.email || '---'}</p>
+                                        <p className="text-sm font-bold text-white/70 truncate">{profileInfo?.email || '---'}</p>
                                     </div>
                                     <div className="col-span-2 md:col-span-1">
                                         <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Institution</p>
-                                        <p className="text-sm font-bold text-white/70 truncate">{results.student_info?.institution || '---'}</p>
+                                        <p className="text-sm font-bold text-white/70 truncate">{profileInfo?.institution || '---'}</p>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-5 border-t border-white/5">
@@ -562,13 +716,13 @@ const Results: React.FC = () => {
 
                             <div className="relative flex items-center justify-center">
                                 <CircularProgress
-                                    value={results.overallPercentage || 0} max={100}
+                                    value={selectedSem === 'overall' ? (results.academicStrength ?? academicStrength ?? 0) : academicStrength} max={100}
                                     primaryColor={accentColor} secondaryColor="rgba(255,255,255,0.02)"
                                     glowColor="rgba(59, 130, 246, 0.4)" size={160} strokeWidth={10}
                                 >
                                     <div className="text-center">
                                         <p className="text-5xl font-black text-white tracking-tighter leading-none">{results.cgpa ? parseFloat(results.cgpa).toFixed(2) : (metrics?.cgpa?.toFixed(2) || '---')}</p>
-                                        <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mt-2">{results.overallPercentage ? `${results.overallPercentage.toFixed(1)}%` : 'CGPA'}</p>
+                                        <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mt-2">{Math.round(selectedSem === 'overall' ? (results.academicStrength ?? academicStrength ?? 0) : academicStrength)}%</p>
                                     </div>
                                 </CircularProgress>
                             </div>
@@ -602,32 +756,63 @@ const Results: React.FC = () => {
                             className="grid grid-cols-2 md:grid-cols-4 gap-3"
                         >
                             {[
-                                { label: 'Total Marks', val: `${currentMetrics.totalMarks}/${currentMetrics.totalMaxMarks}`, icon: <BarChart3 size={15} />, color: accentColor },
+                                { label: 'Scored', val: `${currentMetrics.totalMarks}/${currentMetrics.totalMaxMarks}`, icon: <BarChart3 size={15} />, color: accentColor },
                                 { label: 'Pass Rate', val: `${currentMetrics.passRate}%`, icon: <TrendingUp size={15} />, color: '#3b82f6' },
                                 { label: selectedSem === 'overall' ? 'CGPA' : 'SGPA', val: (selectedSem === 'overall' ? metrics?.cgpa : semMetrics?.sgpa)?.toFixed(2) ?? '---', icon: <Activity size={15} />, color: '#8b5cf6' },
-                                { label: 'Total Credits', val: currentMetrics.totalCredits ? String(Math.round(currentMetrics.totalCredits)) : '---', icon: <BookOpen size={15} />, color: 'rgba(255,255,255,0.6)' },
+                                { label: 'Credits', val: currentMetrics.totalCredits ? String(Math.round(currentMetrics.totalCredits)) : '---', icon: <BookOpen size={15} />, color: 'rgba(255,255,255,0.8)' },
                             ].map(k => (
-                                <div key={k.label} className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5 flex flex-col justify-between min-h-[130px] group transition-all duration-500 hover:border-blue-500/20" style={{ boxShadow: '0 0 20px rgba(59,130,246,0.01), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                                <div key={k.label} className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5 md:p-6 flex flex-col justify-between min-h-[148px] group transition-all duration-500 hover:border-blue-500/20" style={{ boxShadow: '0 0 20px rgba(59,130,246,0.01), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{k.label}</span>
+                                        <span className="text-[11px] font-bold text-white/25 uppercase tracking-[0.18em]">{k.label}</span>
                                         <div style={{ color: `${k.color}80` }} className="group-hover:scale-110 transition-transform">{k.icon}</div>
                                     </div>
-                                    <p className="text-3xl font-black tracking-tighter" style={{ color: k.color }}>{k.val}</p>
+                                    <p className="text-[2rem] md:text-[2.35rem] leading-none font-black tracking-[-0.05em]" style={{ color: k.color }}>{k.val}</p>
                                 </div>
                             ))}
                         </motion.div>
                     )}
 
+                    {currentMetrics && performanceSummary && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.15 }}
+                            className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3"
+                        >
+                            <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5">
+                                <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Academic Power</p>
+                                <p className="text-3xl font-black tracking-tighter text-emerald-400">{Math.round(academicStrength)}%</p>
+                                <p className="text-xs text-white/35 mt-2">Single score that compresses marks strength into one quick read.</p>
+                            </div>
+                            <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5">
+                                <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Strongest Subject</p>
+                                <p className="text-2xl font-black tracking-tighter text-blue-400">{performanceSummary.strongest?.code || performanceSummary.strongest?.name || '---'}</p>
+                                <p className="text-xs text-white/35 mt-2">{performanceSummary.strongest ? `${getSubjectPercentage(performanceSummary.strongest)}% with ${performanceSummary.strongest.grade || 'no grade'}` : 'No completed subjects yet.'}</p>
+                            </div>
+                            <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5">
+                                <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Attention Needed</p>
+                                <p className="text-2xl font-black tracking-tighter text-amber-400">{performanceSummary.weakest?.code || performanceSummary.weakest?.name || '---'}</p>
+                                <p className="text-xs text-white/35 mt-2">{performanceSummary.weakest ? `${getSubjectPercentage(performanceSummary.weakest)}% and grade ${performanceSummary.weakest.grade || 'pending'}` : 'No weak subject detected.'}</p>
+                            </div>
+                            <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5">
+                                <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Distinction Count</p>
+                                <p className="text-3xl font-black tracking-tighter text-fuchsia-400">{performanceSummary.distinctionCount}</p>
+                                <p className="text-xs text-white/35 mt-2">{performanceSummary.pendingCount > 0 ? `${performanceSummary.pendingCount} pending subjects excluded from this count.` : 'Subjects currently scoring 75% or above.'}</p>
+                            </div>
+                        </motion.div>
+                    )}
+
                     {/* Charts */}
-                    {currentSubjects.length > 0 && (
+                    {chartSubjects.length > 0 && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                             <motion.div className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] p-6 min-h-[350px] flex flex-col hover:border-blue-500/20 transition-all duration-500">
-                                <h3 className="text-xs font-bold text-white/20 uppercase tracking-widest mb-6">Subject Statistics</h3>
+                                <h3 className="text-xs font-bold text-white/20 uppercase tracking-widest mb-2">Score Distribution</h3>
+                                <p className="text-xs text-white/30 mb-6">Clear ranking of subject-wise percentages so weak areas are obvious.</p>
                                 <div className="flex-1"><Bar data={barChartData} options={barChartOptions} /></div>
                             </motion.div>
                             <motion.div className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] p-6 min-h-[350px] flex flex-col hover:border-blue-500/20 transition-all duration-500">
-                                <h3 className="text-xs font-bold text-white/20 uppercase tracking-widest mb-6">Performance Radar</h3>
-                                <div className="flex-1 pb-4"><Radar data={radarChartData} options={radarOptions} /></div>
+                                <h3 className="text-xs font-bold text-white/20 uppercase tracking-widest mb-2">Marks Composition</h3>
+                                <p className="text-xs text-white/30 mb-6">Internal and external contributions per subject, useful for spotting missing or weak components.</p>
+                                <div className="flex-1 pb-4"><Bar data={marksBreakdownData} options={marksBreakdownOptions} /></div>
                             </motion.div>
                         </div>
                     )}
@@ -638,10 +823,19 @@ const Results: React.FC = () => {
                             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                             className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] overflow-hidden"
                         >
-                            <div className="p-6 border-b border-white/[0.05] flex items-center justify-between">
+                            <div className="p-6 border-b border-white/[0.05] flex items-center justify-between gap-4">
+                                <div>
                                 <h3 className="text-sm font-black text-white/70 uppercase tracking-widest">
                                     {results.semesters.find((s: any) => s.semester === selectedSem)?.semester_label || 'Semester'} — Subjects
                                 </h3>
+                                    {currentSemesterMeta && (
+                                        <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.18em] text-white/28">
+                                            {currentSemesterMeta.examSession && <span>Exam {currentSemesterMeta.examSession}</span>}
+                                            {currentSemesterMeta.examSession && currentSemesterMeta.declaredDate && <span className="mx-2 text-white/15">•</span>}
+                                            {currentSemesterMeta.declaredDate && <span>Declared {currentSemesterMeta.declaredDate}</span>}
+                                        </p>
+                                    )}
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase">{currentSubjects.length} Subjects</span>
                                     {semMetrics && <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-[10px] font-bold uppercase">SGPA {semMetrics.sgpa.toFixed(2)}</span>}
@@ -662,10 +856,9 @@ const Results: React.FC = () => {
                                     </thead>
                                     <tbody className="divide-y divide-white/[0.03]">
                                         {currentSubjects.map((sub: any, i: number) => {
-                                            const internal = parseFloat(sub.internal || sub.internal_theory || '0') || 0;
-                                            const external = parseFloat(sub.external || sub.external_theory || '0') || 0;
-                                            const tot = parseFloat(sub.marks || '0') || (internal + external) || parseFloat(sub.total_marks || '0');
-                                            const maxMarks = parseFloat(sub.max_marks || '100');
+                                            const { total, maxMarks, hasExplicitTotal } = getSubjectMarks(sub);
+                                            const displayInternal = getSubjectDisplayMark(sub.internal ?? sub.internal_theory);
+                                            const displayExternal = getSubjectDisplayMark(sub.external ?? sub.external_theory);
                                             return (
                                                 <tr key={i} className="group hover:bg-white/[0.02] transition-colors">
                                                     <td className="px-6 py-4 text-xs font-mono text-white/30">{sub.code || '---'}</td>
@@ -676,14 +869,15 @@ const Results: React.FC = () => {
                                                         <span className="text-sm font-black text-white/50">{sub.credits || '---'}</span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <span className="text-sm text-white/40">{internal || '---'}</span>
+                                                        <span className="text-sm text-white/40">{sub.is_pending ? 'Pending' : displayInternal}</span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        <span className="text-sm text-white/40">{external || '---'}</span>
+                                                        <span className="text-sm text-white/40">{sub.is_pending ? 'Pending' : displayExternal}</span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
                                                         <span className="text-sm font-bold text-white/60">
-                                                            {tot || '---'}<span className="text-white/20 text-xs">/{maxMarks}</span>
+                                                            {sub.is_pending ? 'Pending' : total}<span className="text-white/20 text-xs">/{maxMarks}</span>
+                                                            {!sub.is_pending && !hasExplicitTotal && <span className="ml-2 text-[10px] text-white/20">derived</span>}
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
@@ -892,18 +1086,29 @@ const Results: React.FC = () => {
                             <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{cpwError}</div>
                         )}
 
+                        <div className="mb-6 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+                            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.16em] mb-3">Portal Password Rules</p>
+                            <ul className="space-y-2 text-xs leading-5 text-white/55">
+                                <li>Use your current portal password in the first field.</li>
+                                <li>New password must include uppercase, lowercase, number, and one special character from !@#$%^&amp;*.</li>
+                                <li>The portal requires minimum 8 characters.</li>
+                                <li>Do not reuse the current password.</li>
+                                <li className="text-amber-300/80">After 3 unsuccessful attempts, the account can be locked and the session logged out.</li>
+                            </ul>
+                        </div>
+
                         <div className="space-y-3 mb-6">
                             <input
                                 type="password" value={cpwCurrent} onChange={e => setCpwCurrent(e.target.value)}
-                                placeholder="Current Password" className={inputCls}
+                                placeholder="Current Portal Password" className={inputCls}
                             />
                             <input
                                 type="password" value={cpwNew} onChange={e => setCpwNew(e.target.value)}
-                                placeholder="New Password" className={inputCls}
+                                placeholder="New Portal Password" className={inputCls}
                             />
                             <input
                                 type="password" value={cpwConfirm} onChange={e => setCpwConfirm(e.target.value)}
-                                placeholder="Confirm New Password" className={inputCls}
+                                placeholder="Retype New Password" className={inputCls}
                             />
                         </div>
 

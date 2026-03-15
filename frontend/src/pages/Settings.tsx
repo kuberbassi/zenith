@@ -118,7 +118,7 @@ const Settings: React.FC = () => {
 
     const [name, setName] = useState(user?.name || '');
     const [profileForm, setProfileForm] = useState({
-        course: '', college: '', semester: 1, batch: '', picture: '', enrollment_number: '',
+        course: '', branch: '', college: '', semester: 1, batch: '', picture: '', enrollment_number: '',
         attendance_threshold: 75, warning_threshold: 76,
         phone_number: '', headline: '', linkedin_url: '', github_url: '', portfolio_url: ''
     });
@@ -126,7 +126,7 @@ const Settings: React.FC = () => {
     useEffect(() => {
         if (user) {
             setProfileForm({
-                course: user.course || user.branch || '', college: user.college || '',
+                course: user.course || '', branch: user.branch || '', college: user.college || '',
                 semester: user.semester || user.current_semester || 1, batch: user.batch || '',
                 picture: user.picture || '', enrollment_number: user.enrollment_number || '',
                 attendance_threshold: user.attendance_threshold || 75,
@@ -325,7 +325,8 @@ const Settings: React.FC = () => {
                                         <div><label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2.5 ml-1">Comms Channel (Phone)</label><input value={profileForm.phone_number} onChange={e => setProfileForm({ ...profileForm, phone_number: e.target.value })} disabled={!isEditingProfile} className={inputCls} placeholder="+91 0000000000" /></div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div><label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2.5 ml-1">Specialization</label><input value={profileForm.course} onChange={e => setProfileForm({ ...profileForm, course: e.target.value })} disabled={!isEditingProfile} className={inputCls} /></div>
+                                        <div><label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2.5 ml-1">Degree (Course)</label><input value={profileForm.course} onChange={e => setProfileForm({ ...profileForm, course: e.target.value })} disabled={!isEditingProfile} className={inputCls} placeholder="e.g., B.Tech" /></div>
+                                        <div><label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2.5 ml-1">Branch</label><input value={profileForm.branch} onChange={e => setProfileForm({ ...profileForm, branch: e.target.value })} disabled={!isEditingProfile} className={inputCls} placeholder="e.g., CSE" /></div>
                                         <div><label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2.5 ml-1">Deployment Batch</label><input value={profileForm.batch} onChange={e => setProfileForm({ ...profileForm, batch: e.target.value })} disabled={!isEditingProfile} className={inputCls} /></div>
                                         <div><label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2.5 ml-1">Mission Semester</label><Select value={profileForm.semester} options={[1, 2, 3, 4, 5, 6, 7, 8].map(s => ({ value: s, label: `Cycle ${s}` }))} disabled={!isEditingProfile} onChange={e => setProfileForm({ ...profileForm, semester: parseInt(e.target.value) })} /></div>
                                     </div>

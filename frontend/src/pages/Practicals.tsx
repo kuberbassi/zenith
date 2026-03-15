@@ -39,12 +39,11 @@ const Practicals: React.FC = () => {
     };
 
     const handleUpdate = async (id: string | any, updates: { total?: number; completed?: number; hardcopy?: boolean }) => {
-        const subjectId = (typeof id === 'object' && id !== null) ? ((id as any).$oid || id.toString()) : id;
+        const subjectId = String(id);
         try {
             await attendanceService.updatePracticals(subjectId, updates);
             setSubjects((prev: Subject[]) => prev.map(sub => {
-                const subIdRaw = sub._id as any;
-                const subId = (typeof subIdRaw === 'object' && subIdRaw !== null) ? (subIdRaw.$oid || subIdRaw.toString()) : subIdRaw;
+                const subId = String(sub._id || (sub as any).id);
                 if (subId === subjectId) {
                     const current = sub.practicals || { total: 10, completed: 0, hardcopy: false };
                     return {
@@ -63,12 +62,11 @@ const Practicals: React.FC = () => {
     };
 
     const handleAssignmentUpdate = async (id: string | any, updates: { total?: number; completed?: number; hardcopy?: boolean }) => {
-        const subjectId = (typeof id === 'object' && id !== null) ? ((id as any).$oid || id.toString()) : id;
+        const subjectId = String(id);
         try {
             await attendanceService.updateAssignments(subjectId, updates);
             setSubjects((prev: Subject[]) => prev.map(sub => {
-                const subIdRaw = sub._id as any;
-                const subId = (typeof subIdRaw === 'object' && subIdRaw !== null) ? (subIdRaw.$oid || subIdRaw.toString()) : subIdRaw;
+                const subId = String(sub._id || (sub as any).id);
                 if (subId === subjectId) {
                     const current = sub.assignments || { total: 4, completed: 0 };
                     return {

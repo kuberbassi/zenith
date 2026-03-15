@@ -2,12 +2,13 @@ import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { LRUCache } from 'lru-cache'
 import { ENV } from '../config/env.js'
-import { User, type IUser } from '../models/User.js'
+import { prisma } from '../config/prisma.js'
+import type { User } from '../generated/prisma/client.js'
 
 export type ClientPlatform = 'web' | 'ios' | 'android' | 'unknown'
 
 export interface AuthRequest extends Request {
-  user?: IUser
+  user?: User
   userId?: string
   /** Detected client platform (set by detectPlatform middleware) */
   platform?: ClientPlatform
@@ -19,13 +20,10 @@ export interface AuthRequest extends Request {
  *  Caches verified JWT → user lookups for 60 seconds.
  *  Eliminates redundant DB queries for rapid-fire requests.
  * ──────────────────────────────────────────────────────────── */
-const userCache = new LRUCache<string, { user: IUser; userId: string }>({
+const userCache = new LRUCache<string, { user: User; userId: string }>({
   max: 500,
   ttl: 60_000, // 60 s
 })
-
-/** Projection — only fetch fields routes actually use */
-const USER_SELECT = 'name email picture semester current_semester college batch course branch attendance_threshold warning_threshold owner_email preferences google_id enrollment_number target_attendance created_at phone_number headline linkedin_url github_url portfolio_url'
 
 export async function requireAuth(
   req: AuthRequest,
@@ -51,12 +49,12 @@ export async function requireAuth(
   // ── Verify + lookup ──
   try {
     const payload = jwt.verify(token, ENV.JWT_SECRET) as { sub: string }
-    const user = await User.findById(payload.sub).select(USER_SELECT).lean()
+    const user = await prisma.user.findUnique({ where: { id: payload.sub } })
     if (!user) {
       res.status(401).json({ error: 'Unauthorized: user not found' })
       return
     }
-    const entry = { user: user as unknown as IUser, userId: user._id.toString() }
+    const entry = { user, userId: user.id }
     userCache.set(token, entry)
     req.user = entry.user
     req.userId = entry.userId

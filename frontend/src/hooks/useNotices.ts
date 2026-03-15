@@ -9,15 +9,12 @@ export const useNotices = () => {
             const notices = await attendanceService.getNotices();
             if (Array.isArray(notices)) {
                 return notices.sort((a: any, b: any) => {
-                    if (!a.date || !b.date) return 0;
-                    const pA = String(a.date).split('-');
-                    const pB = String(b.date).split('-');
-                    if (pA.length === 3 && pB.length === 3) {
-                        const dA = new Date(`${pA[2]}-${pA[1]}-${pA[0]}`).getTime();
-                        const dB = new Date(`${pB[2]}-${pB[1]}-${pB[0]}`).getTime();
-                        return dB - dA;
-                    }
-                    return 0;
+                    const toTime = (value: string) => {
+                        const [dd, mm, yyyy] = String(value || '').split('-');
+                        if (!dd || !mm || !yyyy) return 0;
+                        return new Date(`${yyyy}-${mm}-${dd}T00:00:00`).getTime();
+                    };
+                    return toTime(b.date) - toTime(a.date);
                 });
             }
             return notices;

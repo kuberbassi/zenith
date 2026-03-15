@@ -1,13 +1,8 @@
 import { Router } from 'express'
-import { Types } from 'mongoose'
 import { z } from 'zod'
 import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middleware/auth.js'
-import { User } from '../models/User.js'
-import { UserPreference } from '../models/UserPreference.js'
-import { Subject } from '../models/Subject.js'
-import { SystemLog } from '../models/SystemLog.js'
+import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
-import { uf } from '../utils/userFilter.js'
 import multer from 'multer'
 import sharp from 'sharp'
 
@@ -19,7 +14,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 
 const MAX_PFP_SIZE = 50 * 1024 // 50 KB
 
-// ─── Zod Schemas ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Zod Schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ProfileUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -56,30 +51,29 @@ const ProfilePostSchema = z.object({
   portfolio_url: z.string().url().max(500).optional().or(z.literal('')),
 }).strict()
 
-async function sysLog(user_id: string, action: string, description: string) {
-  await SystemLog.create({ user_id, action, description }).catch(() => null)
+async function sysLog(req: AuthRequest, user_id: string, action: string, description: string) {
+  const ip = req.ip || (req as any).socket?.remoteAddress || null
+  const user_agent = (req.headers['user-agent'] as string) || null
+  await prisma.systemLog.create({ data: { user_id, action, description, ip, user_agent } }).catch(() => null)
 }
 
-// ─── Profile ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 router.get('/', async (req: AuthRequest, res) => {
   try {
-    const user = await User.findById(req.userId).lean()
+    const userId = req.userId!
+    const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) { fail(res, 'User not found', 'USER_NOT_FOUND', 404); return }
 
     // Merge preferences thresholds
-    const prefs = await UserPreference.findOne({ ...uf(req) }).lean()
-    const merged = { ...user } as Record<string, unknown>
+    const prefs = await prisma.userPreference.findUnique({ where: { user_id: userId } })
+    const merged: Record<string, unknown> = { ...user, _id: user.id }
     if (prefs?.preferences) {
       const p = prefs.preferences as Record<string, unknown>
       if ('attendance_threshold' in p) merged.attendance_threshold = p.attendance_threshold
       if ('warning_threshold' in p) merged.warning_threshold = p.warning_threshold
       else if ('min_attendance' in p) merged.warning_threshold = p.min_attendance
     }
-
-    // Sync course / branch aliases
-    if (merged.course && !merged.branch) merged.branch = merged.course
-    if (merged.branch && !merged.course) merged.course = merged.branch
 
     ok(res, merged)
   } catch (err) {
@@ -96,7 +90,7 @@ router.put('/', async (req: AuthRequest, res) => {
     const data = parsed.data
     const updateData: Record<string, unknown> = { ...data }
 
-    // Map 'semester' → 'current_semester' for schema compatibility
+    // Map 'semester' â†’ 'current_semester'
     if ('semester' in updateData) {
       const semVal = parseInt(String(updateData.semester))
       if (!isNaN(semVal) && semVal >= 1 && semVal <= 12) {
@@ -105,48 +99,30 @@ router.put('/', async (req: AuthRequest, res) => {
       delete updateData.semester
     }
 
-    // Sync course / branch
-    if ('course' in updateData && !('branch' in updateData)) updateData.branch = updateData.course
-    else if ('branch' in updateData && !('course' in updateData)) updateData.course = updateData.branch
-
     // Sync target_attendance = attendance_threshold
     if ('attendance_threshold' in updateData) {
       updateData.target_attendance = updateData.attendance_threshold
     }
 
-    console.log(`[profile PUT] Updating user ${userId}:`, updateData)
-    const result = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true })
-    console.log(`[profile PUT] New user doc exists:`, !!result)
-    if (result) {
-      console.log(`[profile PUT] Saved phone_number:`, result.phone_number)
-    }
+    await prisma.user.update({ where: { id: userId }, data: updateData as Parameters<typeof prisma.user.update>[0]['data'] })
 
-    // Mirror thresholds to UserPreference doc for consistency
+    // Mirror thresholds to UserPreference
     const thresholdMirror: Record<string, unknown> = {}
     if ('attendance_threshold' in data) thresholdMirror.attendance_threshold = data.attendance_threshold
     if ('warning_threshold' in data) thresholdMirror.warning_threshold = data.warning_threshold
     if (Object.keys(thresholdMirror).length) {
-      const existing = await UserPreference.findOne({ ...uf(req) }).lean()
+      const existing = await prisma.userPreference.findUnique({ where: { user_id: userId } })
       const existingPrefs = (existing?.preferences ?? {}) as Record<string, unknown>
       const merged = { ...existingPrefs, ...thresholdMirror }
-      if (existing) {
-        // Only update preferences — never touch user_id to avoid unique index collision
-        // (user may have two docs: one Flask owner_email doc and one Node user_id doc)
-        await UserPreference.updateOne(
-          { _id: existing._id },
-          { $set: { preferences: merged, updated_at: new Date() } },
-        )
-      } else {
-        await UserPreference.create({
-          user_id: new Types.ObjectId(userId),
-          preferences: merged,
-          updated_at: new Date(),
-        })
-      }
+      await prisma.userPreference.upsert({
+        where: { user_id: userId },
+        create: { user_id: userId, preferences: merged as any },
+        update: { preferences: merged as any },
+      })
     }
 
     invalidateAuthCache(req.headers.authorization?.slice(7))
-    sysLog(userId, 'Profile Updated', 'User updated their profile information.').catch(() => { })
+    sysLog(req, userId, 'Profile Updated', 'User updated their profile information.').catch(() => { })
     ok(res, { message: 'Profile updated' })
   } catch (err) {
     console.error('[profile PUT]', err)
@@ -174,9 +150,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
     if (Object.keys(updateData).length === 0) { ok(res, { message: 'No changes' }); return }
 
-    console.log(`[profile POST] Updating user ${userId}:`, updateData)
-    const result = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true })
-    console.log(`[profile POST] Result exists:`, !!result)
+    await prisma.user.update({ where: { id: userId }, data: updateData as Parameters<typeof prisma.user.update>[0]['data'] })
 
     invalidateAuthCache(req.headers.authorization?.slice(7))
     ok(res, { message: 'Profile updated' })
@@ -186,7 +160,7 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 })
 
-// ─── Profile Picture ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Profile Picture â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 router.post('/upload_pfp', upload.single('file'), async (req: AuthRequest, res) => {
   try {
@@ -210,12 +184,11 @@ router.post('/upload_pfp', upload.single('file'), async (req: AuthRequest, res) 
     }
 
     const b64 = compressedBuffer.toString('base64')
-    const mime = 'image/webp'
-    const pfpUrl = `data:${mime};base64,${b64}`
+    const pfpUrl = `data:image/webp;base64,${b64}`
 
-    await User.updateOne({ _id: userId }, { $set: { picture: pfpUrl } })
+    await prisma.user.update({ where: { id: userId }, data: { picture: pfpUrl } })
     invalidateAuthCache(req.headers.authorization?.slice(7))
-    sysLog(userId, 'PFP Updated', 'User uploaded a new profile picture.').catch(() => { })
+    sysLog(req, userId, 'PFP Updated', 'User uploaded a new profile picture.').catch(() => { })
     ok(res, { url: pfpUrl })
   } catch (err) {
     console.error('[profile/upload_pfp]', err)
@@ -223,7 +196,7 @@ router.post('/upload_pfp', upload.single('file'), async (req: AuthRequest, res) 
   }
 })
 
-// ─── Preferences ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Preferences â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const DEFAULT_PREFS = {
   attendance_threshold: 75,
@@ -234,8 +207,8 @@ const DEFAULT_PREFS = {
 
 router.get('/preferences', async (req: AuthRequest, res) => {
   try {
-    const doc = await UserPreference.findOne({ ...uf(req) }).lean()
-    const merged = { ...DEFAULT_PREFS, ...(doc?.preferences ?? {}) }
+    const doc = await prisma.userPreference.findUnique({ where: { user_id: req.userId! } })
+    const merged = { ...DEFAULT_PREFS, ...((doc?.preferences ?? {}) as Record<string, unknown>) }
     ok(res, merged)
   } catch (err) {
     console.error('[profile/preferences GET]', err)
@@ -251,35 +224,29 @@ router.post('/preferences', async (req: AuthRequest, res) => {
     // Normalize alias
     if ('min_attendance' in data) { data.warning_threshold = data.min_attendance; delete data.min_attendance }
 
-    const existing = await UserPreference.findOne({ ...uf(req) }).lean()
+    const existing = await prisma.userPreference.findUnique({ where: { user_id: userId } })
     const existingPrefs = (existing?.preferences ?? {}) as Record<string, unknown>
     const merged = { ...existingPrefs, ...data }
 
-    // Update existing doc if found (may be an owner_email doc from Flask), otherwise upsert by user_id
-    if (existing) {
-      await UserPreference.updateOne(
-        { _id: existing._id },
-        { $set: { preferences: merged, updated_at: new Date() } },
-      )
-    } else {
-      await UserPreference.create({
-        user_id: new Types.ObjectId(userId),
-        preferences: merged,
-        updated_at: new Date(),
-      })
-    }
+    await prisma.userPreference.upsert({
+      where: { user_id: userId },
+      create: { user_id: userId, preferences: merged as any },
+      update: { preferences: merged as any },
+    })
 
     // Mirror thresholds to user doc
     const mirror: Record<string, unknown> = {}
     if ('attendance_threshold' in data) {
       mirror.attendance_threshold = data.attendance_threshold
-      mirror.target_attendance = data.attendance_threshold // keep in sync
+      mirror.target_attendance = data.attendance_threshold
     }
     if ('warning_threshold' in data) mirror.warning_threshold = data.warning_threshold
-    if (Object.keys(mirror).length) await User.updateOne({ _id: userId }, { $set: mirror })
+    if (Object.keys(mirror).length) {
+      await prisma.user.update({ where: { id: userId }, data: mirror as Parameters<typeof prisma.user.update>[0]['data'] })
+    }
 
     invalidateAuthCache(req.headers.authorization?.slice(7))
-    sysLog(userId, 'Preferences Updated', `Updated preferences: ${Object.keys(data).join(', ')}`).catch(() => { })
+    sysLog(req, userId, 'Preferences Updated', `Updated preferences: ${Object.keys(data).join(', ')}`).catch(() => { })
 
     ok(res, { message: 'Preferences saved' })
   } catch (err) {
@@ -288,31 +255,37 @@ router.post('/preferences', async (req: AuthRequest, res) => {
   }
 })
 
-// ─── Sync Thresholds to Subjects ─────────────────────────────────────────────
+// â”€â”€â”€ Sync Thresholds to Subjects â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 router.post('/sync-thresholds', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const user = await User.findById(userId).lean()
+    const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) { fail(res, 'User not found', 'NOT_FOUND', 404); return }
 
     const threshold = user.attendance_threshold ?? 75
     const semester = req.body.semester ? parseInt(String(req.body.semester)) : undefined
 
-    const filter: Record<string, unknown> = { user_id: userId }
-    if (semester) filter.semester = semester
+    const subjects = await prisma.subject.findMany({
+      where: { user_id: userId, ...(semester ? { semester } : {}) },
+      select: { id: true },
+    })
 
-    const result = await Subject.updateMany(filter, { $set: { target: threshold } })
+    let modified = 0
+    for (const subject of subjects) {
+      await prisma.subject.update({ where: { id: subject.id }, data: { target: threshold } })
+      modified += 1
+    }
 
-    sysLog(userId, 'Thresholds Synced', `Updated ${result.modifiedCount} subjects to ${threshold}% target${semester ? ` (semester ${semester})` : ''}`).catch(() => { })
-    ok(res, { message: `Updated ${result.modifiedCount} subjects`, threshold, modified: result.modifiedCount })
+    sysLog(req, userId, 'Thresholds Synced', `Updated ${modified} subjects to ${threshold}% target${semester ? ` (semester ${semester})` : ''}`).catch(() => { })
+    ok(res, { message: `Updated ${modified} subjects`, threshold, modified })
   } catch (err) {
     console.error('[profile/sync-thresholds]', err)
     fail(res, 'Failed to sync thresholds', 'SYNC_FAILED', 500)
   }
 })
 
-// ─── Biometric ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Biometric â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 router.post('/biometric/register', async (req: AuthRequest, res) => {
   try {
@@ -320,10 +293,10 @@ router.post('/biometric/register', async (req: AuthRequest, res) => {
     const { public_key, device_id = 'default' } = req.body as { public_key?: string; device_id?: string }
     if (!public_key) { fail(res, 'Public key required', 'KEY_REQUIRED'); return }
 
-    await User.updateOne(
-      { _id: userId },
-      { $set: { [`biometrics.${device_id}`]: { public_key, registered_at: new Date() } } },
-    )
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { biometrics: true } })
+    const biometrics = ((user?.biometrics as Record<string, unknown>) ?? {})
+    biometrics[device_id] = { public_key, registered_at: new Date().toISOString() }
+    await prisma.user.update({ where: { id: userId }, data: { biometrics: biometrics as any } })
     ok(res, { message: 'Biometric credential registered' })
   } catch (err) {
     console.error('[profile/biometric/register]', err)
@@ -331,11 +304,15 @@ router.post('/biometric/register', async (req: AuthRequest, res) => {
   }
 })
 
-// ─── System Logs ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ System Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 router.get('/logs', async (req: AuthRequest, res) => {
   try {
-    const logs = await SystemLog.find({ ...uf(req) }).sort({ timestamp: -1 }).limit(50).lean()
+    const logs = await prisma.systemLog.findMany({
+      where: { user_id: req.userId! },
+      orderBy: { timestamp: 'desc' },
+      take: 50,
+    })
     ok(res, logs)
   } catch (err) {
     console.error('[profile/logs]', err)

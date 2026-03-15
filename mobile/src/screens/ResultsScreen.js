@@ -29,8 +29,7 @@ if (Platform.OS === 'android') {
 
 import { useSemester } from '../contexts/SemesterContext';
 
-/* ── Demo / Preview data (shown when account is locked) ──────────── */
-const MOBILE_MOCK = {
+const ResultsScreen = ({ navigation }) => {
     cgpa: '8.12',
     semesters: [
         {
@@ -87,8 +86,7 @@ const MOBILE_MOCK = {
                 { code: 'PR-501', name: 'Minor Project', type: 'theory', internal_theory: '27', external_theory: '65', credits: '4', grade: 'O', grade_point: 10 },
             ],
         },
-    ],
-};
+
 
 const ResultsScreen = ({ navigation }) => {
     const { isDark, colors: themeColors } = useTheme();
@@ -246,14 +244,6 @@ const ResultsScreen = ({ navigation }) => {
 
         const sgpa = totalCredits > 0 ? (weightedSum / totalCredits).toFixed(2) : "0.00";
         return { sgpa, credits: totalCredits, processedSubjects: processed };
-    };
-
-    const loadDemoData = () => {
-        setResults(MOBILE_MOCK.semesters);
-        setAvailableSems(MOBILE_MOCK.semesters.map(s => s.semester));
-        calculateOverallStats(MOBILE_MOCK.semesters, MOBILE_MOCK.cgpa);
-        setLastUpdated(null);
-        setStep('results');
     };
 
     const handleAutoFetch = async () => {
@@ -605,16 +595,7 @@ const ResultsScreen = ({ navigation }) => {
                             </View>
                         </View>
 
-                        {/* Demo preview banner */}
-                        <TouchableOpacity
-                            onPress={loadDemoData}
-                            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(99,102,241,0.2)', backgroundColor: 'rgba(99,102,241,0.05)', padding: 12, marginTop: 20, marginBottom: 4 }}
-                        >
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: c.subtext, textTransform: 'uppercase', letterSpacing: 0.5 }}>Account locked? Preview demo</Text>
-                            <Text style={{ fontSize: 11, fontWeight: '900', color: c.primary }}>VIEW →</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={handleAutoFetch} disabled={fetching} style={{ marginTop: 12 }}>
+                        <TouchableOpacity onPress={handleAutoFetch} disabled={fetching} style={{ marginTop: 24 }}>
                             <LinearGradient colors={theme.gradients.primary} style={styles.syncBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                                 {fetching ? <ActivityIndicator color="#FFF" /> : (
                                     <>

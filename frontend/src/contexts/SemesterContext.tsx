@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { authService } from '@/services/auth.service';
+import api from '@/services/api';
 
 interface SemesterContextType {
     currentSemester: number;
@@ -39,6 +40,7 @@ export const SemesterProvider: React.FC<{ children: ReactNode }> = ({ children }
     const setCurrentSemester = (semester: number) => {
         setCurrentSemesterState(semester);
         localStorage.setItem('acadhub_semester', semester.toString());
+        api.post('/api/profile/preferences', { last_semester: semester }).catch(() => {});
     };
 
     return (

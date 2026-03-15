@@ -1,23 +1,13 @@
 import { Router } from 'express'
-import { Types } from 'mongoose'
+import { randomUUID } from 'crypto'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
-import { User } from '../models/User.js'
-import { Subject } from '../models/Subject.js'
-import { AttendanceLog } from '../models/AttendanceLog.js'
-import { SemesterResult } from '../models/SemesterResult.js'
-import { ManualCourse } from '../models/ManualCourse.js'
-import { Timetable } from '../models/Timetable.js'
-import { Skill } from '../models/Skill.js'
-import { UserPreference } from '../models/UserPreference.js'
-import { Holiday } from '../models/Holiday.js'
-import { UserBackup } from '../models/UserBackup.js'
-import { SystemLog } from '../models/SystemLog.js'
+import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
 
 const router = Router()
 router.use(requireAuth)
 
-// In-memory rate limit for destructive ops (use Redis in production)
+// In-memory rate limit for destructive ops
 const _deleteAttempts = new Map<string, Date>()
 const DELETE_COOLDOWN_MS = 5 * 60 * 1000
 const MAX_DELETE_ENTRIES = 500
@@ -32,7 +22,6 @@ function checkDeleteRateLimit(userId: string): { ok: boolean; waitMinutes: numbe
       return { ok: false, waitMinutes: wait }
     }
   }
-  // Prune stale entries if map grows too large
   if (_deleteAttempts.size > MAX_DELETE_ENTRIES) {
     for (const [key, date] of _deleteAttempts) {
       if (now.getTime() - date.getTime() > DELETE_COOLDOWN_MS) _deleteAttempts.delete(key)
@@ -55,45 +44,19 @@ type UserData = {
   user_profile?: unknown
 }
 
-async function collectUserData(userId: string, email?: string): Promise<UserData> {
-  const uid = new Types.ObjectId(userId)
-  // Support both Node schema (user_id: ObjectId) and Flask schema (owner_email: string)
-  const f = email
-    ? { $or: [{ user_id: uid }, { owner_email: email.toLowerCase() }] }
-    : { user_id: uid }
-  const [
-    subjects,
-    attendance_logs,
-    timetable,
-    semester_results,
-    manual_courses,
-    user_preferences,
-    skills,
-    holidays,
-    system_logs,
-  ] = await Promise.all([
-    Subject.find(f).lean(),
-    AttendanceLog.find(f).lean(),
-    Timetable.find(f).lean(),
-    SemesterResult.find(f).lean(),
-    ManualCourse.find(f).lean(),
-    UserPreference.find(f).lean(),
-    Skill.find(f).lean(),
-    Holiday.find(f).lean(),
-    SystemLog.find(f).lean(),
+async function collectUserData(userId: string): Promise<UserData> {
+  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, holidays, system_logs] = await Promise.all([
+    prisma.subject.findMany({ where: { user_id: userId } }),
+    prisma.attendanceLog.findMany({ where: { user_id: userId } }),
+    prisma.timetable.findMany({ where: { user_id: userId } }),
+    prisma.semesterResult.findMany({ where: { user_id: userId } }),
+    prisma.manualCourse.findMany({ where: { user_id: userId } }),
+    prisma.userPreference.findMany({ where: { user_id: userId } }),
+    prisma.skill.findMany({ where: { user_id: userId } }),
+    prisma.holiday.findMany({ where: { user_id: userId } }),
+    prisma.systemLog.findMany({ where: { user_id: userId }, orderBy: { timestamp: 'desc' }, take: 500 }),
   ])
-
-  return {
-    subjects,
-    attendance_logs,
-    timetable,
-    semester_results,
-    manual_courses,
-    user_preferences,
-    skills,
-    holidays,
-    system_logs,
-  }
+  return { subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, holidays, system_logs }
 }
 
 // ─── Export ──────────────────────────────────────────────────────────────────
@@ -101,17 +64,16 @@ async function collectUserData(userId: string, email?: string): Promise<UserData
 router.get('/export_data', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const user = await User.findById(userId).select('-biometrics').lean()
+    const user = await prisma.user.findUnique({ where: { id: userId } })
 
-    const data = await collectUserData(userId, req.user?.email)
-    if (user) data.user_profile = { ...user, password_hash: undefined, google_id: undefined }
+    const data = await collectUserData(userId)
+    if (user) {
+      const { google_id: _g, ...safeUser } = user as any
+      data.user_profile = safeUser
+    }
 
     const payload = {
-      metadata: {
-        version: '2.0',
-        exported_at: new Date().toISOString(),
-        source_email: user?.email ?? '',
-      },
+      metadata: { version: '2.0', exported_at: new Date().toISOString(), source_email: user?.email ?? '' },
       data,
     }
 
@@ -133,119 +95,177 @@ router.get('/export_data', async (req: AuthRequest, res) => {
 router.post('/import_data', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const uid = new Types.ObjectId(userId)
     const body = req.body as { data?: UserData }
     if (!body?.data) { fail(res, 'Invalid import file format', 'INVALID_FORMAT'); return }
 
     const importData = body.data
-    const idMap = new Map<string, Types.ObjectId>()
+    const idMap = new Map<string, string>()
 
-    // Get user email for legacy owner_email doc cleanup
-    const user = await User.findById(userId).lean()
-    const email = user?.email?.toLowerCase()
-    const clearFilter = email
-      ? { $or: [{ user_id: uid }, { owner_email: email }] }
-      : { user_id: uid }
-
-    // 1. Clear existing data (both user_id and owner_email docs)
+    // 1. Clear existing data
     await Promise.all([
-      Subject.deleteMany(clearFilter),
-      AttendanceLog.deleteMany(clearFilter),
-      Timetable.deleteMany(clearFilter),
-      SemesterResult.deleteMany(clearFilter),
-      ManualCourse.deleteMany(clearFilter),
-      UserPreference.deleteMany(clearFilter),
-      Skill.deleteMany(clearFilter),
-      Holiday.deleteMany(clearFilter),
-      SystemLog.deleteMany(clearFilter),
+      prisma.subject.deleteMany({ where: { user_id: userId } }), // cascades attendance_logs
+      prisma.timetable.deleteMany({ where: { user_id: userId } }),
+      prisma.semesterResult.deleteMany({ where: { user_id: userId } }),
+      prisma.manualCourse.deleteMany({ where: { user_id: userId } }),
+      prisma.userPreference.deleteMany({ where: { user_id: userId } }),
+      prisma.skill.deleteMany({ where: { user_id: userId } }),
+      prisma.holiday.deleteMany({ where: { user_id: userId } }),
+      prisma.systemLog.deleteMany({ where: { user_id: userId } }),
     ])
 
-    // Helper: restore BSON-like types
-    function restoreTypes(obj: unknown): unknown {
-      if (Array.isArray(obj)) return obj.map(restoreTypes)
-      if (obj && typeof obj === 'object') {
-        const o = obj as Record<string, unknown>
-        if ('$oid' in o) return new Types.ObjectId(o.$oid as string)
-        if ('$date' in o) {
-          const v = o.$date
-          if (typeof v === 'number') return new Date(v)
-          if (typeof v === 'string') return new Date(v)
-          return v
-        }
-        return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, restoreTypes(v)]))
-      }
-      return obj
-    }
-
-    // 2. Insert subjects first (build ID map)
+    // 2. Insert subjects first — build ID map from old id → new id
     if (importData.subjects?.length) {
-      const clean = importData.subjects.map((item) => {
-        const s = restoreTypes(item) as Record<string, unknown>
-        const oldId = String(s._id ?? '')
-        const newId = new Types.ObjectId()
+      const subjectsData = (importData.subjects as any[]).map(s => {
+        const oldId = String(s._id ?? s.id ?? '')
+        const newId = randomUUID()
         if (oldId) idMap.set(oldId, newId)
-        return { ...s, _id: newId, user_id: uid }
+        return {
+          id: newId,
+          user_id: userId,
+          name: String(s.name ?? ''),
+          code: String(s.code ?? ''),
+          professor: String(s.professor ?? ''),
+          classroom: String(s.classroom ?? ''),
+          semester: Number(s.semester ?? 1),
+          type: String(s.type ?? 'theory'),
+          credits: s.credits != null ? Number(s.credits) : null,
+          attended: Number(s.attended ?? 0),
+          total: Number(s.total ?? 0),
+          target: Number(s.target ?? 75),
+          categories: Array.isArray(s.categories) ? s.categories : ['Theory'],
+          practicals: s.practicals ?? null,
+          assignments: s.assignments ?? null,
+          syllabus: s.syllabus ?? null,
+        }
       })
-      await Subject.insertMany(clean, { ordered: false }).catch(() => null)
+      await prisma.subject.createMany({ data: subjectsData }).catch(() => null)
     }
 
-    // 3. Insert attendance logs (remap subject_id)
+    // 3. Insert attendance logs — remap subject_id
     if (importData.attendance_logs?.length) {
-      const clean = importData.attendance_logs.map((item) => {
-        const l = restoreTypes(item) as Record<string, unknown>
-        const subRef = String(l.subject_id ?? '')
-        if (subRef && idMap.has(subRef)) l.subject_id = idMap.get(subRef)
-        return { ...l, _id: new Types.ObjectId(), user_id: uid }
+      const logsData = (importData.attendance_logs as any[]).map(l => {
+        const oldSubId = String(l.subject_id ?? '')
+        const newSubId = idMap.get(oldSubId) ?? oldSubId
+        return {
+          id: randomUUID(),
+          user_id: userId,
+          subject_id: newSubId,
+          subject_name: String(l.subject_name ?? ''),
+          date: String(l.date ?? ''),
+          status: l.status ?? 'present',
+          type: String(l.type ?? 'Lecture'),
+          notes: l.notes ?? null,
+          semester: l.semester != null ? Number(l.semester) : null,
+          substituted_by: l.substituted_by ? (idMap.get(String(l.substituted_by)) ?? String(l.substituted_by)) : null,
+          timestamp: l.timestamp ? new Date(l.timestamp) : new Date(),
+        }
       })
-      await AttendanceLog.insertMany(clean, { ordered: false }).catch(() => null)
+      await prisma.attendanceLog.createMany({ data: logsData as any }).catch(() => null)
     }
 
-    // 4. Insert timetable (remap slot subject_ids)
+    // 4. Insert timetable — remap slot subject_ids
     if (importData.timetable?.length) {
-      const clean = importData.timetable.map((item) => {
-        const t = restoreTypes(item) as Record<string, unknown>
-        if (t.schedule && typeof t.schedule === 'object') {
-          const sched = t.schedule as Record<string, Array<Record<string, unknown>>>
-          for (const day of Object.keys(sched)) {
-            for (const slot of sched[day]) {
-              const sRef = String(slot.subjectId ?? slot.subject_id ?? '')
+      const timetableData = (importData.timetable as any[]).map(t => {
+        const schedule = JSON.parse(JSON.stringify(t.schedule ?? {}))
+        for (const day of Object.keys(schedule)) {
+          if (Array.isArray(schedule[day])) {
+            for (const slot of schedule[day]) {
+              const sRef = String(slot.subject_id ?? slot.subjectId ?? '')
               if (sRef && idMap.has(sRef)) {
-                slot.subject_id = String(idMap.get(sRef))
+                slot.subject_id = idMap.get(sRef)
                 delete slot.subjectId
               }
             }
           }
         }
-        return { ...t, _id: new Types.ObjectId(), user_id: uid }
+        return {
+          id: randomUUID(),
+          user_id: userId,
+          semester: Number(t.semester ?? 1),
+          schedule,
+          periods: t.periods ?? null,
+        }
       })
-      await Timetable.insertMany(clean, { ordered: false }).catch(() => null)
+      await prisma.timetable.createMany({ data: timetableData as any }).catch(() => null)
     }
 
-    // 5. Other collections
-    const simpleCollections: Array<{ data: unknown[] | undefined; Model: { insertMany: (d: unknown[], o?: object) => Promise<unknown> } }> = [
-      { data: importData.semester_results, Model: SemesterResult },
-      { data: importData.manual_courses, Model: ManualCourse },
-      { data: importData.user_preferences, Model: UserPreference },
-      { data: importData.skills, Model: Skill },
-      { data: importData.holidays, Model: Holiday },
-      { data: importData.system_logs, Model: SystemLog },
-    ]
-
-    for (const { data, Model } of simpleCollections) {
-      if (data?.length) {
-        const clean = data.map((item) => {
-          const d = restoreTypes(item) as Record<string, unknown>
-          return { ...d, _id: new Types.ObjectId(), user_id: uid }
-        })
-        await Model.insertMany(clean, { ordered: false }).catch(() => null)
-      }
+    // 5. Semester results
+    if (importData.semester_results?.length) {
+      await prisma.semesterResult.createMany({
+        data: (importData.semester_results as any[]).map(r => ({
+          id: randomUUID(),
+          user_id: userId,
+          semester: Number(r.semester ?? 1),
+          subjects: r.subjects ?? [],
+          sgpa: Number(r.sgpa ?? 0),
+          total_credits: Number(r.total_credits ?? 0),
+          student_info: r.student_info ?? null,
+          source: r.source ?? 'manual',
+          enrollment_number: r.enrollment_number ?? null,
+          semester_label: r.semester_label ?? null,
+        })),
+      }).catch(() => null)
     }
 
-    // 6. Restore profile
+    // 6. Manual courses
+    if (importData.manual_courses?.length) {
+      await prisma.manualCourse.createMany({
+        data: (importData.manual_courses as any[]).map(c => ({
+          id: randomUUID(),
+          user_id: userId,
+          name: c.name ?? null,
+          platform: c.platform ?? c.provider ?? null,
+          status: c.status ?? null,
+          progress: Number(c.progress ?? c.percentage ?? 0),
+          url: c.url ?? null,
+          notes: c.notes ?? null,
+        })),
+      }).catch(() => null)
+    }
+
+    // 7. User preferences (upsert — 1 per user)
+    if (importData.user_preferences?.length) {
+      const pref = (importData.user_preferences as any[])[0]
+      await prisma.userPreference.upsert({
+        where: { user_id: userId },
+        create: { user_id: userId, preferences: pref.preferences ?? {} },
+        update: { preferences: pref.preferences ?? {} },
+      }).catch(() => null)
+    }
+
+    // 8. Skills
+    if (importData.skills?.length) {
+      await prisma.skill.createMany({
+        data: (importData.skills as any[]).map(s => ({
+          id: randomUUID(),
+          user_id: userId,
+          name: String(s.name ?? ''),
+          category: s.category ?? null,
+          level: s.level ?? null,
+          progress: Number(s.progress ?? 0),
+          notes: s.notes ?? '',
+        })),
+      }).catch(() => null)
+    }
+
+    // 9. Holidays
+    if (importData.holidays?.length) {
+      await prisma.holiday.createMany({
+        data: (importData.holidays as any[]).map(h => ({
+          id: randomUUID(),
+          user_id: userId,
+          date: String(h.date ?? ''),
+          name: String(h.name ?? ''),
+        })),
+      }).catch(() => null)
+    }
+
+    // 10. Restore profile
     if (importData.user_profile) {
       const profile = { ...(importData.user_profile as Record<string, unknown>) }
-      delete profile._id; delete profile.email; delete profile.password_hash; delete profile.biometrics
-      await User.updateOne({ _id: uid }, { $set: profile })
+      delete profile.id; delete profile._id; delete profile.email; delete profile.google_id
+      delete profile.created_at; delete profile.updated_at
+      await prisma.user.update({ where: { id: userId }, data: profile as any }).catch(() => null)
     }
 
     ok(res, { message: 'Data imported successfully' })
@@ -260,18 +280,15 @@ router.post('/import_data', async (req: AuthRequest, res) => {
 router.delete('/delete_all_data', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const uid = new Types.ObjectId(userId)
 
-    // Rate limit
     const rl = checkDeleteRateLimit(userId)
     if (!rl.ok) {
       fail(res, `Please wait ${rl.waitMinutes} more minutes before deleting again.`, 'RATE_LIMITED', 429)
       return
     }
 
-    // Optional email confirmation
     const body = req.body as { confirmation_email?: string }
-    const user = await User.findById(userId).lean()
+    const user = await prisma.user.findUnique({ where: { id: userId } })
     if (body.confirmation_email && user) {
       if (body.confirmation_email.toLowerCase() !== user.email.toLowerCase()) {
         fail(res, "Email mismatch. Confirmation email doesn't match your account.", 'EMAIL_MISMATCH', 403)
@@ -280,59 +297,39 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
     }
 
     // Create auto-backup first
-    const backupData = await collectUserData(userId, user?.email)
+    const backupData = await collectUserData(userId)
     if (user) backupData.user_profile = user
 
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-    const backup = await UserBackup.create({
-      user_id: uid,
-      backup_type: 'pre_delete_auto',
-      data: backupData,
-      created_at: new Date(),
-      expires_at: expires,
+    const backup = await prisma.userBackup.create({
+      data: { user_id: userId, backup_type: 'pre_delete_auto', data: backupData as any, expires_at: expires },
     })
 
-    // Wipe all collections (user_id AND legacy owner_email docs)
-    const collectionsToWipe = [
-      Subject, AttendanceLog, Timetable, SemesterResult,
-      ManualCourse, UserPreference, Skill, Holiday, SystemLog,
-    ]
-    const email = user?.email?.toLowerCase()
-    const summary: Record<string, number> = {}
-    for (const Model of collectionsToWipe) {
-      // Delete by user_id (Node docs) and owner_email (Flask legacy docs)
-      const filter = email
-        ? { $or: [{ user_id: uid }, { owner_email: email }] }
-        : { user_id: uid }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const countBefore = await (Model as any).countDocuments(filter)
-      const result = await (Model as any).deleteMany(filter)
-      if (result.deletedCount !== countBefore) {
-        console.warn(`[data/delete] Count mismatch in ${(Model as { modelName: string }).modelName}: expected ${countBefore}, deleted ${result.deletedCount}`)
-      }
-      summary[(Model as { modelName: string }).modelName] = result.deletedCount
-    }
+    // Wipe all collections
+    const [s, al, t, sr, mc, up, sk, h, sl] = await Promise.all([
+      prisma.subject.deleteMany({ where: { user_id: userId } }),
+      // attendance_logs cascade-deleted with subjects — but also delete orphans
+      prisma.attendanceLog.deleteMany({ where: { user_id: userId } }),
+      prisma.timetable.deleteMany({ where: { user_id: userId } }),
+      prisma.semesterResult.deleteMany({ where: { user_id: userId } }),
+      prisma.manualCourse.deleteMany({ where: { user_id: userId } }),
+      prisma.userPreference.deleteMany({ where: { user_id: userId } }),
+      prisma.skill.deleteMany({ where: { user_id: userId } }),
+      prisma.holiday.deleteMany({ where: { user_id: userId } }),
+      prisma.systemLog.deleteMany({ where: { user_id: userId } }),
+    ])
 
-    // Reset profile
-    await User.updateOne({ _id: uid }, {
-      $set: { course: '', college: '', current_semester: 1, batch: '', picture: null },
+    const summary = { subjects: s.count, attendance_logs: al.count, timetable: t.count, semester_results: sr.count, manual_courses: mc.count, user_preferences: up.count, skills: sk.count, holidays: h.count, system_logs: sl.count }
+
+    await prisma.user.update({ where: { id: userId }, data: { course: null, college: null, current_semester: 1, batch: null, picture: null } })
+
+    console.warn(`🚨 DELETE ALL DATA for user ${userId} from IP: ${req.ip}`)
+
+    await prisma.systemLog.create({
+      data: { user_id: userId, action: 'Account Reset', description: `All personal data deleted. Backup ID: ${backup.id}. Summary: ${JSON.stringify(summary)}. IP: ${req.ip}.` },
     })
 
-    console.warn(`🚨 DELETE ALL DATA for user ${userId} (${email || 'unknown'}) from IP: ${req.ip}`)
-
-    // Re-add audit log
-    await SystemLog.create({
-      user_id: uid,
-      action: 'Account Reset',
-      description: `All personal data deleted. Backup ID: ${backup._id}. Summary: ${JSON.stringify(summary)}. IP: ${req.ip}. UA: ${req.headers['user-agent'] || 'Unknown'}`,
-    })
-
-    ok(res, {
-      message: 'All data wiped successfully.',
-      backup_id: String(backup._id),
-      backup_expires: expires.toISOString(),
-      summary,
-    })
+    ok(res, { message: 'All data wiped successfully.', backup_id: backup.id, backup_expires: expires.toISOString(), summary })
   } catch (err) {
     console.error('[data/delete_all]', err)
     fail(res, 'Failed to delete data', 'DELETE_FAILED', 500)
@@ -343,13 +340,14 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
 
 router.get('/backups', async (req: AuthRequest, res) => {
   try {
-    const uid = new Types.ObjectId(req.userId!)
-    const backups = await UserBackup.find(
-      { user_id: uid, expires_at: { $gt: new Date() } },
-      { data: 0 },
-    ).sort({ created_at: -1 }).limit(10).lean()
-
-    ok(res, { backups })
+    const userId = req.userId!
+    const backups = await prisma.userBackup.findMany({
+      where: { user_id: userId, expires_at: { gt: new Date() } },
+      select: { id: true, backup_type: true, created_at: true, expires_at: true },
+      orderBy: { created_at: 'desc' },
+      take: 10,
+    })
+    ok(res, { backups: backups.map(b => ({ ...b, _id: b.id })) })
   } catch (err) {
     console.error('[data/backups GET]', err)
     fail(res, 'Failed to list backups', 'LIST_FAILED', 500)
@@ -359,56 +357,65 @@ router.get('/backups', async (req: AuthRequest, res) => {
 router.post('/restore_backup/:backupId', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const uid = new Types.ObjectId(userId)
+    const backupId = String(req.params.backupId)
 
-    const backup = await UserBackup.findOne({
-      _id: req.params.backupId,
-      user_id: uid,
-    }).lean()
-
+    const backup = await prisma.userBackup.findFirst({ where: { id: backupId, user_id: userId } })
     if (!backup) { fail(res, 'Backup not found or access denied', 'NOT_FOUND', 404); return }
     if (backup.expires_at && backup.expires_at < new Date()) {
       fail(res, 'This backup has expired', 'EXPIRED', 410); return
     }
 
     const data = backup.data as UserData
-    // Clear current (both Node user_id and Flask owner_email docs)
-    const user = await User.findById(uid).lean()
-    const email = user?.email?.toLowerCase()
-    const clearFilter = email
-      ? { $or: [{ user_id: uid }, { owner_email: email }] }
-      : { user_id: uid }
+
+    // Clear current data
     await Promise.all([
-      Subject.deleteMany(clearFilter),
-      AttendanceLog.deleteMany(clearFilter),
-      Timetable.deleteMany(clearFilter),
-      SemesterResult.deleteMany(clearFilter),
-      ManualCourse.deleteMany(clearFilter),
-      UserPreference.deleteMany(clearFilter),
-      Skill.deleteMany(clearFilter),
-      Holiday.deleteMany(clearFilter),
-      SystemLog.deleteMany(clearFilter),
+      prisma.subject.deleteMany({ where: { user_id: userId } }),
+      prisma.attendanceLog.deleteMany({ where: { user_id: userId } }),
+      prisma.timetable.deleteMany({ where: { user_id: userId } }),
+      prisma.semesterResult.deleteMany({ where: { user_id: userId } }),
+      prisma.manualCourse.deleteMany({ where: { user_id: userId } }),
+      prisma.userPreference.deleteMany({ where: { user_id: userId } }),
+      prisma.skill.deleteMany({ where: { user_id: userId } }),
+      prisma.holiday.deleteMany({ where: { user_id: userId } }),
+      prisma.systemLog.deleteMany({ where: { user_id: userId } }),
     ])
 
-    // Restore
-    const models = [
-      { key: 'subjects', Model: Subject },
-      { key: 'attendance_logs', Model: AttendanceLog },
-      { key: 'timetable', Model: Timetable },
-      { key: 'semester_results', Model: SemesterResult },
-      { key: 'manual_courses', Model: ManualCourse },
-      { key: 'user_preferences', Model: UserPreference },
-      { key: 'skills', Model: Skill },
-      { key: 'holidays', Model: Holiday },
-      { key: 'system_logs', Model: SystemLog },
-    ] as const
-
-    for (const { key, Model } of models) {
-      const items = (data[key as keyof UserData] as unknown[]) ?? []
-      if (items.length) {
-        const clean = items.map((item) => ({ ...(item as Record<string, unknown>), _id: new Types.ObjectId(), user_id: uid }))
-        await (Model as { insertMany: (d: unknown[], o?: object) => Promise<unknown> }).insertMany(clean, { ordered: false }).catch(() => null)
-      }
+    // Restore subjects with ID mapping
+    const idMap = new Map<string, string>()
+    if (data.subjects?.length) {
+      const subjectsData = (data.subjects as any[]).map(s => {
+        const oldId = String(s._id ?? s.id ?? '')
+        const newId = randomUUID()
+        if (oldId) idMap.set(oldId, newId)
+        return { id: newId, user_id: userId, name: String(s.name ?? ''), code: String(s.code ?? ''), professor: String(s.professor ?? ''), classroom: String(s.classroom ?? ''), semester: Number(s.semester ?? 1), type: String(s.type ?? 'theory'), credits: s.credits != null ? Number(s.credits) : null, attended: Number(s.attended ?? 0), total: Number(s.total ?? 0), target: Number(s.target ?? 75), categories: Array.isArray(s.categories) ? s.categories : ['Theory'], practicals: s.practicals ?? null, assignments: s.assignments ?? null, syllabus: s.syllabus ?? null }
+      })
+      await prisma.subject.createMany({ data: subjectsData }).catch(() => null)
+    }
+    if (data.attendance_logs?.length) {
+      await prisma.attendanceLog.createMany({
+        data: (data.attendance_logs as any[]).map(l => ({ id: randomUUID(), user_id: userId, subject_id: idMap.get(String(l.subject_id ?? '')) ?? String(l.subject_id ?? ''), subject_name: String(l.subject_name ?? ''), date: String(l.date ?? ''), status: l.status ?? 'present', type: String(l.type ?? 'Lecture'), notes: l.notes ?? null, semester: l.semester != null ? Number(l.semester) : null, substituted_by: l.substituted_by ? (idMap.get(String(l.substituted_by)) ?? String(l.substituted_by)) : null, timestamp: l.timestamp ? new Date(l.timestamp) : new Date() })) as any,
+      }).catch(() => null)
+    }
+    if (data.timetable?.length) {
+      await prisma.timetable.createMany({
+        data: (data.timetable as any[]).map(t => { const schedule = JSON.parse(JSON.stringify(t.schedule ?? {})); for (const day of Object.keys(schedule)) { if (Array.isArray(schedule[day])) for (const slot of schedule[day]) { const sRef = String(slot.subject_id ?? ''); if (sRef && idMap.has(sRef)) slot.subject_id = idMap.get(sRef) } } return { id: randomUUID(), user_id: userId, semester: Number(t.semester ?? 1), schedule, periods: t.periods ?? null } }) as any,
+      }).catch(() => null)
+    }
+    if (data.semester_results?.length) {
+      await prisma.semesterResult.createMany({ data: (data.semester_results as any[]).map(r => ({ id: randomUUID(), user_id: userId, semester: Number(r.semester ?? 1), subjects: r.subjects ?? [], sgpa: Number(r.sgpa ?? 0), total_credits: Number(r.total_credits ?? 0), student_info: r.student_info ?? null, source: r.source ?? 'manual' })) }).catch(() => null)
+    }
+    if (data.manual_courses?.length) {
+      await prisma.manualCourse.createMany({ data: (data.manual_courses as any[]).map(c => ({ id: randomUUID(), user_id: userId, name: c.name ?? null, platform: c.platform ?? null, status: c.status ?? null, progress: Number(c.progress ?? 0), url: c.url ?? null, notes: c.notes ?? null })) }).catch(() => null)
+    }
+    if (data.user_preferences?.length) {
+      const pref = (data.user_preferences as any[])[0]
+      await prisma.userPreference.upsert({ where: { user_id: userId }, create: { user_id: userId, preferences: pref.preferences ?? {} }, update: { preferences: pref.preferences ?? {} } }).catch(() => null)
+    }
+    if (data.skills?.length) {
+      await prisma.skill.createMany({ data: (data.skills as any[]).map(s => ({ id: randomUUID(), user_id: userId, name: String(s.name ?? ''), category: s.category ?? null, level: s.level ?? null, progress: Number(s.progress ?? 0), notes: s.notes ?? '' })) }).catch(() => null)
+    }
+    if (data.holidays?.length) {
+      await prisma.holiday.createMany({ data: (data.holidays as any[]).map(h => ({ id: randomUUID(), user_id: userId, date: String(h.date ?? ''), name: String(h.name ?? '') })) }).catch(() => null)
     }
 
     ok(res, { message: 'Backup restored successfully' })

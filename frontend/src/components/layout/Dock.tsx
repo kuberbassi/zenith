@@ -70,12 +70,14 @@ function DockItem({ item, mouseX, isHoveredGlobal }: {
 }
 
 function DesktopDock() {
+    const location = useLocation();
     const mouseX = useMotionValue(Infinity);
     const [isHoveredGlobal, setIsHoveredGlobal] = useState(false);
     const [pfpMenuOpen, setPfpMenuOpen] = useState(false);
     const [dropdownPos, setDropdownPos] = useState({ bottom: 0, left: 0 });
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const dockRef = useRef<HTMLDivElement>(null);
     const pfpRef = useRef<HTMLDivElement>(null);
     const pfpBtnRef = useRef<HTMLButtonElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,56 @@ function DesktopDock() {
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    useEffect(() => {
+        const syncHoverFromPointer = (clientX: number, clientY: number) => {
+            const bounds = dockRef.current?.getBoundingClientRect();
+            if (!bounds) return;
+            const inside =
+                clientX >= bounds.left &&
+                clientX <= bounds.right &&
+                clientY >= bounds.top &&
+                clientY <= bounds.bottom;
+
+            setIsHoveredGlobal(inside);
+            mouseX.set(inside ? clientX : Infinity);
+        };
+
+        const handlePointerMove = (event: PointerEvent) => {
+            syncHoverFromPointer(event.clientX, event.clientY);
+        };
+
+        window.addEventListener('pointermove', handlePointerMove, { passive: true });
+
+        return () => window.removeEventListener('pointermove', handlePointerMove);
+    }, [mouseX]);
+
+    useEffect(() => {
+        // Route transitions can preserve pointer position without firing mouseenter again.
+        const lastPointer = window as Window & { __acadhubPointer?: { x: number; y: number } };
+        if (lastPointer.__acadhubPointer) {
+            const { x, y } = lastPointer.__acadhubPointer;
+            const bounds = dockRef.current?.getBoundingClientRect();
+            const inside = !!bounds &&
+                x >= bounds.left &&
+                x <= bounds.right &&
+                y >= bounds.top &&
+                y <= bounds.bottom;
+            setIsHoveredGlobal(inside);
+            mouseX.set(inside ? x : Infinity);
+        }
+    }, [location.pathname, mouseX]);
+
+    useEffect(() => {
+        const rememberPointer = (event: PointerEvent) => {
+            (window as Window & { __acadhubPointer?: { x: number; y: number } }).__acadhubPointer = {
+                x: event.clientX,
+                y: event.clientY,
+            };
+        };
+        window.addEventListener('pointermove', rememberPointer, { passive: true });
+        return () => window.removeEventListener('pointermove', rememberPointer);
     }, []);
 
     const handlePfpClick = () => {
@@ -109,7 +161,8 @@ function DesktopDock() {
         <>
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
                 <motion.div
-                    onMouseMove={(e) => mouseX.set(e.pageX)}
+                    ref={dockRef}
+                    onMouseMove={(e) => mouseX.set(e.clientX)}
                     onMouseEnter={() => setIsHoveredGlobal(true)}
                     onMouseLeave={() => { mouseX.set(Infinity); setIsHoveredGlobal(false); }}
                     className="flex items-center gap-3 px-5 py-3 rounded-3xl bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/[0.1] shadow-2xl"

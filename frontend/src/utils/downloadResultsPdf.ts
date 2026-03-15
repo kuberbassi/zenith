@@ -3,31 +3,80 @@ import autoTable from 'jspdf-autotable';
 
 type RGB = [number, number, number];
 
-const NAVY: RGB    = [15, 23, 42];
-const BLUE: RGB    = [37, 99, 235];
+const NAVY: RGB = [15, 23, 42];
+const BLUE: RGB = [37, 99, 235];
 const BLUE_LIGHT: RGB = [239, 246, 255];
-const BLUE_MID: RGB   = [191, 219, 254];
-const GRAY_DARK: RGB  = [51, 65, 85];
-const GRAY_MID: RGB   = [148, 163, 184];
+const BLUE_MID: RGB = [191, 219, 254];
+const GRAY_DARK: RGB = [51, 65, 85];
+const GRAY_MID: RGB = [148, 163, 184];
 const GRAY_LIGHT: RGB = [248, 250, 252];
-const WHITE: RGB   = [255, 255, 255];
-const DARK: RGB    = [15, 23, 42];
-const RED: RGB     = [220, 38, 38];
-const GREEN: RGB   = [21, 128, 61];
+const WHITE: RGB = [255, 255, 255];
+const DARK: RGB = [15, 23, 42];
+const RED: RGB = [220, 38, 38];
+const GREEN: RGB = [21, 128, 61];
+
+function normalizeProfileInfo(info: any) {
+    return {
+        name: info?.name || info?.stname || '',
+        roll_no: info?.roll_no || info?.nrollno || info?.enrollment_number || '',
+        father: info?.father || '',
+        mother: info?.mother || '',
+        gender: info?.gender || '',
+        email: info?.email || '',
+        phone: info?.phone || info?.mobno || '',
+        batch: info?.batch || info?.byoa || '',
+        admission_year: info?.admission_year || info?.yoa || '',
+        institution: info?.institution || info?.iname || '',
+        programme: info?.programme || info?.prgname || '',
+    };
+}
+
+function shortenProgramme(value: string): string {
+    return value
+        .replace(/BACHELOR OF TECHNOLOGY/i, 'B.TECH')
+        .replace(/MASTER OF TECHNOLOGY/i, 'M.TECH')
+        .replace(/BACHELOR OF/i, 'B.')
+        .replace(/MASTER OF/i, 'M.')
+        .slice(0, 46);
+}
+
+function shortenInst(value: string): string {
+    return value.slice(0, 42);
+}
+
+function truncateText(value: string, limit: number): string {
+    return value.length > limit ? `${value.slice(0, limit - 2)}..` : value;
+}
+
+function formatDeclaredDate(value: unknown): string | null {
+    if (!value) return null;
+    const parsed = new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) return String(value);
+    return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getSemestersToRender(results: any, selectedSem: string) {
+    const allSems = results?.semesters || [];
+    return selectedSem === 'overall'
+        ? allSems
+        : allSems.filter((sem: any) => String(sem.semester_num ?? sem.semester) === selectedSem);
+}
 
 export function downloadResultsPdf(results: any, selectedSem: string) {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margin = 14;
-    const contentW = pageW - margin * 2;
+    const contentW = pageW - (margin * 2);
 
-    const info = results.student_info || {};
+    const info = normalizeProfileInfo(results?.student_info || {});
     const dateStr = new Date().toLocaleDateString('en-IN', {
-        day: '2-digit', month: 'long', year: 'numeric',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
     });
+    const semesters = getSemestersToRender(results, selectedSem);
 
-    /* ── HEADER ─────────────────────────────────────────────────────────── */
     doc.setFillColor(...NAVY);
     doc.rect(0, 0, pageW, 40, 'F');
     doc.setFillColor(...BLUE);
@@ -40,23 +89,22 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    doc.text('Sector 16C, Dwarka, New Delhi – 110078  |  examweb.ggsipu.ac.in', pageW / 2, 19, { align: 'center' });
+    doc.text('Sector 16C, Dwarka, New Delhi | examweb.ggsipu.ac.in', pageW / 2, 19, { align: 'center' });
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
-    doc.text('ACADEMIC RESULT TRANSCRIPT', pageW / 2, 28, { align: 'center' });
+    doc.text(selectedSem === 'overall' ? 'ACADEMIC RESULT TRANSCRIPT' : 'SEMESTER RESULT REPORT', pageW / 2, 28, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(191, 219, 254);
     doc.text(`Generated: ${dateStr}`, pageW - margin, 35, { align: 'right' });
 
-    /* ── STUDENT INFO BOX ───────────────────────────────────────────────── */
     let y = 48;
 
     doc.setFillColor(...BLUE_LIGHT);
     doc.setDrawColor(...BLUE_MID);
-    doc.roundedRect(margin, y, contentW, 38, 2, 2, 'FD');
+    doc.roundedRect(margin, y, contentW, 48, 2, 2, 'FD');
 
     doc.setTextColor(...BLUE);
     doc.setFont('helvetica', 'bold');
@@ -65,16 +113,17 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
 
     const c1 = margin + 4;
     const c1v = c1 + 28;
-    const c2 = margin + 4 + 96;
+    const c2 = margin + 100;
     const c2v = c2 + 28;
     const lh = 6.2;
 
     const infoRows: [string, string, string, string][] = [
-        ['Name', info.name || '---', 'Enrollment No.', results.enrollment_number || '---'],
+        ['Name', info.name || '---', 'Enrollment No.', results?.enrollment_number || info.roll_no || '---'],
         ['Programme', shortenProgramme(info.programme || '---'), 'Batch', info.batch || '---'],
-        ['Institution', shortenInst(info.institution || '---'), 'CGPA', results.cgpa ? parseFloat(results.cgpa).toFixed(2) : '---'],
+        ['Institution', shortenInst(info.institution || '---'), 'CGPA', results?.cgpa ? Number(results.cgpa).toFixed(2) : '---'],
         ["Father's Name", info.father || '---', "Mother's Name", info.mother || '---'],
         ['Gender', info.gender || '---', 'Admission Year', info.admission_year || '---'],
+        ['Email', truncateText(info.email || '---', 34), 'Phone', info.phone || '---'],
     ];
 
     let iy = y + 12;
@@ -82,70 +131,82 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
         doc.setTextColor(...GRAY_MID);
-        doc.text(l1 + ':', c1, iy);
+        doc.text(`${l1}:`, c1, iy);
+        doc.text(`${l2}:`, c2, iy);
+
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.5);
         doc.setTextColor(...DARK);
         doc.text(String(v1), c1v, iy);
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-        doc.setTextColor(...GRAY_MID);
-        doc.text(l2 + ':', c2, iy);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(...DARK);
         doc.text(String(v2), c2v, iy);
-
         iy += lh;
     }
 
-    y += 43;
+    y += 53;
 
-    /* ── DETERMINE SEMESTERS ────────────────────────────────────────────── */
-    const allSems: any[] = results.semesters || [];
-    const semsToRender = selectedSem === 'overall'
-        ? allSems
-        : allSems.filter(s => {
-              const num = s.semester_num ?? s.semester;
-              return String(num) === selectedSem;
-          });
-
-    /* ── RENDER EACH SEMESTER ───────────────────────────────────────────── */
-    for (const sem of semsToRender) {
-        if (y > pageH - 55) { doc.addPage(); y = 14; }
+    for (const sem of semesters) {
+        if (y > pageH - 70) {
+            doc.addPage();
+            y = 14;
+        }
 
         const semNum = sem.semester_num ?? sem.semester;
-        const rawLabel = sem.semester_label || (semNum ? `Semester ${semNum}` : 'Semester');
+        const semLabel = String(sem.semester_label || `Semester ${semNum}`).toUpperCase();
+        const subjects = sem.subjects || [];
+        const completedSubjects = subjects.filter((sub: any) => !sub.is_pending && sub.grade !== '-');
+        const passedSubjects = completedSubjects.filter((sub: any) => String(sub.grade || '').toUpperCase() !== 'F');
+        const distinctionCount = completedSubjects.filter((sub: any) => Number(sub.percentage || 0) >= 75).length;
+        const semesterTotal = completedSubjects.reduce((sum: number, sub: any) => sum + Number(sub.total_marks ?? 0), 0);
+        const semesterMax = completedSubjects.reduce((sum: number, sub: any) => sum + Number(sub.max_marks ?? 100), 0);
+        const semesterPct = semesterMax > 0 ? ((semesterTotal / semesterMax) * 100).toFixed(1) : '0.0';
+        const declaredDate = formatDeclaredDate(subjects.find((sub: any) => sub?.declared_date)?.declared_date);
+        const examSession = subjects.find((sub: any) => sub?.exam_session)?.exam_session || null;
+        const sgpaVal = sem.sgpa ? parseFloat(sem.sgpa) : 0;
 
-        // Semester header bar
         doc.setFillColor(...GRAY_DARK);
         doc.rect(margin, y, contentW, 8, 'F');
         doc.setTextColor(...WHITE);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.5);
-        const semLabel = rawLabel.toUpperCase();
         doc.text(semLabel, margin + 4, y + 5.5);
-
-        const sgpaVal = sem.sgpa ? parseFloat(sem.sgpa) : 0;
         if (sgpaVal > 0) {
             doc.text(`SGPA: ${sgpaVal.toFixed(2)}`, pageW - margin - 4, y + 5.5, { align: 'right' });
         }
         y += 11;
 
-        const subjects = sem.subjects || [];
+        if (examSession || declaredDate) {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7);
+            doc.setTextColor(...GRAY_MID);
+            const meta = [examSession ? `Exam: ${examSession}` : null, declaredDate ? `Declared: ${declaredDate}` : null]
+                .filter(Boolean)
+                .join(' | ');
+            doc.text(meta, margin, y - 2);
+        }
+
+        doc.setFillColor(...GRAY_LIGHT);
+        doc.setDrawColor(...BLUE_MID);
+        doc.roundedRect(margin, y, contentW, 12, 2, 2, 'FD');
+        doc.setTextColor(...GRAY_DARK);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.text(`Subjects: ${subjects.length}`, margin + 4, y + 7);
+        doc.text(`Passed: ${passedSubjects.length}/${completedSubjects.length || subjects.length}`, margin + 36, y + 7);
+        doc.text(`Distinctions: ${distinctionCount}`, margin + 78, y + 7);
+        doc.text(`Marks: ${semesterTotal}/${semesterMax || 0}`, margin + 116, y + 7);
+        doc.text(`Percentage: ${semesterPct}%`, pageW - margin - 4, y + 7, { align: 'right' });
+        y += 15;
+
         const tableBody = subjects.map((sub: any, idx: number) => {
             const isPending = sub.is_pending || sub.grade === '-' || sub.total_marks === null || sub.total_marks === undefined;
-            const totalDisp = isPending ? 'Pending' : (sub.total_marks ?? '-');
-            const maxDisp = isPending ? '---' : (sub.max_marks ?? 100);
             return [
                 idx + 1,
                 sub.code || '---',
                 sub.name || '---',
                 sub.internal ?? '-',
                 sub.external ?? '-',
-                totalDisp,
-                maxDisp,
+                isPending ? 'Pending' : (sub.total_marks ?? '-'),
+                isPending ? '---' : (sub.max_marks ?? 100),
                 sub.grade || '-',
                 sub.status || '-',
             ];
@@ -184,10 +245,10 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
             alternateRowStyles: { fillColor: [...GRAY_LIGHT] },
             didParseCell: (data: any) => {
                 if (data.section === 'body' && data.column.index === 7) {
-                    const g = String(data.cell.raw);
-                    if (g === 'F') data.cell.styles.textColor = RED;
-                    else if (g === 'O' || g === 'A+') data.cell.styles.textColor = GREEN;
-                    else if (g === '-') data.cell.styles.textColor = GRAY_MID;
+                    const grade = String(data.cell.raw);
+                    if (grade === 'F') data.cell.styles.textColor = RED;
+                    else if (grade === 'O' || grade === 'A+') data.cell.styles.textColor = GREEN;
+                    else if (grade === '-') data.cell.styles.textColor = GRAY_MID;
                 }
             },
         });
@@ -195,20 +256,20 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         y = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    /* ── OVERALL SUMMARY ────────────────────────────────────────────────── */
     if (selectedSem === 'overall') {
-        if (y > pageH - 50) { doc.addPage(); y = 14; }
+        if (y > pageH - 45) {
+            doc.addPage();
+            y = 14;
+        }
 
-        // SGPA progression table
-        const sgpaRows = allSems
-            .filter(s => s.sgpa && parseFloat(s.sgpa) > 0)
-            .map(s => {
-                const num = s.semester_num ?? s.semester;
-                const label = s.semester_label || (num ? `Semester ${num}` : 'Semester');
-                return [label, parseFloat(s.sgpa).toFixed(2)];
+        const sgpaRows = (results?.semesters || [])
+            .filter((sem: any) => sem.sgpa && parseFloat(sem.sgpa) > 0)
+            .map((sem: any) => {
+                const semNum = sem.semester_num ?? sem.semester;
+                return [sem.semester_label || `Semester ${semNum}`, parseFloat(sem.sgpa).toFixed(2)];
             });
 
-        if (sgpaRows.length > 0) {
+        if (sgpaRows.length) {
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(8);
             doc.setTextColor(...GRAY_DARK);
@@ -231,36 +292,32 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
                 bodyStyles: { fontSize: 8, halign: 'center' as const },
             });
 
-            y = (doc as any).lastAutoTable.finalY + 6;
+            y = (doc as any).lastAutoTable.finalY + 8;
         }
 
-        // CGPA box
-        if (y > pageH - 25) { doc.addPage(); y = 14; }
+        const allSubjects = (results?.semesters || []).flatMap((sem: any) => sem.subjects || []);
+        const completedSubjects = allSubjects.filter((sub: any) => !sub.is_pending && sub.grade !== '-');
+        const distinctionCount = completedSubjects.filter((sub: any) => Number(sub.percentage || 0) >= 75).length;
+        const latestDeclared = completedSubjects
+            .map((sub: any) => formatDeclaredDate(sub.declared_date))
+            .filter(Boolean)
+            .sort()
+            .slice(-1)[0];
 
         doc.setFillColor(...BLUE_LIGHT);
         doc.setDrawColor(...BLUE_MID);
-        doc.roundedRect(margin, y, contentW, 22, 2, 2, 'FD');
-
+        doc.roundedRect(margin, y, contentW, 24, 2, 2, 'FD');
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(...BLUE);
-        doc.text(
-            `Cumulative GPA (CGPA): ${results.cgpa ? parseFloat(results.cgpa).toFixed(2) : '---'}`,
-            pageW / 2, y + 9, { align: 'center' }
-        );
-
-        if (results.overallPercentage) {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8);
-            doc.setTextColor(...GRAY_DARK);
-            doc.text(
-                `Overall Percentage (declared subjects only): ${results.overallPercentage.toFixed(1)}%`,
-                pageW / 2, y + 16, { align: 'center' }
-            );
-        }
+        doc.text(`Cumulative GPA (CGPA): ${results?.cgpa ? Number(results.cgpa).toFixed(2) : '---'}`, pageW / 2, y + 8, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...GRAY_DARK);
+        doc.text(`Overall Percentage (declared subjects only): ${results?.overallPercentage ? Number(results.overallPercentage).toFixed(1) : '0.0'}%`, pageW / 2, y + 14, { align: 'center' });
+        doc.text(`Declared Subjects: ${completedSubjects.length} | Distinctions: ${distinctionCount} | Latest Declared Date: ${latestDeclared || '---'}`, pageW / 2, y + 20, { align: 'center' });
     }
 
-    /* ── FOOTER ON EVERY PAGE ───────────────────────────────────────────── */
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
@@ -269,31 +326,12 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(6.5);
         doc.setTextColor(...GRAY_MID);
-        doc.text(
-            `Generated by AcadHub  •  ${dateStr}  •  Data sourced from GGSIPU examination portal.`,
-            pageW / 2, pageH - 4, { align: 'center' }
-        );
+        doc.text(`Generated by AcadHub | ${dateStr} | Data sourced from GGSIPU examination portal.`, pageW / 2, pageH - 4, { align: 'center' });
         doc.text(`Page ${i} / ${totalPages}`, pageW - margin, pageH - 4, { align: 'right' });
     }
 
-    /* ── DOWNLOAD ───────────────────────────────────────────────────────── */
     const nameSlug = (info.name || 'Student').replace(/\s+/g, '_').toUpperCase();
-    const enroll = results.enrollment_number || '';
+    const enroll = results?.enrollment_number || info.roll_no || '';
     const semPart = selectedSem === 'overall' ? 'All_Semesters' : `Sem_${selectedSem}`;
     doc.save(`${nameSlug}_${enroll}_${semPart}_Results.pdf`);
-}
-
-/* ── Helpers ────────────────────────────────────────────────────────────── */
-
-function shortenProgramme(p: string): string {
-    return p
-        .replace(/BACHELOR OF TECHNOLOGY/i, 'B.TECH')
-        .replace(/MASTER OF TECHNOLOGY/i, 'M.TECH')
-        .replace(/BACHELOR OF/i, 'B.')
-        .replace(/MASTER OF/i, 'M.')
-        .substring(0, 45);
-}
-
-function shortenInst(name: string): string {
-    return name.substring(0, 42);
 }

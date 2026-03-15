@@ -8,7 +8,7 @@ function required(key: string): string {
 }
 
 export const ENV = {
-  MONGODB_URI: required('MONGODB_URI'),
+  DATABASE_URL: required('DATABASE_URL'),
   JWT_SECRET: required('JWT_SECRET'),
   GOOGLE_CLIENT_ID: required('GOOGLE_CLIENT_ID'),
   PORT: parseInt(process.env.PORT ?? '5001', 10),

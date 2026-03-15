@@ -28,9 +28,10 @@ const SlotModal: React.FC<SlotModalProps> = ({ isOpen, onClose, onSuccess, slot,
 
     useEffect(() => {
         if (slot) {
+            const slotAny = slot as any;
             setFormData({
                 type: slot.type || 'class',
-                subject_id: slot.subject_id?.$oid || slot.subject_id || '',
+                subject_id: String(slotAny.subject_id || slotAny.subjectId || slotAny.subject?._id || slotAny.subject?.id || ''),
                 label: slot.label || ''
             });
         } else {
@@ -43,6 +44,7 @@ const SlotModal: React.FC<SlotModalProps> = ({ isOpen, onClose, onSuccess, slot,
             setLoading(true);
             const slotData = {
                 ...formData,
+                subject_id: formData.subject_id ? String(formData.subject_id) : '',
                 day: day || slot?.day,
                 start_time: period?.startTime || slot?.start_time,
                 end_time: period?.endTime || slot?.end_time,
@@ -105,7 +107,7 @@ const SlotModal: React.FC<SlotModalProps> = ({ isOpen, onClose, onSuccess, slot,
                                     { value: 'custom', label: 'Custom' }
                                 ]} />
                                 {formData.type === 'class' ? (
-                                    <Select label="Subject" value={formData.subject_id} onChange={e => setFormData({ ...formData, subject_id: e.target.value })} options={subjects.map(s => ({ value: s._id, label: s.name }))} />
+                                    <Select label="Subject" value={formData.subject_id} onChange={e => setFormData({ ...formData, subject_id: e.target.value })} options={subjects.map(s => ({ value: String(s._id || s.id || ''), label: s.name }))} />
                                 ) : (
                                     <Input label="Label" value={formData.label} onChange={e => setFormData({ ...formData, label: e.target.value })} placeholder="Mission Objective" />
                                 )}

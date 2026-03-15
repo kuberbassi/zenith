@@ -43,12 +43,7 @@ const ScheduleGrid: React.FC<ScheduleGridProps> = ({
 }) => {
 
     const getSubjectName = (id: string) => {
-        const subject = subjects.find(s => {
-            const subId = (s.id || s._id) as any;
-            const strId = (typeof subId === 'object' && subId !== null) ? (subId.$oid || subId.toString()) : subId;
-            return String(strId) === String(id);
-        });
-
+        const subject = subjects.find(s => String(s.id || s._id) === String(id));
         return subject?.name || 'Unknown';
     };
 

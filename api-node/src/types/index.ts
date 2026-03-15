@@ -5,14 +5,14 @@
  */
 
 import type { Request } from 'express'
-import type { IUser } from '../models/User.js'
+import type { User } from '../generated/prisma/client.js'
 
 /* ── Client Platform ──────────────────────────────────────── */
 export type ClientPlatform = 'web' | 'ios' | 'android' | 'unknown'
 
 /* ── Auth Request ─────────────────────────────────────────── */
 export interface AuthRequest extends Request {
-  user?: IUser
+  user?: User
   userId?: string
   platform?: ClientPlatform
   apiVersion?: string

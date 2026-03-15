@@ -147,15 +147,15 @@ export const attendanceService = {
                 const log = c.log || null;
                 const subjId = subj._id || subj.id || slot.subject_id || '';
                 return {
-                    _id: typeof subjId === 'object' ? (subjId.$oid || String(subjId)) : String(subjId),
-                    subject_id: typeof subjId === 'object' ? (subjId.$oid || String(subjId)) : String(subjId),
-                    name: subj.name || slot.name || 'Unknown',
+                    _id: String(subjId),
+                    subject_id: String(subjId),
+                    name: subj.name || slot.name || c.subject_name || slot.label || 'Unknown',
                     time: slot.time || '',
                     type: slot.type || 'Lecture',
                     semester: subj.semester || slot.semester,
                     marked: c.marked || false,
                     marked_status: log ? log.status : 'pending',
-                    log_id: log ? (typeof log._id === 'object' ? (log._id.$oid || String(log._id)) : String(log._id)) : null,
+                    log_id: log ? String(log._id || log.id) : null,
                     notes: log?.notes || '',
                     attended: subj.attended || 0,
                     total: subj.total || 0,

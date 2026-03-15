@@ -1,0 +1,1 @@
+import * as cheerio from 'cheerio'; const html = '<table><tr><td><a href=\"1.pdf\">Title</a></td><td>14-03-2026</td></tr></table>'; const q = cheerio.load(html); console.log(q('td').map((i, el) => q(el).text()).get());

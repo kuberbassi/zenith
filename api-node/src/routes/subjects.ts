@@ -1,9 +1,8 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
-import { Subject } from '../models/Subject.js'
+import { prisma } from '../config/prisma.js'
 import { ok, created, fail } from '../utils/response.js'
-import { uf, ownership } from '../utils/userFilter.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -21,9 +20,10 @@ const UpdateSubjectSchema = CreateSubjectSchema.partial()
 /* GET /api/subjects */
 router.get('/', async (req: AuthRequest, res) => {
   try {
-    const subjects = await Subject.find({ ...uf(req) })
-      .sort({ name: 1 })
-      .lean()
+    const subjects = await prisma.subject.findMany({
+      where: { user_id: req.userId! },
+      orderBy: { name: 'asc' },
+    })
     ok(res, subjects)
   } catch (err) {
     console.error('[subjects/GET]', err)
@@ -35,7 +35,7 @@ router.get('/', async (req: AuthRequest, res) => {
 router.post('/', async (req: AuthRequest, res) => {
   try {
     const body = CreateSubjectSchema.parse(req.body)
-    const subject = await Subject.create({ ...body, ...ownership(req) })
+    const subject = await prisma.subject.create({ data: { ...body, user_id: req.userId! } })
     created(res, subject)
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -50,16 +50,14 @@ router.post('/', async (req: AuthRequest, res) => {
 /* PUT /api/subjects/:id */
 router.put('/:id', async (req: AuthRequest, res) => {
   try {
+    const subjectId = String(req.params.id)
     const body = UpdateSubjectSchema.parse(req.body)
-    const subject = await Subject.findOneAndUpdate(
-      { _id: req.params.id, ...uf(req) },
-      { $set: body },
-      { new: true },
-    )
-    if (!subject) {
+    const existing = await prisma.subject.findFirst({ where: { id: subjectId, user_id: req.userId! } })
+    if (!existing) {
       fail(res, 'Subject not found', 'NOT_FOUND', 404)
       return
     }
+    const subject = await prisma.subject.update({ where: { id: subjectId }, data: body })
     ok(res, subject)
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -74,14 +72,13 @@ router.put('/:id', async (req: AuthRequest, res) => {
 /* DELETE /api/subjects/:id */
 router.delete('/:id', async (req: AuthRequest, res) => {
   try {
-    const subject = await Subject.findOneAndDelete({
-      _id: req.params.id,
-      ...uf(req),
-    })
-    if (!subject) {
+    const subjectId = String(req.params.id)
+    const existing = await prisma.subject.findFirst({ where: { id: subjectId, user_id: req.userId! } })
+    if (!existing) {
       fail(res, 'Subject not found', 'NOT_FOUND', 404)
       return
     }
+    await prisma.subject.delete({ where: { id: subjectId } })
     ok(res, { message: 'Subject deleted' })
   } catch (err) {
     console.error('[subjects/DELETE]', err)

@@ -1,16 +1,15 @@
 import { Router } from 'express'
+import { createHash } from 'crypto'
 import https from 'https'
-import { Types } from 'mongoose'
 import { z } from 'zod'
 import axios, { type AxiosInstance } from 'axios'
 import * as cheerio from 'cheerio'
 import { LRUCache } from 'lru-cache'
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
-import { SemesterResult } from '../models/SemesterResult.js'
-import { User } from '../models/User.js'
+import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
-import { uf, ownership } from '../utils/userFilter.js'
-import { fetchIpuResults, fetchAllIpuResults, type ProcessedSubject } from '../services/ipuResultsFetcher.service.js'
+import { fetchIpuResults, fetchAllIpuResults, fetchAllIpuResultsWithClient, parseIpuResultsPayload, type ProcessedSubject } from '../services/ipuResultsFetcher.service.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -19,10 +18,11 @@ router.use(requireAuth)
 
 const IPU_BASE = 'https://examweb.ggsipu.ac.in'
 const IPU_LOGIN_URL = `${IPU_BASE}/web/login.jsp`
-const IPU_LOGIN_ACTION = `${IPU_BASE}/web/loginaction.do`
+const IPU_LOGIN_ACTION = `${IPU_BASE}/web/Login`
 const IPU_HOME_URL = `${IPU_BASE}/web/student/studenthome.jsp`
-const IPU_PROFILE_URL = `${IPU_BASE}/web/student/studentprofile.jsp`
-const IPU_CHANGE_PW_URL = `${IPU_BASE}/web/student/changepassword.jsp`
+const IPU_PROFILE_URL = `${IPU_BASE}/web/student/profile.jsp`
+const IPU_CHANGE_PW_URL = `${IPU_BASE}/web/changepasswd.jsp`
+const IPU_RESULTS_URL = `${IPU_BASE}/web/StudentSearchProcess`
 
 const HEADERS = {
   'User-Agent':
@@ -38,13 +38,86 @@ const HEADERS = {
 interface IpuSession {
   client: AxiosInstance
   getCookieString: () => string
+  markCaptchaIssued: () => void
+  markLoginAttempt: () => void
+  markLoginFailure: () => void
+  markLoginSuccess: () => void
+  canAttemptLogin: () => { ok: boolean; reason?: string }
+}
+
+type ResultStudentInfo = Record<string, unknown>
+type PersistableSemester = {
+  semester: string
+  semester_num: number
+  semester_label: string
+  subjects: ProcessedSubject[]
+  sgpa: string
+  total_credits: number
+  total_marks: string
+  max_marks: string
+  student_info?: Record<string, string>
 }
 
 const _sessions = new LRUCache<string, IpuSession>({ max: 100, ttl: 30 * 60 * 1000 })
 
+interface IpuBrowserSession {
+  browser: Browser
+  context: BrowserContext
+  page: Page
+  captchaIssuedAt: number
+  attemptsForCaptcha: number
+  failedLoginAttempts: number
+  authenticatedAt?: number
+}
+
+const _browserSessions = new LRUCache<string, IpuBrowserSession>({ max: 20, ttl: 10 * 60 * 1000 })
+
+function destroySession(userId: string) {
+  _sessions.delete(userId)
+  const browserSession = _browserSessions.get(userId)
+  if (browserSession) {
+    void browserSession.context.close().catch(() => null)
+    void browserSession.browser.close().catch(() => null)
+    _browserSessions.delete(userId)
+  }
+}
+
+async function createBrowserSession(userId: string) {
+  destroySession(userId)
+  const browser = await chromium.launch({ headless: true })
+  const context = await browser.newContext({
+    userAgent: HEADERS['User-Agent'],
+    extraHTTPHeaders: { 'Accept-Language': 'en-US,en;q=0.9' },
+  })
+  const page = await context.newPage()
+  const session: IpuBrowserSession = {
+    browser,
+    context,
+    page,
+    captchaIssuedAt: 0,
+    attemptsForCaptcha: 0,
+    failedLoginAttempts: 0,
+    authenticatedAt: undefined,
+  }
+  _browserSessions.set(userId, session)
+  return session
+}
+
+function getBrowserSession(userId: string) {
+  return _browserSessions.get(userId)
+}
+
+function isBrowserSessionAuthenticated(session: IpuBrowserSession | undefined) {
+  if (!session?.authenticatedAt) return false
+  return Date.now() - session.authenticatedAt < 10 * 60 * 1000
+}
+
 function getSession(userId: string): IpuSession {
   if (!_sessions.has(userId)) {
     const jar: Record<string, string> = {}
+    let captchaIssuedAt = 0
+    let attemptsForCaptcha = 0
+    let failedLoginAttempts = 0
 
     const client = axios.create({
       headers: HEADERS,
@@ -78,7 +151,34 @@ function getSession(userId: string): IpuSession {
         .map(([k, v]) => `${k}=${v}`)
         .join('; ')
 
-    _sessions.set(userId, { client, getCookieString })
+    const markCaptchaIssued = () => {
+      captchaIssuedAt = Date.now()
+      attemptsForCaptcha = 0
+    }
+    const markLoginAttempt = () => {
+      attemptsForCaptcha += 1
+    }
+    const markLoginFailure = () => {
+      failedLoginAttempts += 1
+    }
+    const markLoginSuccess = () => {
+      attemptsForCaptcha = 0
+      failedLoginAttempts = 0
+    }
+    const canAttemptLogin = () => {
+      if (!captchaIssuedAt || Date.now() - captchaIssuedAt > 5 * 60 * 1000) {
+        return { ok: false, reason: 'CAPTCHA expired. Refresh it before trying again.' }
+      }
+      if (attemptsForCaptcha >= 1) {
+        return { ok: false, reason: 'This CAPTCHA was already submitted once. Refresh it before retrying so the portal does not count repeated failures.' }
+      }
+      if (failedLoginAttempts >= 2) {
+        return { ok: false, reason: 'Portal login retries were blocked locally after multiple failures to protect your account. Wait a bit and fetch a fresh CAPTCHA before retrying.' }
+      }
+      return { ok: true }
+    }
+
+    _sessions.set(userId, { client, getCookieString, markCaptchaIssued, markLoginAttempt, markLoginFailure, markLoginSuccess, canAttemptLogin })
   }
   return _sessions.get(userId)!
 }
@@ -125,6 +225,10 @@ async function scrapeIpuProfile(client: AxiosInstance): Promise<Record<string, s
     })
     console.log('[IPU Profile] Fields scraped:', Object.keys(info))
   } catch (e: any) {
+    if (e?.response?.status === 404) {
+      console.warn('[IPU Profile] Profile page not found at current path; skipping profile enrichment.')
+      return info
+    }
     console.error('[IPU Profile] Scrape failed:', e.message)
   }
   return info
@@ -180,9 +284,13 @@ function findCaptchaImg($: cheerio.CheerioAPI): string | null {
 function extractHiddenFields($: cheerio.CheerioAPI): Record<string, string> {
   const hidden: Record<string, string> = {}
   const form = getLoginForm($)
-  form.find('input[type="hidden"]').each((_i, inp) => {
+  form.find('input').each((_i, inp) => {
     const name = $(inp).attr('name')
-    if (name) hidden[name] = $(inp).attr('value') || ''
+    const type = ($(inp).attr('type') || 'text').toLowerCase()
+    if (!name) return
+    if (type === 'hidden' || type === 'submit' || type === 'button') {
+      hidden[name] = $(inp).attr('value') || ''
+    }
   })
   return hidden
 }
@@ -214,7 +322,331 @@ function detectLoginAction($: cheerio.CheerioAPI): string {
   const form = getLoginForm($)
   const action = form.attr('action')?.trim() || ''
   if (!action) return IPU_LOGIN_ACTION
-  return resolveIpuUrl(action)
+  const resolved = resolveIpuUrl(action)
+  if (/\/web\/login\.jsp$/i.test(resolved)) return IPU_LOGIN_ACTION
+  return resolved
+}
+
+function hashPortalPassword(password: string, captcha: string): string {
+  return createHash('sha256')
+    .update(`${password}${captcha}`, 'utf8')
+    .digest('base64')
+}
+
+function extractPortalMessage($: cheerio.CheerioAPI): string | null {
+  const selectors = [
+    '.error',
+    '.alert',
+    '.danger',
+    '.warning',
+    '.message',
+    '[class*="error" i]',
+    '[class*="alert" i]',
+    '[class*="warning" i]',
+    '#content',
+    'h2',
+    'h3',
+    'p',
+  ]
+
+  for (const selector of selectors) {
+    const text = $(selector).first().text().replace(/\s+/g, ' ').trim()
+    if (text && text.length >= 8) return text
+  }
+  return null
+}
+
+function canAttemptBrowserLogin(session: IpuBrowserSession) {
+  if (!session.captchaIssuedAt || Date.now() - session.captchaIssuedAt > 5 * 60 * 1000) {
+    return { ok: false, reason: 'CAPTCHA expired. Refresh it before trying again.' }
+  }
+  if (session.attemptsForCaptcha >= 1) {
+    return { ok: false, reason: 'This CAPTCHA was already submitted once. Refresh it before retrying so the portal does not count repeated failures.' }
+  }
+  if (session.failedLoginAttempts >= 2) {
+    return { ok: false, reason: 'Portal login retries were blocked locally after multiple failures to protect your account. Wait a bit and fetch a fresh CAPTCHA before retrying.' }
+  }
+  return { ok: true }
+}
+
+async function fetchBrowserResults(page: Page) {
+  const semesters: PersistableSemester[] = []
+
+  for (let sem = 1; sem <= 8; sem++) {
+    const response = await page.goto(`${IPU_RESULTS_URL}?flag=2&euno=${sem}`, { waitUntil: 'domcontentloaded' })
+    if (!response) continue
+    const status = response.status()
+    const contentType = String(response.headers()['content-type'] || '').toLowerCase()
+    const body = await response.text()
+
+    if (status === 401 || status === 403) {
+      throw Object.assign(new Error('Session Expired. Please Login again.'), { code: 'SESSION_EXPIRED' })
+    }
+    try {
+      const parsed = parseIpuResultsPayload(
+        contentType.includes('application/json') ? JSON.parse(body) : body,
+        sem,
+        status,
+        contentType,
+      )
+
+      if (!parsed.subjects.length) continue
+
+      semesters.push({
+        semester: String(parsed.semester),
+        semester_num: parsed.semester,
+        semester_label: `Semester ${parsed.semester}`,
+        subjects: parsed.subjects,
+        sgpa: String(parsed.sgpa),
+        total_credits: parsed.total_credits,
+        total_marks: String(parsed.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.total_marks ?? 0), 0)),
+        max_marks: String(parsed.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.max_marks ?? 100), 0)),
+        student_info: normalizeStudentInfo((parsed as unknown as { student_info?: Record<string, unknown> }).student_info || {}),
+      })
+    } catch (err: any) {
+      if (err?.code === 'NO_RESULTS') {
+        console.log('[IPU browser-results] No results for semester', sem, {
+          status,
+          contentType,
+          preview: body.slice(0, 180),
+        })
+        continue
+      }
+      throw err
+    }
+  }
+
+  return semesters
+}
+
+function buildStudentInfoFromSemesters(semesters: PersistableSemester[]): Record<string, string> {
+  return semesters.reduce((acc, semester) => {
+    const semesterInfo = normalizeStudentInfo((semester as unknown as { student_info?: Record<string, unknown> }).student_info || {})
+    return mergePreferredRecord(semesterInfo, acc)
+  }, {} as Record<string, string>)
+}
+
+function isMeaningfulValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false
+  if (typeof value === 'string') {
+    const normalized = value.trim()
+    return normalized !== '' && normalized !== '-' && normalized !== '---' && normalized.toLowerCase() !== 'null'
+  }
+  return true
+}
+
+function mergePreferredRecord<T extends Record<string, unknown>>(primary: T, fallback: T): T {
+  const merged: Record<string, unknown> = { ...fallback }
+  for (const [key, value] of Object.entries(primary)) {
+    if (isMeaningfulValue(value)) merged[key] = value
+  }
+  return merged as T
+}
+
+function normalizeStudentInfo(info: Record<string, unknown> = {}): Record<string, string> {
+  const normalized: Record<string, string> = {}
+  const mappings: Array<[string, string]> = [
+    ['name', 'name'],
+    ['stname', 'name'],
+    ['roll_no', 'roll_no'],
+    ['nrollno', 'roll_no'],
+    ['enrollment_number', 'roll_no'],
+    ['father', 'father'],
+    ['mother', 'mother'],
+    ['email', 'email'],
+    ['phone', 'phone'],
+    ['mobno', 'phone'],
+    ['gender', 'gender'],
+    ['batch', 'batch'],
+    ['byoa', 'batch'],
+    ['admission_year', 'admission_year'],
+    ['yoa', 'admission_year'],
+    ['institution', 'institution'],
+    ['iname', 'institution'],
+    ['programme', 'programme'],
+    ['prgname', 'programme'],
+  ]
+
+  for (const [sourceKey, targetKey] of mappings) {
+    const value = info[sourceKey]
+    if (!isMeaningfulValue(value)) continue
+    normalized[targetKey] = String(value).trim()
+  }
+
+  return normalized
+}
+
+function extractProfileInfoFromEmbeddedData(raw: string): Record<string, string> {
+  if (!raw) return {}
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    // The payload can be huge because of stimage; strip it if needed and retry.
+    const sanitized = raw.replace(/"stimage"\s*:\s*"[\s\S]*?"\s*(,)?/g, (_match, trailingComma) => trailingComma ? '' : '')
+    parsed = JSON.parse(sanitized)
+  }
+
+  const row = Array.isArray(parsed) ? parsed[0] : null
+  if (!row || typeof row !== 'object') return {}
+  const data = row as Record<string, unknown>
+
+  return normalizeStudentInfo({
+    name: String(data.stname || ''),
+    roll_no: String(data.nrollno || ''),
+    father: String(data.father || ''),
+    mother: String(data.mother || ''),
+    email: String(data.email || ''),
+    phone: String(data.mobno || ''),
+    gender: String(data.gender || ''),
+    batch: data.byoa ? String(data.byoa) : '',
+    admission_year: data.yoa ? String(data.yoa) : '',
+    institution: String(data.iname || ''),
+    programme: String(data.prgname || ''),
+  })
+}
+
+function extractEmbeddedProfileDataBlock(html: string): string {
+  const cheerioMatch = cheerio.load(html)('#data').text().trim()
+  if (cheerioMatch) return cheerioMatch
+
+  const regexMatch = html.match(/<div[^>]*id=["']data["'][^>]*>([\s\S]*?)<\/div>/i)
+  if (regexMatch?.[1]) {
+    return regexMatch[1]
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .trim()
+  }
+
+  const jsonArrayMatch = html.match(/(\[\s*\{\s*"nrollno"[\s\S]*?\}\s*\])/i)
+  if (!jsonArrayMatch?.[1]) return ''
+
+  return jsonArrayMatch[1]
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .trim()
+}
+
+function getSubjectKey(subject: Partial<ProcessedSubject>): string {
+  const code = String(subject.code || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+  if (code) return `code::${code}`
+
+  const name = String(subject.name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+  return `name::${name}`
+}
+
+function subjectCompletenessScore(subject: Partial<ProcessedSubject>): number {
+  let score = 0
+  if (isMeaningfulValue(subject.total_marks)) score += 5
+  if (isMeaningfulValue(subject.internal)) score += 2
+  if (isMeaningfulValue(subject.external)) score += 2
+  if (isMeaningfulValue(subject.grade) && subject.grade !== '-') score += 2
+  if (subject.is_pending === false) score += 3
+  return score
+}
+
+function mergeSubjectPair(current: Partial<ProcessedSubject>, incoming: Partial<ProcessedSubject>): ProcessedSubject {
+  const preferred = subjectCompletenessScore(incoming) >= subjectCompletenessScore(current) ? incoming : current
+  const fallback = preferred === incoming ? current : incoming
+  const merged = mergePreferredRecord(preferred as Record<string, unknown>, fallback as Record<string, unknown>) as unknown as ProcessedSubject
+
+  // Fresh portal payload should be authoritative for marks/status fields, even when
+  // a component is intentionally "-" (for example external-only subjects).
+  const authoritativeIncomingFields = [
+    'name',
+    'code',
+    'internal',
+    'external',
+    'total_marks',
+    'max_marks',
+    'percentage',
+    'grade',
+    'grade_point',
+    'status',
+    'is_pending',
+    'declared_date',
+    'exam_session',
+  ] as const
+
+  for (const field of authoritativeIncomingFields) {
+    if (!Object.prototype.hasOwnProperty.call(incoming, field)) continue
+    const value = incoming[field]
+    if (value === undefined || value === null) continue
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed === '' && field !== 'status') continue
+      merged[field] = value as never
+      continue
+    }
+    merged[field] = value as never
+  }
+
+  if (merged.total_marks === null && typeof merged.internal === 'string' && typeof merged.external === 'string') {
+    const internal = parseFloat(merged.internal)
+    const external = parseFloat(merged.external)
+    if (!Number.isNaN(internal) || !Number.isNaN(external)) {
+      merged.total_marks = (Number.isNaN(internal) ? 0 : internal) + (Number.isNaN(external) ? 0 : external)
+    }
+  }
+  return merged
+}
+
+function normalizeAndMergeSubjects(subjects: unknown, existingSubjects: unknown = []): ProcessedSubject[] {
+  const merged = new Map<string, ProcessedSubject>()
+  const allSubjects = [
+    ...(Array.isArray(existingSubjects) ? existingSubjects : []),
+    ...(Array.isArray(subjects) ? subjects : []),
+  ] as Array<Partial<ProcessedSubject>>
+
+  for (const subject of allSubjects) {
+    const key = getSubjectKey(subject)
+    if (!key || key === '::') continue
+    const previous = merged.get(key)
+    merged.set(key, previous ? mergeSubjectPair(previous, subject) : mergeSubjectPair(subject, {}))
+  }
+
+  return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function computeSubjectTotals(subjects: ProcessedSubject[]) {
+  const completed = subjects.filter(subject => !subject.is_pending && subject.grade !== '-')
+  const totalMarks = completed.reduce((sum, subject) => sum + Number(subject.total_marks ?? 0), 0)
+  const totalMaxMarks = completed.reduce((sum, subject) => sum + Number(subject.max_marks ?? 100), 0)
+  return {
+    total_marks: String(totalMarks),
+    max_marks: String(totalMaxMarks),
+  }
+}
+
+function mergeSemestersWithExisting(
+  incomingSemesters: PersistableSemester[],
+  existingResults: Array<{ semester: number; semester_label: string | null; subjects: unknown; total_marks: string | null; max_marks: string | null; sgpa: number }>
+): PersistableSemester[] {
+  const bySemester = new Map(existingResults.map(result => [result.semester, result]))
+  return incomingSemesters.map((semester) => {
+    const existing = bySemester.get(semester.semester_num)
+    const mergedSubjects = normalizeAndMergeSubjects(semester.subjects, existing?.subjects)
+    const totals = computeSubjectTotals(mergedSubjects)
+    return {
+      ...semester,
+      semester_label: isMeaningfulValue(semester.semester_label) ? semester.semester_label : (existing?.semester_label || `Semester ${semester.semester_num}`),
+      subjects: mergedSubjects,
+      sgpa: isMeaningfulValue(semester.sgpa) ? semester.sgpa : String(existing?.sgpa ?? 0),
+      total_marks: totals.total_marks || existing?.total_marks || '0',
+      max_marks: totals.max_marks || existing?.max_marks || '0',
+    }
+  })
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -224,64 +656,80 @@ function detectLoginAction($: cheerio.CheerioAPI): string {
 /** Save fetched results to semester_results collection and update user profile */
 async function saveResultsToDB(req: AuthRequest, results: {
   enrollment_number: string
-  student_info: Record<string, unknown>
-  semesters: Array<{
-    semester: string
-    semester_num: number
-    semester_label: string
-    subjects: ProcessedSubject[]
-    sgpa: string
-    total_credits: number
-    total_marks: string
-    max_marks: string
-  }>
+  student_info: ResultStudentInfo
+  semesters: PersistableSemester[]
 }) {
   const userId = req.userId!
-  const own = ownership(req)
+  const existingResults = await prisma.semesterResult.findMany({
+    where: { user_id: userId },
+    select: {
+      semester: true,
+      semester_label: true,
+      subjects: true,
+      total_marks: true,
+      max_marks: true,
+      sgpa: true,
+      student_info: true,
+    },
+  })
+  const existingStudentInfo = existingResults.reduce((acc, row) => {
+    const current = (row.student_info ?? {}) as ResultStudentInfo
+    return mergePreferredRecord(current, acc)
+  }, {} as ResultStudentInfo)
+  const mergedStudentInfo = mergePreferredRecord(results.student_info, existingStudentInfo)
+  const normalizedSemesters = mergeSemestersWithExisting(results.semesters, existingResults)
 
-  for (const sem of results.semesters) {
+  for (const sem of normalizedSemesters) {
     if (!sem.semester_num) continue
 
-    await SemesterResult.findOneAndUpdate(
-      { user_id: new Types.ObjectId(userId), semester: sem.semester_num },
-      {
-        $set: {
-          ...own,
-          enrollment_number: results.enrollment_number,
-          semester: sem.semester_num,
-          semester_label: sem.semester_label,
-          subjects: sem.subjects,
-          sgpa: parseFloat(sem.sgpa) || 0,
-          total_credits: sem.total_credits,
-          total_marks: sem.total_marks,
-          max_marks: sem.max_marks,
-          student_info: results.student_info,
-          source: 'ipu_scraper',
-          updated_at: new Date(),
-        },
+    await prisma.semesterResult.upsert({
+      where: { user_id_semester: { user_id: userId, semester: sem.semester_num } },
+      create: {
+        user_id: userId,
+        enrollment_number: results.enrollment_number,
+        semester: sem.semester_num,
+        semester_label: sem.semester_label,
+        subjects: sem.subjects as any,
+        sgpa: parseFloat(sem.sgpa) || 0,
+        total_credits: sem.total_credits,
+        total_marks: sem.total_marks,
+        max_marks: sem.max_marks,
+        student_info: mergedStudentInfo as any,
+        source: 'ipu_scraper',
       },
-      { upsert: true },
-    )
+      update: {
+        enrollment_number: results.enrollment_number,
+        semester_label: sem.semester_label,
+        subjects: sem.subjects as any,
+        sgpa: parseFloat(sem.sgpa) || 0,
+        total_credits: sem.total_credits,
+        total_marks: sem.total_marks,
+        max_marks: sem.max_marks,
+        student_info: mergedStudentInfo as any,
+        source: 'ipu_scraper',
+        updated_at: new Date(),
+      },
+    })
   }
 
   // Update user profile with student info
   const info = results.student_info
   const profileUpdate: Record<string, unknown> = {}
-  if (results.enrollment_number) profileUpdate.enrollment_number = results.enrollment_number
-  if (info.institution) profileUpdate.college = info.institution
-  if (info.programme) {
-    profileUpdate.course = info.programme
-    profileUpdate.branch = info.programme
+  if (isMeaningfulValue(results.enrollment_number)) profileUpdate.enrollment_number = results.enrollment_number
+  if (isMeaningfulValue(mergedStudentInfo.institution)) profileUpdate.college = mergedStudentInfo.institution
+  if (isMeaningfulValue(mergedStudentInfo.programme)) {
+    profileUpdate.course = mergedStudentInfo.programme
+    profileUpdate.branch = mergedStudentInfo.programme
   }
-  if (info.batch) profileUpdate.batch = info.batch
-  if (info.admission_year) profileUpdate.admission_year = info.admission_year
-  if (info.name) profileUpdate.name = info.name
-  if (info.mother) profileUpdate.mother_name = info.mother
-  if (info.phone) profileUpdate.phone_number = info.phone
-  if (info.gender) profileUpdate.gender = info.gender
+  if (isMeaningfulValue(mergedStudentInfo.batch)) profileUpdate.batch = mergedStudentInfo.batch
+  if (isMeaningfulValue(mergedStudentInfo.admission_year)) profileUpdate.admission_year = mergedStudentInfo.admission_year
+  if (isMeaningfulValue(mergedStudentInfo.name)) profileUpdate.name = mergedStudentInfo.name
+  if (isMeaningfulValue(mergedStudentInfo.mother)) profileUpdate.mother_name = mergedStudentInfo.mother
+  if (isMeaningfulValue(mergedStudentInfo.phone)) profileUpdate.phone_number = mergedStudentInfo.phone
+  if (isMeaningfulValue(mergedStudentInfo.gender)) profileUpdate.gender = mergedStudentInfo.gender
 
   if (Object.keys(profileUpdate).length) {
-    await User.updateOne({ _id: userId }, { $set: profileUpdate })
+    await prisma.user.update({ where: { id: userId }, data: profileUpdate as any })
   }
 
   console.log(`[IPU] Saved ${results.semesters.length} semesters to DB for user ${userId}`)
@@ -293,21 +741,20 @@ async function saveResultsToDB(req: AuthRequest, results: {
 
 /* ── GET /api/ipu/captcha ─────────────────────────────────────────────── */
 router.get('/captcha', async (req: AuthRequest, res) => {
-  const { client: sess } = getSession(req.userId!)
+  const userId = req.userId!
   try {
-    const resp = await sess.get(IPU_LOGIN_URL)
-    const $ = cheerio.load(resp.data)
-
-    const captchaSrc = findCaptchaImg($)
-    if (!captchaSrc) return fail(res, 'Could not locate CAPTCHA image on the IPU login page.', 'CAPTCHA_NOT_FOUND', 422)
-
-    // Download CAPTCHA image
-    const imgResp = await sess.get(captchaSrc, { responseType: 'arraybuffer' })
-    const b64 = Buffer.from(imgResp.data).toString('base64')
-    const ct = (imgResp.headers['content-type'] as string) || 'image/jpeg'
+    const session = await createBrowserSession(userId)
+    await session.page.goto(IPU_LOGIN_URL, { waitUntil: 'domcontentloaded' })
+    const html = await session.page.content()
+    const $ = cheerio.load(html)
+    const captcha = session.page.locator('#captchaImage')
+    if (!await captcha.count()) return fail(res, 'Could not locate CAPTCHA image on the IPU login page.', 'CAPTCHA_NOT_FOUND', 422)
+    const b64 = (await captcha.screenshot({ type: 'png' })).toString('base64')
+    session.captchaIssuedAt = Date.now()
+    session.attemptsForCaptcha = 0
 
     ok(res, {
-      captcha_image: `data:${ct};base64,${b64}`,
+      captcha_image: `data:image/png;base64,${b64}`,
       hidden_fields: extractHiddenFields($),
       field_names: detectFieldNames($),
       login_action: detectLoginAction($),
@@ -323,7 +770,6 @@ router.get('/captcha', async (req: AuthRequest, res) => {
 
 /* ── POST /api/ipu/auto-fetch ─────────────────────────────────────────── */
 router.post('/auto-fetch', async (req: AuthRequest, res) => {
-  const { client: sess } = getSession(req.userId!)
   const { enrollment_number = '', password = '' } = req.body || {}
   const enrollment = enrollment_number.trim()
   const pwd = password.trim()
@@ -332,30 +778,27 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
 
   try {
     // 1. Fetch login page
-    const resp = await sess.get(IPU_LOGIN_URL)
-    const $ = cheerio.load(resp.data)
+    const session = await createBrowserSession(req.userId!)
+    await session.page.goto(IPU_LOGIN_URL, { waitUntil: 'domcontentloaded' })
+    const html = await session.page.content()
+    const $ = cheerio.load(html)
 
     // 2. Find CAPTCHA
-    const captchaSrc = findCaptchaImg($)
-    if (!captchaSrc) return fail(res, 'Could not locate CAPTCHA on login page.', 'CAPTCHA_NOT_FOUND', 422)
-
-    // 3. Download CAPTCHA
-    const imgResp = await sess.get(captchaSrc, { responseType: 'arraybuffer' })
-    const b64 = Buffer.from(imgResp.data).toString('base64')
-    const ct = (imgResp.headers['content-type'] as string) || 'image/jpeg'
+    const captcha = session.page.locator('#captchaImage')
+    if (!await captcha.count()) return fail(res, 'Could not locate CAPTCHA on login page.', 'CAPTCHA_NOT_FOUND', 422)
+    const b64 = (await captcha.screenshot({ type: 'png' })).toString('base64')
 
     // 4. Extract fields
-    const hiddenFields = extractHiddenFields($)
-    const fieldNames = detectFieldNames($)
+    session.captchaIssuedAt = Date.now()
+    session.attemptsForCaptcha = 0
 
     // 5. No OCR in Node — always return captcha for manual entry
-    const loginAction = detectLoginAction($)
     ok(res, {
       captcha_required: true,
-      captcha_image: `data:${ct};base64,${b64}`,
-      hidden_fields: hiddenFields,
-      field_names: fieldNames,
-      login_action: loginAction,
+      captcha_image: `data:image/png;base64,${b64}`,
+      hidden_fields: extractHiddenFields($),
+      field_names: detectFieldNames($),
+      login_action: detectLoginAction($),
     })
   } catch (e: any) {
     console.error('[IPU auto-fetch]', e.message)
@@ -368,7 +811,8 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
 
 /* ── POST /api/ipu/fetch-results ──────────────────────────────────────── */
 router.post('/fetch-results', async (req: AuthRequest, res) => {
-  const sess = getSession(req.userId!)
+  const userId = req.userId!
+  const browserSession = getBrowserSession(userId)
   const { enrollment_number = '', password = '', captcha = '', hidden_fields = {}, field_names = {}, login_action = '' } = req.body || {}
   const enrollment = enrollment_number.trim()
   const pwd = password.trim()
@@ -377,44 +821,51 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
   if (!enrollment || !pwd || !cap) {
     return fail(res, 'Enrollment number, password and CAPTCHA are required.', 'MISSING_FIELDS', 400)
   }
+  if (!browserSession) {
+    return fail(res, 'CAPTCHA session expired. Refresh it before trying again.', 'SESSION_EXPIRED', 401)
+  }
+  const loginSafety = canAttemptBrowserLogin(browserSession)
+  if (!loginSafety.ok) {
+    return fail(res, loginSafety.reason || 'Portal login blocked for safety.', 'LOGIN_BLOCKED', 429)
+  }
 
   try {
-    // Build login payload
-    const payload: Record<string, string> = { ...hidden_fields }
-    payload[field_names.username || 'j_username'] = enrollment
-    payload[field_names.password || 'j_password'] = pwd
-    payload[field_names.captcha || 'captcha'] = cap
-
-    // Use the login action from the captcha step, or fall back to the constant
+    const page = browserSession.page
+    const usernameField = field_names.username || 'username'
+    const passwordField = field_names.password || 'passwd'
+    const captchaField = field_names.captcha || 'captcha'
     const loginUrl = login_action || IPU_LOGIN_ACTION
+    browserSession.attemptsForCaptcha += 1
     console.log('[IPU] Posting login to:', loginUrl)
 
-    const loginResp = await sess.client.post(loginUrl, new URLSearchParams(payload).toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      maxRedirects: 5,
-    })
+    await page.locator(`[name="${usernameField}"]`).fill(enrollment)
+    await page.locator(`[name="${passwordField}"]`).fill(pwd)
+    await page.locator(`[name="${captchaField}"]`).fill(cap)
+    const navigation = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => null)
+    await page.locator('input[type="submit"], button[type="submit"]').first().click()
+    await navigation
 
-    const pageText: string = loginResp.data
+    const pageText = await page.content()
     const pageLower = pageText.toLowerCase()
     const $page = cheerio.load(pageText)
 
     // Log post-login info for debugging
     const postTitle = $page('title').text().trim()
     const postBodyLen = pageText.length
-    console.log(`[IPU] Post-login page: title="${postTitle}", length=${postBodyLen}, status=${loginResp.status}`)
-    if (loginResp.request?.res?.responseUrl) {
-      console.log(`[IPU] Final redirect URL: ${loginResp.request.res.responseUrl}`)
-    }
+    console.log(`[IPU] Post-login page: title="${postTitle}", length=${postBodyLen}, status=200`)
+    console.log(`[IPU] Final redirect URL: ${page.url()}`)
 
     // Check for account lockout (BEFORE other checks)
     const lockoutMsg = detectAccountLockout(pageText)
     if (lockoutMsg) {
+      browserSession.failedLoginAttempts += 1
       console.warn('[IPU] Account lockout detected:', lockoutMsg)
       return fail(res, lockoutMsg, 'ACCOUNT_LOCKED', 423)
     }
 
     // Check for captcha validation failure
     if (pageLower.includes('captcha validation fail') || pageLower.includes('captcha fail')) {
+      browserSession.failedLoginAttempts += 1
       return fail(res, 'CAPTCHA validation failed. Please try again with a new CAPTCHA.', 'CAPTCHA_FAILED', 401)
     }
 
@@ -433,17 +884,69 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
         loginError = $page(el).text().trim() || 'Login failed — check your credentials or CAPTCHA.'
       }
     })
-    if (loginError) return fail(res, loginError, 'LOGIN_FAILED', 401)
+    if (loginError) {
+      browserSession.failedLoginAttempts += 1
+      return fail(res, loginError, 'LOGIN_FAILED', 401)
+    }
 
     if (stillOnLogin) {
+      browserSession.failedLoginAttempts += 1
       return fail(res, 'Login failed — incorrect credentials or CAPTCHA. Please try again.', 'LOGIN_FAILED', 401)
     }
 
     // Successful login — scrape profile first, then fetch results
+    browserSession.failedLoginAttempts = 0
+    browserSession.attemptsForCaptcha = 0
+    browserSession.authenticatedAt = Date.now()
     console.log('[IPU] Login successful, scraping profile + fetching JSON API data...')
-    const profileInfo = await scrapeIpuProfile(sess.client)
-    const cookieStr = sess.getCookieString()
-    const rawSemesters = await fetchAllIpuResults(cookieStr)
+    let profileInfo: Record<string, string> = {}
+    try {
+      const profileResponse = await page.request.get(IPU_PROFILE_URL, {
+        headers: {
+          Referer: IPU_HOME_URL,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        },
+      })
+      const profileHtml = await profileResponse.text()
+      const embeddedFromRequest = extractEmbeddedProfileDataBlock(profileHtml)
+
+      if (embeddedFromRequest) {
+        profileInfo = extractProfileInfoFromEmbeddedData(embeddedFromRequest)
+        console.log('[IPU Profile] Browser profile fields:', Object.keys(profileInfo))
+      } else {
+        await page.goto(IPU_PROFILE_URL, { waitUntil: 'domcontentloaded' })
+        const profileNode = page.locator('#data')
+        await profileNode.waitFor({ state: 'attached', timeout: 5000 }).catch(() => null)
+        const embeddedJson = ((await profileNode.textContent().catch(() => '')) || '').trim()
+        if (embeddedJson) {
+          profileInfo = extractProfileInfoFromEmbeddedData(embeddedJson)
+          console.log('[IPU Profile] Browser profile fields (fallback):', Object.keys(profileInfo))
+        } else {
+          const liveProfileHtml = await page.content()
+          const title = await page.title().catch(() => '')
+          console.warn('[IPU Profile] Embedded profile data block was not found on profile page.', {
+            url: page.url(),
+            title,
+            hasNrollno: /"nrollno"\s*:/.test(liveProfileHtml) || /"nrollno"\s*:/.test(profileHtml),
+            preview: liveProfileHtml.slice(0, 220),
+          })
+        }
+      }
+    } catch (profileErr: any) {
+      console.warn('[IPU Profile] Browser profile fetch skipped:', profileErr?.message || profileErr)
+    }
+    let rawSemesters
+    try {
+      rawSemesters = await fetchBrowserResults(page)
+    } catch (fetchErr: any) {
+      console.error('[IPU results-api]', fetchErr?.message || fetchErr)
+      return fail(
+        res,
+        fetchErr?.message || 'Portal login succeeded, but result data could not be read.',
+        'RESULTS_FETCH_FAILED',
+        502,
+      )
+    }
 
     if (!rawSemesters || rawSemesters.length === 0) {
       return fail(res, 'No results found on IPU portal.', 'NO_RESULTS', 404)
@@ -452,35 +955,32 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     // Deduplicate: the IPU API sometimes returns the same semester data for multiple euno calls
     const seenSemesters = new Set<number>()
     const uniqueSemesters = rawSemesters.filter(s => {
-      if (seenSemesters.has(s.semester)) return false
-      seenSemesters.add(s.semester)
+      if (seenSemesters.has(s.semester_num)) return false
+      seenSemesters.add(s.semester_num)
       return true
     })
 
-    const results = {
-      enrollment_number: enrollment,
-      student_info: {
-        ...uniqueSemesters[0].student_info as Record<string, unknown>,
-        // Enrich with portal profile data
-        ...(profileInfo.name ? { name: profileInfo.name } : {}),
-        ...(profileInfo.father ? { father: profileInfo.father } : {}),
-        ...(profileInfo.mother ? { mother: profileInfo.mother } : {}),
-        ...(profileInfo.email ? { email: profileInfo.email } : {}),
-        ...(profileInfo.phone ? { phone: profileInfo.phone } : {}),
-        ...(profileInfo.gender ? { gender: profileInfo.gender } : {}),
-        ...(profileInfo.batch ? { batch: profileInfo.batch } : {}),
-        ...(profileInfo.admission_year ? { admission_year: profileInfo.admission_year } : {}),
+    const existingResults = await prisma.semesterResult.findMany({
+      where: { user_id: req.userId! },
+      select: {
+        semester: true,
+        semester_label: true,
+        subjects: true,
+        total_marks: true,
+        max_marks: true,
+        sgpa: true,
       },
-      semesters: uniqueSemesters.map(sem => ({
-        semester: String(sem.semester),
-        semester_num: sem.semester,
-        semester_label: `Semester ${sem.semester}`,
-        subjects: sem.subjects,
-        sgpa: String(sem.sgpa),
-        total_credits: sem.total_credits,
-        total_marks: String(sem.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.total_marks ?? 0), 0)),
-        max_marks: String(sem.subjects.filter(s => !s.is_pending).reduce((a, s) => a + (s.max_marks ?? 100), 0)),
-      })),
+    })
+
+    const semesterStudentInfo = buildStudentInfoFromSemesters(uniqueSemesters)
+    const rawResults = {
+      enrollment_number: enrollment,
+      student_info: mergePreferredRecord(profileInfo, semesterStudentInfo),
+      semesters: uniqueSemesters,
+    }
+    const results = {
+      ...rawResults,
+      semesters: mergeSemestersWithExisting(rawResults.semesters, existingResults),
     }
 
     // Compute grade distribution and overall percentage — exclude pending subjects
@@ -501,43 +1001,54 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
 
     ok(res, { ...results, gradeDistribution, overallPercentage, totalSubjects: completedSubjs.length })
   } catch (e: any) {
-    console.error('[IPU fetch-results]', e.message)
+    console.error('[IPU fetch-results]', e.message, e.stack)
     if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'ETIMEDOUT') {
       return fail(res, `Network error connecting to IPU portal: ${e.message}`, 'NETWORK_ERROR', 502)
     }
     fail(res, `Unexpected error: ${e.message}`, 'INTERNAL_ERROR', 500)
+  } finally {
+    const currentSession = getBrowserSession(userId)
+    if (!isBrowserSessionAuthenticated(currentSession)) {
+      destroySession(userId)
+    }
   }
 })
 
 /* ── GET /api/ipu/saved-results ────────────────────────────────────────── */
 router.get('/saved-results', async (req: AuthRequest, res) => {
   try {
-    const results = await SemesterResult.find({
-      ...uf(req),
-      source: 'ipu_scraper',
-    }).sort({ semester: 1 }).lean()
+    const userId = req.userId!
+    const results = await prisma.semesterResult.findMany({
+      where: { user_id: userId, source: 'ipu_scraper' },
+      orderBy: { semester: 'asc' },
+    })
 
     if (!results.length) {
       return ok(res, null)
     }
 
-    // Build response matching the scraped format
-    const studentInfo = results[0]?.student_info || {}
-    const enrollmentNumber = results[0]?.enrollment_number || ''
-    const userId = (req as AuthRequest).userId!
+      // Build response matching the scraped format
+      const studentInfo = results.reduce((acc, row) => {
+        const current = (row.student_info ?? {}) as Record<string, unknown>
+        return mergePreferredRecord(current, acc)
+      }, {} as Record<string, unknown>)
+      const enrollmentNumber = results[0]?.enrollment_number || ''
 
-    // Enrich student_info with User document
-    const userDoc = await User.findById(userId).lean()
-    const enrichedStudentInfo = {
-      ...studentInfo,
-      ...(userDoc?.mother_name ? { mother: userDoc.mother_name } : {}),
-      ...(userDoc?.phone_number ? { phone: userDoc.phone_number } : {}),
-      ...(userDoc?.email ? { email: userDoc.email } : {}),
-      ...(userDoc?.gender ? { gender: userDoc.gender } : {}),
-      ...(userDoc?.batch ? { batch: userDoc.batch } : {}),
-      ...(userDoc?.course ? { programme: userDoc.course } : {}),
-      ...(userDoc?.admission_year ? { admission_year: userDoc.admission_year } : {}),
-    }
+      // Enrich student_info with User document
+      const userDoc = await prisma.user.findUnique({ where: { id: userId } })
+      const enrichedStudentInfo = {
+        ...(userDoc?.name ? { name: userDoc.name } : {}),
+        ...(userDoc?.enrollment_number ? { roll_no: userDoc.enrollment_number } : {}),
+        ...(userDoc?.mother_name ? { mother: userDoc.mother_name } : {}),
+        ...(userDoc?.phone_number ? { phone: userDoc.phone_number } : {}),
+        ...(userDoc?.email ? { email: userDoc.email } : {}),
+        ...(userDoc?.gender ? { gender: userDoc.gender } : {}),
+        ...(userDoc?.batch ? { batch: userDoc.batch } : {}),
+        ...(userDoc?.course ? { programme: userDoc.course } : {}),
+        ...(userDoc?.college ? { institution: userDoc.college } : {}),
+        ...(userDoc?.admission_year ? { admission_year: userDoc.admission_year } : {}),
+        ...normalizeStudentInfo(studentInfo),
+      }
 
     // Calculate CGPA
     const validSgpas = results.filter(r => r.sgpa > 0)
@@ -557,14 +1068,18 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
 
     // Compute grade distribution and overall percentage — exclude pending subjects
     const gradeDistSaved: Record<string, number> = {}
-    const allSubjsSaved = results.flatMap(r => r.subjects || [])
-    const completedSaved = allSubjsSaved.filter(s => !(s as any).is_pending && (s as any).grade !== '-')
+    const allSubjsSaved = results.flatMap(r => ((r.subjects ?? []) as any[]))
+    const completedSaved = allSubjsSaved.filter(s => !s.is_pending && s.grade !== '-')
     for (const sub of completedSaved) {
-      const g = (sub as any).grade || 'F'
+      const g = sub.grade || 'F'
       gradeDistSaved[g] = (gradeDistSaved[g] || 0) + 1
     }
-    const totalMarksSaved = completedSaved.reduce((a, s) => a + ((s as any).total_marks ?? 0), 0)
-    const totalMaxSaved = completedSaved.reduce((a, s) => a + ((s as any).max_marks ?? 100), 0)
+    let totalMarksSaved = 0
+    let totalMaxSaved = 0
+    for (const sub of completedSaved) {
+      totalMarksSaved += Number(sub.total_marks ?? 0)
+      totalMaxSaved += Number(sub.max_marks ?? 100)
+    }
     const overallPctSaved = totalMaxSaved > 0
       ? parseFloat(((totalMarksSaved / totalMaxSaved) * 100).toFixed(1))
       : 0
@@ -598,19 +1113,29 @@ router.post('/change-password', async (req: AuthRequest, res) => {
   if (new_password !== confirm_password) {
     return fail(res, 'New password and confirm password do not match.', 'VALIDATION_ERROR', 400)
   }
-  if (new_password.length < 6) {
-    return fail(res, 'New password must be at least 6 characters.', 'VALIDATION_ERROR', 400)
+  if (new_password === current_password) {
+    return fail(res, 'New password must be different from the current password.', 'VALIDATION_ERROR', 400)
+  }
+  if (new_password.length < 8) {
+    return fail(res, 'New password must be at least 8 characters.', 'VALIDATION_ERROR', 400)
+  }
+  if (!/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/[0-9]/.test(new_password) || !/[!@#$%^&*]/.test(new_password)) {
+    return fail(res, 'New password must include uppercase, lowercase, number, and special character (!@#$%^&*).', 'VALIDATION_ERROR', 400)
   }
 
-  const sess = getSession(req.userId!)
-  try {
-    // Try to load the change-password page using the existing session
-    const pageResp = await sess.client.get(IPU_CHANGE_PW_URL, { timeout: 10_000 })
-    const html = pageResp.data as string
+  const browserSession = getBrowserSession(req.userId!)
+  if (!isBrowserSessionAuthenticated(browserSession)) {
+    return fail(res, 'Active IPU session expired. Sync results once, then change password within 10 minutes.', 'SESSION_EXPIRED', 401)
+  }
 
-    // If redirected to login, session has expired
+  try {
+    const page = browserSession!.page
+    await page.goto(IPU_CHANGE_PW_URL, { waitUntil: 'domcontentloaded', timeout: 15_000 })
+    const html = await page.content()
+
     if (html.toLowerCase().includes('j_username') || html.toLowerCase().includes('captchaservlet')) {
-      return fail(res, 'IPU session expired. Please sync your results first to establish an active session, then retry.', 'SESSION_EXPIRED', 401)
+      browserSession!.authenticatedAt = undefined
+      return fail(res, 'Active IPU session expired. Sync results again before changing password.', 'SESSION_EXPIRED', 401)
     }
 
     const $cp = cheerio.load(html)
@@ -639,23 +1164,30 @@ router.post('/change-password', async (req: AuthRequest, res) => {
     payload[findField('confirm', 'retype', 'verify', 'cnf') || 'confirmPassword'] = confirm_password
 
     const formAction = form.attr('action')?.trim() || ''
-    const actionUrl = formAction ? resolveIpuUrl(formAction) : `${IPU_BASE}/web/student/changepassword.do`
+    const actionUrl = formAction ? resolveIpuUrl(formAction) : `${IPU_BASE}/web/ChangePassword`
 
-    const submitResp = await sess.client.post(actionUrl, new URLSearchParams(payload).toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      maxRedirects: 5,
+    const submitResp = await page.request.post(actionUrl, {
+      form: payload,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Referer: IPU_CHANGE_PW_URL,
+      },
+      timeout: 15_000,
     })
 
-    const respText = submitResp.data as string
+    const respText = await submitResp.text()
     const respLow = respText.toLowerCase()
 
     if (respLow.includes('j_username') || respLow.includes('captchaservlet')) {
-      return fail(res, 'IPU session expired during submission. Please sync results first.', 'SESSION_EXPIRED', 401)
+      browserSession!.authenticatedAt = undefined
+      return fail(res, 'IPU session expired during password change. Sync results again.', 'SESSION_EXPIRED', 401)
     }
     if (respLow.includes('incorrect') || respLow.includes('wrong') || respLow.includes('mismatch') || respLow.includes('invalid') || respLow.includes('does not match')) {
       return fail(res, 'Current password is incorrect.', 'WRONG_PASSWORD', 401)
     }
-    if (respLow.includes('success') || respLow.includes('changed') || respLow.includes('updated') || respLow.includes('home')) {
+    if (respLow.includes('success') || respLow.includes('changed') || respLow.includes('updated') || (submitResp.status() >= 200 && submitResp.status() < 300 && !respLow.includes('error'))) {
+      browserSession!.authenticatedAt = undefined
+      destroySession(req.userId!)
       return ok(res, { message: 'Password changed successfully on the IPU portal.' })
     }
     // Ambiguous — likely worked if no error message
@@ -685,7 +1217,7 @@ router.post('/sync-results', async (req: AuthRequest, res) => {
 
     const { sessionCookie, semester } = parsed.data
     const userId = req.userId!
-    const own = ownership(req)
+
 
     // Fetch from IPU portal — single semester or all
     let fetched
@@ -700,43 +1232,82 @@ router.post('/sync-results', async (req: AuthRequest, res) => {
     }
 
     // Upsert each semester into SemesterResult
+    const existingResults = await prisma.semesterResult.findMany({
+      where: { user_id: userId },
+      select: {
+        semester: true,
+        semester_label: true,
+        subjects: true,
+        total_marks: true,
+        max_marks: true,
+        sgpa: true,
+      },
+    })
+    const normalizedFetched = mergeSemestersWithExisting(
+      fetched.map(sem => {
+        const totals = computeSubjectTotals(sem.subjects)
+        return {
+          semester: String(sem.semester),
+          semester_num: sem.semester,
+          semester_label: `Semester ${sem.semester}`,
+          subjects: sem.subjects,
+          sgpa: String(sem.sgpa),
+          total_credits: sem.total_credits,
+          total_marks: totals.total_marks,
+          max_marks: totals.max_marks,
+        }
+      }),
+      existingResults,
+    )
+
     const savedSemesters = []
-    for (const sem of fetched) {
-      const doc = await SemesterResult.findOneAndUpdate(
-        { user_id: new Types.ObjectId(userId), semester: sem.semester },
-        {
-          $set: {
-            ...own,
-            enrollment_number: sem.enrollment_number,
-            semester: sem.semester,
-            semester_label: `Semester ${sem.semester}`,
-            subjects: sem.subjects,
-            sgpa: sem.sgpa,
-            total_credits: sem.total_credits,
-            student_info: sem.student_info,
-            source: 'ipu_scraper' as const,
-            updated_at: new Date(),
-          },
+    for (const sem of normalizedFetched) {
+      const doc = await prisma.semesterResult.upsert({
+        where: { user_id_semester: { user_id: userId, semester: sem.semester_num } },
+        create: {
+          user_id: userId,
+          enrollment_number: fetched[0].enrollment_number,
+          semester: sem.semester_num,
+          semester_label: sem.semester_label,
+          subjects: sem.subjects as any,
+          sgpa: parseFloat(sem.sgpa) || 0,
+          total_credits: sem.total_credits,
+          total_marks: sem.total_marks,
+          max_marks: sem.max_marks,
+          student_info: mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any,
+          source: 'ipu_scraper',
         },
-        { upsert: true, new: true },
-      )
+        update: {
+          enrollment_number: fetched[0].enrollment_number,
+          semester_label: sem.semester_label,
+          subjects: sem.subjects as any,
+          sgpa: parseFloat(sem.sgpa) || 0,
+          total_credits: sem.total_credits,
+          total_marks: sem.total_marks,
+          max_marks: sem.max_marks,
+          student_info: mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any,
+          source: 'ipu_scraper',
+          updated_at: new Date(),
+        },
+      })
       savedSemesters.push(doc)
     }
 
     // Update user profile with latest student info
     const info = fetched[0].student_info
     const profileUpdate: Record<string, unknown> = {}
-    if (info.name) profileUpdate.name = info.name
-    if (info.institution) profileUpdate.college = info.institution
-    if (info.programme) {
+    if (isMeaningfulValue(info.name)) profileUpdate.name = info.name
+    if (isMeaningfulValue(info.institution)) profileUpdate.college = info.institution
+    if (isMeaningfulValue(info.programme)) {
       profileUpdate.course = info.programme
       profileUpdate.branch = info.programme
     }
-    if (info.batch) profileUpdate.batch = info.batch
-    if (fetched[0].enrollment_number) profileUpdate.enrollment_number = fetched[0].enrollment_number
+    if (isMeaningfulValue(info.batch)) profileUpdate.batch = info.batch
+    if (isMeaningfulValue(info.admission_year)) profileUpdate.admission_year = info.admission_year
+    if (isMeaningfulValue(fetched[0].enrollment_number)) profileUpdate.enrollment_number = fetched[0].enrollment_number
 
     if (Object.keys(profileUpdate).length) {
-      await User.updateOne({ _id: userId }, { $set: profileUpdate })
+      await prisma.user.update({ where: { id: userId }, data: profileUpdate as any })
     }
 
     console.log(`[IPU sync-results] Saved ${savedSemesters.length} semester(s) for user ${userId}`)
