@@ -1,4 +1,4 @@
-﻿import { useRef, useState, useEffect } from 'react';
+﻿import { useRef, useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -257,33 +257,49 @@ function DesktopDock() {
    8 nav items fanned in a semicircle (160° → 20°, r=120px)
    Long-press FAB 2s → profile/logout menu
    ══════════════════════════════════════════════════════ */
-const BUBBLE_R = 120;
-const ITEM_BOTTOM = 28;
-const HOLD_DURATION = 2000;
+const MIN_BUBBLE_R = 92;
+const MAX_BUBBLE_R = 128;
+const HOLD_DURATION = 1200;
 const CIRCUMFERENCE = 2 * Math.PI * 25;
 
-const NAV_ARC = navItems.map((item, i) => {
-    const deg = 160 - (i / (navItems.length - 1)) * 140; // 160°→20°, wider spread
-    const rad = (deg * Math.PI) / 180;
-    return {
-        ...item,
-        tx: parseFloat((Math.cos(rad) * BUBBLE_R).toFixed(1)),
-        ty: parseFloat((-Math.sin(rad) * BUBBLE_R).toFixed(1)),
-    };
-});
+function getNavArc(radius: number) {
+    return navItems.map((item, i) => {
+        const deg = 160 - (i / (navItems.length - 1)) * 140;
+        const rad = (deg * Math.PI) / 180;
+        return {
+            ...item,
+            tx: parseFloat((Math.cos(rad) * radius).toFixed(1)),
+            ty: parseFloat((-Math.sin(rad) * radius).toFixed(1)),
+        };
+    });
+}
 
 function MobileBubble() {
     const [isOpen, setIsOpen] = useState(false);
     const [pfpMenuOpen, setPfpMenuOpen] = useState(false);
     const [holding, setHolding] = useState(false);
+    const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
     const location = useLocation();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const didHold = useRef(false);
     const pfpMenuRef = useRef<HTMLDivElement>(null);
+    const bubbleRadius = useMemo(
+        () => Math.min(MAX_BUBBLE_R, Math.max(MIN_BUBBLE_R, Math.round(viewportWidth * 0.32))),
+        [viewportWidth],
+    );
+    const navArc = useMemo(() => getNavArc(bubbleRadius), [bubbleRadius]);
+    const itemBottom = 'calc(env(safe-area-inset-bottom, 0px) + 24px)';
+    const fabBottom = 'calc(env(safe-area-inset-bottom, 0px) + 20px)';
 
     useEffect(() => { setIsOpen(false); setPfpMenuOpen(false); }, [location.pathname]);
+
+    useEffect(() => {
+        const onResize = () => setViewportWidth(window.innerWidth);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
 
     useEffect(() => {
         if (!pfpMenuOpen) return;
@@ -294,6 +310,22 @@ function MobileBubble() {
         document.addEventListener('pointerdown', close);
         return () => document.removeEventListener('pointerdown', close);
     }, [pfpMenuOpen]);
+
+    useEffect(() => {
+        const shouldLock = isOpen || pfpMenuOpen;
+        document.body.style.overflow = shouldLock ? 'hidden' : '';
+        const onEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsOpen(false);
+                setPfpMenuOpen(false);
+            }
+        };
+        if (shouldLock) window.addEventListener('keydown', onEsc);
+        return () => {
+            document.body.style.overflow = '';
+            window.removeEventListener('keydown', onEsc);
+        };
+    }, [isOpen, pfpMenuOpen]);
 
     const startHold = () => {
         didHold.current = false;
@@ -347,7 +379,7 @@ function MobileBubble() {
                         transition={{ type: 'spring', stiffness: 420, damping: 28 }}
                         style={{
                             position: 'fixed',
-                            bottom: 104,
+                            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
                             left: '50%',
                             zIndex: 60,
                             width: 220,
@@ -393,7 +425,7 @@ function MobileBubble() {
 
             {/* Radial nav items */}
             <AnimatePresence>
-                {isOpen && NAV_ARC.map((item, i) => {
+                {isOpen && navArc.map((item, i) => {
                     const isActive = location.pathname === item.href;
                     return (
                         <motion.div
@@ -404,9 +436,9 @@ function MobileBubble() {
                             transition={{ type: 'spring', stiffness: 400, damping: 28, delay: i * 0.025 }}
                             style={{
                                 position: 'fixed',
-                                bottom: ITEM_BOTTOM,
+                                bottom: itemBottom,
                                 left: '50%',
-                                marginLeft: -24,
+                                marginLeft: -26,
                                 zIndex: 50,
                             }}
                         >
@@ -417,7 +449,7 @@ function MobileBubble() {
                                 style={{ WebkitTapHighlightColor: 'transparent' }}
                             >
                                 <div
-                                    className={`w-12 h-12 rounded-[18px] flex items-center justify-center border transition-all ${
+                                    className={`w-[52px] h-[52px] rounded-[18px] flex items-center justify-center border transition-all ${
                                         isActive
                                             ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
                                             : 'bg-[#111]/95 border-white/[0.09] text-white/55'
@@ -442,11 +474,12 @@ function MobileBubble() {
 
             {/* FAB trigger */}
             <motion.div
-                style={{ position: 'fixed', bottom: 24, left: '50%', marginLeft: -28, zIndex: 52 }}
+                style={{ position: 'fixed', bottom: fabBottom, left: '50%', marginLeft: -28, zIndex: 52 }}
                 animate={holding ? { scale: 0.94 } : { scale: 1 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 20 }}
             >
                 <button
+                    aria-label={isOpen ? 'Close navigation menu' : 'Open navigation menu'}
                     onClick={handleClick}
                     onPointerDown={startHold}
                     onPointerUp={endHold}

@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
 COPY api-node/package*.json ./
@@ -7,7 +7,7 @@ RUN npm ci
 COPY api-node/ ./
 RUN npm run build
 
-FROM node:20-alpine
+FROM node:22-bookworm-slim
 WORKDIR /app
 
 ENV NODE_ENV=production

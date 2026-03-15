@@ -1,17 +1,21 @@
 # AcadHub
 
-AcadHub is a full-stack student productivity app with React frontend, React Native mobile app, and a Node + Express + Prisma backend on Neon PostgreSQL.
+AcadHub is a full-stack student productivity app with a React web client and a Node + Express + Prisma backend on Neon PostgreSQL.
 
 ## Current Stack
 - Frontend: React, TypeScript, Vite, Tailwind
 - Backend: Express, TypeScript, Prisma, Zod
 - Database: Neon Postgres
-- Mobile: Expo React Native
+- Client delivery: Installable PWA (web app)
+
+## Client Support Status
+- Native app support has ended.
+- The supported client is the web app (PWA), which you can install on mobile and desktop from your browser.
 
 ## Monorepo Layout
 - frontend: web app
 - api-node: Node API (primary backend)
-- mobile: React Native app
+- mobile: legacy code kept for reference (not actively supported)
 - api: Vercel serverless entry that proxies to api-node build output
 - legacy: old Python backend (not primary runtime)
 
@@ -78,4 +82,4 @@ Services:
 ## Notes
 - Holiday system has been removed from API/schema.
 - Attendance substitution flow is Neon-safe (no transaction/upsert dependency).
-- Backup/restore includes resume entities (projects, experiences, certifications).
+- Preferred usage is web/PWA across desktop and mobile.
