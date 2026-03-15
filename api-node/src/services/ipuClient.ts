@@ -1,6 +1,10 @@
 import axios from 'axios';
-import { Cookie } from 'playwright'; // Using the interface for type compatibility, though we use axios
 
+export interface Cookie {
+    name: string;
+    value: string;
+    [key: string]: any;
+}
 export interface IpuScraperResponse {
     nrollno: string;
     stname: string;

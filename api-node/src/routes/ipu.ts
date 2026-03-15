@@ -758,24 +758,39 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     console.log('[IPU] Posting login to:', loginUrl)
 
     const payload = new URLSearchParams()
-    for (const [k, v] of Object.entries(hidden_fields)) payload.append(k, String(v))
+    const reservedFields = [usernameField, passwordField, captchaField, 'btn_login'].map(s => s.toLowerCase())
+    
+    for (const [k, v] of Object.entries(hidden_fields)) {
+      if (!reservedFields.includes(k.toLowerCase())) {
+        payload.append(k, String(v))
+      }
+    }
+    
     payload.append(usernameField, enrollment)
     payload.append(passwordField, pwd)
     payload.append(captchaField, cap)
     payload.append('btn_login', 'Login')
 
     const loginResp = await browserSession.client.post(loginUrl, payload.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: IPU_LOGIN_URL }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: IPU_LOGIN_URL },
+      maxRedirects: 0,
+      validateStatus: (status) => status >= 200 && status < 400
     })
     
-    const pageText = String(loginResp.data)
+    let pageText = String(loginResp.data)
+    if (loginResp.status >= 300 && loginResp.status < 400 && loginResp.headers.location) {
+      const redirectUrl = resolveIpuUrl(loginResp.headers.location)
+      const redirectResp = await browserSession.client.get(redirectUrl)
+      pageText = String(redirectResp.data)
+    }
+
     const pageLower = pageText.toLowerCase()
     const $page = cheerio.load(pageText)
 
     // Log post-login info for debugging
     const postTitle = $page('title').text().trim()
     const postBodyLen = pageText.length
-    console.log(`[IPU] Post-login page: title="${postTitle}", length=${postBodyLen}, status=200`)
+    console.log(`[IPU] Post-login page: title="${postTitle}", length=${postBodyLen}, status=${loginResp.status}`)
 
     // Check for account lockout (BEFORE other checks)
     const lockoutMsg = detectAccountLockout(pageText)
