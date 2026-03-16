@@ -349,9 +349,11 @@ const Results: React.FC = () => {
         const passRate = allSubjects.length
             ? Math.round((allSubjects.filter((s: any) => (GRADE_POINTS[s.grade] ?? 0) >= 4).length / allSubjects.length) * 100)
             : 0;
-        const academicScore = allSubjects.length
-            ? Math.round((allSubjects.reduce((acc: number, s: any) => acc + (GRADE_POINTS[s.grade] ?? 0), 0) / (allSubjects.length * 10)) * 100)
-            : 0;
+        const academicScore = totalMaxMarks > 0
+            ? Math.round((totalMarks / totalMaxMarks) * 100)
+            : (allSubjects.length
+                ? Math.round((allSubjects.reduce((acc: number, s: any) => acc + (GRADE_POINTS[s.grade] ?? 0), 0) / (allSubjects.length * 10)) * 100)
+                : 0);
         return { cgpa, passRate, totalSubjects: allSubjects.length, totalMarks, totalMaxMarks, totalCredits, completedSubjects: completedSubjects.length, academicScore };
     }, [results]);
 

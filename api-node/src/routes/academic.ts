@@ -346,7 +346,7 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
             cgpa: cgpaCalc.cgpa,
             semesters: mappedSemesters,
             gradeDistribution: gradeDist,
-            overallPercentage: academicStrength,
+            academicStrength: academicStrength,
         }, 200, 30)
     } catch (err) {
         console.error('[academic/results/analytics GET]', err)
