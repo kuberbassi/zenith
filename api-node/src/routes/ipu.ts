@@ -844,15 +844,24 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     }
     
     let rawSemesters
+    const fetchStart = Date.now()
     try {
       rawSemesters = await fetchAllIpuResultsWithClient(browserSession.client, 8)
+      const fetchDuration = Date.now() - fetchStart
+      console.log(`[IPU results-api] Successfully fetched ${rawSemesters.length} semesters in ${fetchDuration}ms`)
     } catch (fetchErr: any) {
-      console.error('[IPU results-api]', fetchErr?.message || fetchErr)
+      const fetchDuration = Date.now() - fetchStart
+      console.error(`[IPU results-api] Fetch failed after ${fetchDuration}ms:`, fetchErr?.message || fetchErr)
+      
+      if (fetchErr?.code === 'SESSION_EXPIRED') {
+        return fail(res, 'IPU session expired while fetching results. Please log in again.', 'SESSION_EXPIRED', 401)
+      }
+
       return fail(
         res,
         fetchErr?.message || 'Portal login succeeded, but result data could not be read.',
         'RESULTS_FETCH_FAILED',
-        502,
+        fetchErr?.code === 'BAD_RESULTS_RESPONSE' ? 502 : 500,
       )
     }
 
@@ -921,7 +930,10 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
 
     ok(res, { ...results, gradeDistribution, overallPercentage, totalSubjects: completedSubjs.length })
   } catch (e: any) {
-    console.error('[IPU fetch-results]', e.message, e.stack)
+    console.error('[IPU fetch-results] Error:', e.message, e.stack)
+    if (e.code === 'SESSION_EXPIRED') {
+      return fail(res, 'IPU session expired. Please log in again.', 'SESSION_EXPIRED', 401)
+    }
     if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'ETIMEDOUT') {
       return fail(res, `Network error connecting to IPU portal: ${e.message}`, 'NETWORK_ERROR', 502)
     }
