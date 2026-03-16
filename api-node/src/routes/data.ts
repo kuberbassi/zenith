@@ -284,11 +284,20 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       // Restore profile
       if (importData.user_profile) {
         const profile = { ...(importData.user_profile as Record<string, unknown>) }
-        delete profile.id; delete profile._id; delete profile.email; delete profile.google_id
-        delete profile.created_at; delete profile.updated_at
-        await prisma.user.update({ where: { id: userId }, data: profile as any })
+        const allowedFields = [
+          'name', 'picture', 'branch', 'course', 'college', 'batch',
+          'enrollment_number', 'mother_name', 'father_name', 'gender',
+          'phone_number', 'admission_year', 'headline', 'linkedin_url',
+          'github_url', 'portfolio_url', 'current_semester', 'target_attendance', 'attendance_threshold', 'warning_threshold'
+        ]
+        const filteredProfile: Record<string, unknown> = {}
+        for (const key of allowedFields) {
+          if (profile[key] !== undefined) filteredProfile[key] = profile[key]
+        }
+        await prisma.user.update({ where: { id: userId }, data: filteredProfile as any })
       }
-    } catch (txErr) {
+    } catch (txErr: any) {
+      console.error('[data/import] Transaction failed at:', txErr.table || 'unknown', txErr)
       throw txErr;
     }
 
@@ -311,8 +320,10 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
       return
     }
 
-    const body = req.body as { confirmation_email?: string }
+    const body = req.body as { confirmation_email?: string, backup_id?: string }
     const user = await prisma.user.findUnique({ where: { id: userId } })
+
+    // Require backup_id in body
     if (body.confirmation_email && user) {
       if (body.confirmation_email.toLowerCase() !== user.email.toLowerCase()) {
         fail(res, "Email mismatch. Confirmation email doesn't match your account.", 'EMAIL_MISMATCH', 403)
@@ -320,14 +331,19 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
       }
     }
 
-    // Create auto-backup first
-    const backupData = await collectUserData(userId)
-    if (user) backupData.user_profile = user
+    if (!body.backup_id) {
+      fail(res, "Backup required before wipe. Please provide backup_id.", "BACKUP_REQUIRED", 400)
+      return
+    }
 
-    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-    const backup = await prisma.userBackup.create({
-      data: { user_id: userId, backup_type: 'pre_delete_auto', data: backupData as any, expires_at: expires },
+    // Verify backup exists and belongs to user
+    const backup = await prisma.userBackup.findFirst({
+      where: { id: body.backup_id, user_id: userId }
     })
+    if (!backup) {
+      fail(res, "Invalid backup_id. Please create a backup first.", "INVALID_BACKUP", 400)
+      return
+    }
 
     // Wipe all collections
     const [s, al, t, sr, mc, up, sk, sl] = await Promise.all([
@@ -344,7 +360,31 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
 
     const summary = { subjects: s.count, attendance_logs: al.count, timetable: t.count, semester_results: sr.count, manual_courses: mc.count, user_preferences: up.count, skills: sk.count, system_logs: sl.count }
 
-    await prisma.user.update({ where: { id: userId }, data: { course: null, college: null, current_semester: 1, batch: null, picture: null } })
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        branch: null,
+        course: null,
+        college: null,
+        batch: null,
+        enrollment_number: null,
+        mother_name: null,
+        father_name: null,
+        gender: null,
+        phone_number: null,
+        admission_year: null,
+        headline: null,
+        linkedin_url: null,
+        github_url: null,
+        portfolio_url: null,
+        current_semester: 1,
+        target_attendance: 75,
+        attendance_threshold: 75,
+        warning_threshold: 76,
+        biometrics: {},
+        picture: null
+      }
+    })
 
     console.warn(`🚨 DELETE ALL DATA for user ${userId} from IP: ${req.ip}`)
 
@@ -352,7 +392,8 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
       data: { user_id: userId, action: 'Account Reset', description: `All personal data deleted. Backup ID: ${backup.id}. Summary: ${JSON.stringify(summary)}. IP: ${req.ip}.` },
     })
 
-    ok(res, { message: 'All data wiped successfully.', backup_id: backup.id, backup_expires: expires.toISOString(), summary })
+    const expires = backup.expires_at || new Date()
+    ok(res, { message: 'All data wiped successfully.', backup_id: backup.id, backup_expires: expires instanceof Date ? expires.toISOString() : expires, summary })
   } catch (err) {
     console.error('[data/delete_all]', err)
     fail(res, 'Failed to delete data', 'DELETE_FAILED', 500)
@@ -360,6 +401,25 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
 })
 
 // ─── Backups ─────────────────────────────────────────────────────────────────
+
+router.post('/backups', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    const backupData = await collectUserData(userId)
+    if (user) backupData.user_profile = user
+
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+    const backup = await prisma.userBackup.create({
+      data: { user_id: userId, backup_type: 'manual', data: backupData as any, expires_at: expires },
+    })
+
+    ok(res, { backup_id: backup.id, expires_at: expires.toISOString() })
+  } catch (err) {
+    console.error('[data/backups POST]', err)
+    fail(res, 'Failed to create backup', 'BACKUP_FAILED', 500)
+  }
+})
 
 router.get('/backups', async (req: AuthRequest, res) => {
   try {

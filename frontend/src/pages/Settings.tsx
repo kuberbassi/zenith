@@ -196,11 +196,22 @@ const Settings: React.FC = () => {
         if (!confirm('⚠️ IRREVERSIBLE ACTION: Delete all records?')) return;
         const userInput = prompt('Type DELETE to purge everything:');
         if (userInput !== 'DELETE') return;
+        
         try {
-            await attendanceService.deleteAllData(user?.email || '');
+            showToast('info', 'Creating safety backup...');
+            const backupRes = await attendanceService.createBackup();
+            if (!backupRes?.backup_id) {
+                showToast('error', 'Backup failed. Aborting wipe for safety.');
+                return;
+            }
+
+            await attendanceService.deleteAllData(user?.email || '', backupRes.backup_id);
             showToast('success', 'Data Purged');
             setTimeout(() => window.location.reload(), 1500);
-        } catch { showToast('error', 'Purge Failed'); }
+        } catch (err: any) { 
+            console.error(err);
+            showToast('error', err.response?.data?.message || 'Purge Failed'); 
+        }
     };
 
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
@@ -386,8 +397,19 @@ const Settings: React.FC = () => {
                                             Initialize Load
                                             <input type="file" className="hidden" accept=".json" onChange={async (e) => {
                                                 const file = e.target.files?.[0]; if (!file) return;
-                                                const txt = await file.text(); const data = JSON.parse(txt);
-                                                await attendanceService.importData(data); showToast('success', 'Terminal Updated'); window.location.reload();
+                                                const txt = await file.text(); 
+                                                try {
+                                                    const data = JSON.parse(txt);
+                                                    if (!confirm('Are you sure you want to import this data? Current data will be merged/overwritten and a safety backup will be created.')) return;
+                                                    
+                                                    showToast('info', 'Importing data...');
+                                                    await attendanceService.importData(data); 
+                                                    showToast('success', 'Terminal Updated'); 
+                                                    setTimeout(() => window.location.reload(), 1000);
+                                                } catch (err: any) {
+                                                    console.error('Import Error:', err);
+                                                    showToast('error', 'Import failed: ' + (err.message || 'Invalid JSON'));
+                                                }
                                             }} />
                                         </label>
                                     </div>

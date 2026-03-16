@@ -394,15 +394,19 @@ export const attendanceService = {
         await api.post('/api/data/import_data', data);
     },
 
-    deleteAllData: async (confirmationEmail?: string) => {
+    deleteAllData: async (confirmationEmail?: string, backupId?: string) => {
         const response = await api.delete('/api/data/delete_all_data', {
-            data: { confirmation_email: confirmationEmail }
+            data: { confirmation_email: confirmationEmail, backup_id: backupId }
         });
         // Return full response for success field checking
         return { ...response.data, ...(response.data?.data || {}) };
     },
 
     // Backup Management
+    createBackup: async (): Promise<{ backup_id: string, expires_at: string }> => {
+        const response = await api.post('/api/data/backups');
+        return response.data?.data;
+    },
     listBackups: async () => {
         const response = await api.get('/api/data/backups');
         return response.data?.data?.backups || [];
