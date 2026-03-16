@@ -124,6 +124,18 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       return val
     }
 
+    function mapAttendanceStatus(status: string): any {
+      const s = String(status || 'present').toLowerCase().trim()
+      if (s.includes('present')) return 'present'
+      if (s.includes('absent')) return 'absent'
+      if (s.includes('late')) return 'late'
+      if (s.includes('medical')) return 'medical'
+      if (s.includes('duty')) return 'duty'
+      if (s.includes('substituted')) return 'substituted'
+      if (s.includes('cancelled')) return 'cancelled'
+      return 'present'
+    }
+
     // 2. Clear existing data and 3-9. Insert new data sequentially
     try {
       // Clear existing records
@@ -177,7 +189,7 @@ router.post('/import_data', async (req: AuthRequest, res) => {
             subject_id: newSubId,
             subject_name: String(l.subject_name ?? ''),
             date: String(normalizeValue(l.date) ?? ''),
-            status: String(normalizeValue(l.status) ?? 'present').toLowerCase(),
+            status: mapAttendanceStatus(String(normalizeValue(l.status) ?? 'present')),
             type: String(l.type ?? 'Lecture'),
             notes: l.notes ?? null,
             semester: l.semester != null ? Number(normalizeValue(l.semester)) : null,
@@ -225,7 +237,7 @@ router.post('/import_data', async (req: AuthRequest, res) => {
             sgpa: Number(r.sgpa ?? 0),
             total_credits: Number(r.total_credits ?? 0),
             student_info: r.student_info ?? null,
-            source: r.source ?? 'manual',
+            source: String(r.source ?? 'manual').toLowerCase().includes('ipu') ? 'ipu_scraper' : 'manual',
             enrollment_number: r.enrollment_number ?? null,
             semester_label: r.semester_label ?? null,
           })),
@@ -290,9 +302,12 @@ router.post('/import_data', async (req: AuthRequest, res) => {
           'phone_number', 'admission_year', 'headline', 'linkedin_url',
           'github_url', 'portfolio_url', 'current_semester', 'target_attendance', 'attendance_threshold', 'warning_threshold'
         ]
+        const numericFields = ['current_semester', 'target_attendance', 'attendance_threshold', 'warning_threshold']
         const filteredProfile: Record<string, unknown> = {}
         for (const key of allowedFields) {
-          if (profile[key] !== undefined) filteredProfile[key] = profile[key]
+          if (profile[key] !== undefined) {
+            filteredProfile[key] = numericFields.includes(key) ? Number(profile[key]) : profile[key]
+          }
         }
         await prisma.user.update({ where: { id: userId }, data: filteredProfile as any })
       }
