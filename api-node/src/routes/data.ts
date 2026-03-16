@@ -34,10 +34,12 @@ function checkDeleteRateLimit(userId: string): { ok: boolean; waitMinutes: numbe
 type UserData = {
   subjects: unknown[]
   attendance_logs: unknown[]
-  timetable: unknown[]
+  timetable?: unknown[]
+  timetables?: unknown[]
   semester_results: unknown[]
   manual_courses: unknown[]
-  user_preferences: unknown[]
+  user_preferences?: unknown[]
+  user_preference?: unknown[]
   skills: unknown[]
   system_logs: unknown[]
   user_profile?: unknown
@@ -201,8 +203,9 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       }
 
       // Insert timetable
-      if (importData.timetable?.length) {
-        const timetableData = (importData.timetable as any[]).map(t => {
+      const ttable = importData.timetable || importData.timetables
+      if (ttable?.length) {
+        const timetableData = (ttable as any[]).map(t => {
           const schedule = JSON.parse(JSON.stringify(t.schedule ?? {}))
           for (const day of Object.keys(schedule)) {
             if (Array.isArray(schedule[day])) {
@@ -269,8 +272,9 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       }
 
       // User preferences
-      if (importData.user_preferences?.length) {
-        const pref = (importData.user_preferences as any[])[0]
+      const prefData = importData.user_preferences || importData.user_preference
+      if (prefData?.length) {
+        const pref = (prefData as any[])[0]
         await prisma.userPreference.upsert({
           where: { user_id: userId },
           create: { user_id: userId, preferences: pref.preferences ?? {} },
