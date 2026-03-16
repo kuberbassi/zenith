@@ -99,8 +99,10 @@ router.post('/import_data', async (req: AuthRequest, res) => {
     const body = req.body as { data?: UserData }
     if (!body?.data) { fail(res, 'Invalid import file format', 'INVALID_FORMAT'); return }
 
-    const importData = body.data
+    const importData = req.body as UserData
     const idMap = new Map<string, string>()
+    console.log('[data/import] Received keys:', Object.keys(importData))
+    if (!importData || typeof importData !== 'object') { fail(res, 'Invalid import file format', 'INVALID_FORMAT'); return }
 
     // 1. Create auto-backup first
     const [user, backupData] = await Promise.all([
@@ -155,9 +157,14 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       // Insert subjects
       if (importData.subjects?.length) {
         const subjectsData = (importData.subjects as any[]).map(s => {
-          const oldId = String(normalizeValue(s._id) ?? normalizeValue(s.id) ?? '')
+          const oldId = normalizeValue(s.id ?? s._id)
           const newId = randomUUID()
-          if (oldId) idMap.set(oldId, newId)
+          if (oldId) {
+            idMap.set(String(oldId), newId)
+          } else {
+            console.warn('[data/import] Subject has no ID:', s.name);
+          }
+
           return {
             id: newId,
             user_id: userId,
@@ -182,18 +189,24 @@ router.post('/import_data', async (req: AuthRequest, res) => {
           console.log(`[data/import] Subjects created: ${subjectsData.length}`);
         } catch (e: any) {
           console.error('[data/import] Subjects creation failed:', e.message);
-          throw new Error('FAILED_SUBJECTS');
+          throw new Error(`FAILED_SUBJECTS: ${e.message}`);
         }
       }
 
       // Insert attendance logs
       if (importData.attendance_logs?.length) {
+        console.log(`[data/import] Processing attendance logs: ${importData.attendance_logs.length}`);
         const logsData = (importData.attendance_logs as any[]).map(l => {
-          const oldSubId = String(normalizeValue(l.subject_id) ?? '')
+          const oldSubIdVal = normalizeValue(l.subject_id)
+          if (!oldSubIdVal) return null;
+          const oldSubId = String(oldSubIdVal)
           const newSubId = idMap.get(oldSubId)
           
           // Skip logs that refer to subjects not present in the mapping
-          if (!newSubId) return null;
+          if (!newSubId) {
+            // console.warn(`[data/import] Skipping log for unknown subject ID: ${oldSubId}`);
+            return null;
+          }
 
           const timestamp = normalizeValue(l.timestamp)
           return {
@@ -334,32 +347,44 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       }
 
       // Restore profile
-      if (importData.user_profile) {
-        const profile = { ...(importData.user_profile as Record<string, unknown>) }
-        const allowedFields = [
-          'name', 'picture', 'branch', 'course', 'college', 'batch',
-          'enrollment_number', 'mother_name', 'father_name', 'gender',
-          'phone_number', 'admission_year', 'headline', 'linkedin_url',
-          'github_url', 'portfolio_url', 'current_semester', 'target_attendance', 'attendance_threshold', 'warning_threshold'
+      const profile = importData.user_profile
+      if (profile) {
+        console.log('[data/import] Restoring user profile');
+        const allowedProfileFields = [
+          'name', 'course', 'branch', 'college', 'batch', 'current_semester',
+          'enrollment_number', 'target_attendance', 'attendance_threshold', 'warning_threshold',
+          'phone_number', 'headline', 'linkedin_url', 'github_url', 'portfolio_url', 'admission_year'
         ]
-        const numericFields = ['current_semester', 'target_attendance', 'attendance_threshold', 'warning_threshold']
-        const filteredProfile: Record<string, unknown> = {}
-        for (const key of allowedFields) {
-          if (profile[key] !== undefined) {
-            filteredProfile[key] = numericFields.includes(key) ? Number(profile[key]) : profile[key]
-          }
+
+        // Only include fields that exist in the backup and are in the safe list
+        const filteredProfile = Object.fromEntries(
+          Object.entries(profile).filter(([key]) => allowedProfileFields.includes(key))
+        );
+
+        // Explicitly handle admission_year as string and numeric fields
+        if (filteredProfile.admission_year) filteredProfile.admission_year = String(normalizeValue(filteredProfile.admission_year))
+        if (filteredProfile.current_semester) filteredProfile.current_semester = Number(normalizeValue(filteredProfile.current_semester))
+        if (filteredProfile.target_attendance) filteredProfile.target_attendance = Number(normalizeValue(filteredProfile.target_attendance))
+        if (filteredProfile.attendance_threshold) filteredProfile.attendance_threshold = Number(normalizeValue(filteredProfile.attendance_threshold))
+        if (filteredProfile.warning_threshold) filteredProfile.warning_threshold = Number(normalizeValue(filteredProfile.warning_threshold))
+
+        try {
+          await prisma.user.update({ where: { id: userId }, data: filteredProfile as any })
+          console.log('[data/import] User profile updated');
+        } catch (e: any) {
+          console.error('[data/import] Profile update failed:', e.message);
         }
-        await prisma.user.update({ where: { id: userId }, data: filteredProfile as any })
       }
+      ok(res, { message: 'Data imported successfully' })
     } catch (txErr: any) {
       console.error('[data/import] Transaction failed at:', txErr.table || 'unknown', txErr)
-      throw txErr;
+      fail(res, `Import failed during transaction: ${txErr.message}`, 'IMPORT_FAILED', 500)
+      return
     }
 
-    ok(res, { message: 'Data imported successfully' })
-  } catch (err) {
-    console.error('[data/import]', err)
-    fail(res, 'Import failed', 'IMPORT_FAILED', 500)
+  } catch (err: any) {
+    console.error('[data/import] Global error:', err)
+    fail(res, `Import failed: ${err.message}`, 'IMPORT_FAILED', 500)
   }
 })
 
