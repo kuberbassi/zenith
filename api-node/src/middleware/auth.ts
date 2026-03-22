@@ -25,18 +25,37 @@ const userCache = new LRUCache<string, { user: User; userId: string }>({
   ttl: 60_000, // 60 s
 })
 
+function readCookie(req: Request, name: string): string | null {
+  const cookieHeader = req.headers.cookie
+  if (!cookieHeader) return null
+  const parts = cookieHeader.split(';')
+  for (const part of parts) {
+    const [rawKey, ...rawValue] = part.trim().split('=')
+    if (rawKey === name) return decodeURIComponent(rawValue.join('='))
+  }
+  return null
+}
+
+function getAuthToken(req: Request): string | null {
+  const authHeader = req.headers.authorization
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7)
+  return readCookie(req, 'acadhub_access_token')
+}
+
+export function getCsrfTokenFromRequest(req: Request): string | null {
+  return readCookie(req, 'acadhub_csrf_token')
+}
+
 export async function requireAuth(
   req: AuthRequest,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const authHeader = req.headers.authorization
-  if (!authHeader?.startsWith('Bearer ')) {
+  const token = getAuthToken(req)
+  if (!token) {
     res.status(401).json({ error: 'Unauthorized: no token' })
     return
   }
-
-  const token = authHeader.slice(7)
 
   // ── Cache hit ──
   const cached = userCache.get(token)
@@ -59,8 +78,12 @@ export async function requireAuth(
     req.user = entry.user
     req.userId = entry.userId
     next()
-  } catch {
-    res.status(401).json({ error: 'Unauthorized: invalid token' })
+  } catch (error: any) {
+    const code = error?.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID'
+    const message = error?.name === 'TokenExpiredError'
+      ? 'Unauthorized: token expired'
+      : 'Unauthorized: invalid token'
+    res.status(401).json({ error: message, code })
   }
 }
 
@@ -68,4 +91,27 @@ export async function requireAuth(
 export function invalidateAuthCache(token?: string) {
   if (token) userCache.delete(token)
   else userCache.clear()
+}
+
+export function requireCsrf(req: Request, res: Response, next: NextFunction): void {
+  const method = req.method.toUpperCase()
+  if (['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    next()
+    return
+  }
+
+  const authCookie = readCookie(req, 'acadhub_access_token')
+  if (!authCookie) {
+    next()
+    return
+  }
+
+  const cookieToken = readCookie(req, 'acadhub_csrf_token')
+  const headerToken = String(req.headers['x-csrf-token'] ?? '').trim()
+  if (!cookieToken || !headerToken || cookieToken !== headerToken) {
+    res.status(403).json({ success: false, error: 'Invalid CSRF token', code: 'CSRF_INVALID' })
+    return
+  }
+
+  next()
 }

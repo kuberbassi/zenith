@@ -4,6 +4,8 @@ import { randomUUID } from 'crypto'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
+import { getSlotType, scoreScheduleBySubjects } from '../utils/timetableSlots.js'
+import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -33,36 +35,24 @@ const acronymFromName = (value: string) =>
     .join('')
     .toLowerCase()
 
-function getNormalizedSlotType(slot: Record<string, unknown>): string {
-  const explicit = String(slot.type ?? '').trim().toLowerCase()
-  if (explicit) return explicit
-
-  const hasSubjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim().length > 0
-  const hasLabel = String(slot.label ?? slot.name ?? '').trim().length > 0
-  if (!hasSubjectRef && hasLabel) return 'custom'
-
-  return 'class'
-}
-
-function scoreScheduleBySubjects(schedule: unknown, subjectIds: Set<string>): number {
-  if (!schedule || typeof schedule !== 'object') return 0
-  let score = 0
-  for (const slots of Object.values(schedule as Record<string, unknown>)) {
-    if (!Array.isArray(slots)) continue
-    for (const rawSlot of slots) {
-      if (!rawSlot || typeof rawSlot !== 'object') continue
-      const slot = rawSlot as Record<string, unknown>
-      if (getNormalizedSlotType(slot) !== 'class') continue
-      const subjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim()
-      if (subjectRef && subjectIds.has(subjectRef)) score++
-    }
-  }
-  return score
-}
-
 function normalizeSlotForSave(slot: Record<string, unknown>) {
-  const type = String(slot.type ?? 'class').trim().toLowerCase() || 'class'
+  const type = getSlotType(slot)
   const normalized: Record<string, unknown> = { ...slot, type }
+
+  const existingId = String(slot.id ?? slot._id ?? '').trim()
+  normalized.id = existingId || randomUUID()
+  delete normalized._id
+
+  const start = String(slot.start_time ?? slot.startTime ?? '').trim()
+  const end = String(slot.end_time ?? slot.endTime ?? '').trim()
+  if (start) normalized.start_time = start
+  if (end) normalized.end_time = end
+  delete normalized.startTime
+  delete normalized.endTime
+
+  const rawSubjectId = String(slot.subject_id ?? slot.subjectId ?? '').trim()
+  if (rawSubjectId) normalized.subject_id = rawSubjectId
+  delete normalized.subjectId
 
   if (type !== 'class') {
     normalized.subject_id = ''
@@ -76,12 +66,29 @@ function normalizeSlotForSave(slot: Record<string, unknown>) {
   return normalized
 }
 
+function getSingleQueryValue(value: unknown): string {
+  if (Array.isArray(value)) return String(value[0] ?? '').trim()
+  return String(value ?? '').trim()
+}
+
+function sameSlotIdentity(slot: Record<string, unknown>, slotId: string, fallback?: { day?: string; start_time?: string }) {
+  const currentId = String(slot.id ?? slot._id ?? '').trim()
+  if (currentId && currentId === slotId) return true
+  if (!fallback?.start_time) return false
+  const currentStart = String(slot.start_time ?? slot.startTime ?? '').trim()
+  if (!currentStart || currentStart !== fallback.start_time) return false
+  return true
+}
+
 // ─── Timetable ───────────────────────────────────────────────────────────────
 
 router.get('/', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
+    const cacheId = buildViewCacheId('timetable', { semester })
+    const cached = await readViewCache<any>(userId, cacheId)
+    if (cached) { ok(res, cached, 200, 0); return }
     const [requestedDoc, subjects, logs, allTimetables] = await Promise.all([
       prisma.timetable.findFirst({
         where: { user_id: userId, semester },
@@ -162,7 +169,7 @@ router.get('/', async (req: AuthRequest, res) => {
 
     for (const [day, slots] of Object.entries(schedule)) {
       schedule[day] = (Array.isArray(slots) ? slots : []).map((slot) => {
-        const slotType = getNormalizedSlotType(slot)
+        const slotType = getSlotType(slot)
         if (slotType !== 'class') {
           const cleanLabel = String(slot.label ?? slot.name ?? '').trim()
           return {
@@ -210,7 +217,9 @@ router.get('/', async (req: AuthRequest, res) => {
       await prisma.timetable.update({ where: { id: doc.id }, data: { schedule: JSON.parse(JSON.stringify(schedule)) } }).catch(() => null)
     }
 
-    ok(res, { ...doc, _id: doc.id, schedule })
+    const payload = { ...doc, _id: doc.id, schedule }
+    ok(res, payload, 200, 0)
+    void writeViewCache(userId, cacheId, payload, 10 * 60 * 1000).catch(() => {})
   } catch (err) {
     console.error('[timetable GET]', err)
     fail(res, 'Failed to fetch timetable', 'FETCH_FAILED', 500)
@@ -230,7 +239,8 @@ router.post('/', async (req: AuthRequest, res) => {
     } else {
       await prisma.timetable.create({ data: { user_id: userId, semester, schedule } })
     }
-    sysLog(req, userId, 'Schedule Updated', `User updated timetable for Semester ${semester}.`).catch(() => { })
+    await clearUserViewCache(userId).catch(() => {})
+    void sysLog(req, userId, 'Schedule Updated', `User updated timetable for Semester ${semester}.`).catch(() => { })
     ok(res, { message: 'Timetable updated' })
   } catch (err) {
     console.error('[timetable POST]', err)
@@ -252,6 +262,7 @@ router.post('/structure', async (req: AuthRequest, res) => {
     } else {
       await prisma.timetable.create({ data: { user_id: userId, semester, schedule: {}, periods: req.body } })
     }
+    await clearUserViewCache(userId).catch(() => {})
     ok(res, { message: 'Timetable structure saved' })
   } catch (err) {
     console.error('[timetable/structure]', err)
@@ -268,8 +279,6 @@ router.post('/slot', async (req: AuthRequest, res) => {
     const parsed = SlotSchema.parse(req.body)
     const slotData = normalizeSlotForSave({ ...parsed } as Record<string, unknown>)
     const day = slotData.day as string
-
-    if (!slotData.id && !slotData._id) slotData.id = randomUUID()
 
     const doc = await prisma.timetable.findFirst({ where: { user_id: userId, semester } })
     if (!doc) {
@@ -291,6 +300,7 @@ router.post('/slot', async (req: AuthRequest, res) => {
       await prisma.timetable.update({ where: { id: doc.id }, data: { schedule: JSON.parse(JSON.stringify(schedule)) } })
     }
 
+    await clearUserViewCache(userId).catch(() => {})
     ok(res, { message: 'Slot added', id: slotData.id })
   } catch (err) {
     console.error('[timetable/slot POST]', err)
@@ -302,7 +312,12 @@ router.put('/slot/:slotId', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
+    const slotId = getSingleQueryValue(req.params.slotId)
     const updates = normalizeSlotForSave(req.body as Record<string, unknown>)
+    const fallback = {
+      day: String((req.body as any)?.day ?? '').trim(),
+      start_time: String((req.body as any)?.start_time ?? (req.body as any)?.startTime ?? '').trim(),
+    }
 
     const doc = await prisma.timetable.findFirst({ where: { user_id: userId, semester } })
     if (!doc || !doc.schedule) { fail(res, 'Timetable not found', 'NOT_FOUND', 404); return }
@@ -313,13 +328,18 @@ router.put('/slot/:slotId', async (req: AuthRequest, res) => {
 
     for (const [day, slots] of Object.entries(schedule)) {
       for (let i = 0; i < slots.length; i++) {
-        const curId = String(slots[i].id || slots[i]._id || '')
-        if (curId === req.params.slotId) {
-          schedule[day][i] = { ...slots[i], ...updates }
+        if (!sameSlotIdentity(slots[i], slotId, fallback.day && fallback.day !== day ? undefined : fallback)) continue
+        schedule[day][i] = { ...slots[i], ...updates, id: String(slots[i].id ?? slots[i]._id ?? updates.id ?? slotId) }
+        if (fallback.day && fallback.day !== day) {
+          const moved = schedule[day].splice(i, 1)[0]
+          if (!schedule[fallback.day]) schedule[fallback.day] = []
+          schedule[fallback.day].push(moved)
+          updatedSlot = moved
+        } else {
           updatedSlot = schedule[day][i]
-          found = true
-          break
         }
+        found = true
+        break
       }
       if (found) break
     }
@@ -327,6 +347,7 @@ router.put('/slot/:slotId', async (req: AuthRequest, res) => {
     if (!found) { fail(res, 'Slot not found', 'NOT_FOUND', 404); return }
 
     await prisma.timetable.update({ where: { id: doc.id }, data: { schedule: JSON.parse(JSON.stringify(schedule)) } })
+    await clearUserViewCache(userId).catch(() => {})
     ok(res, { message: 'Slot updated', slot: updatedSlot })
   } catch (err) {
     console.error('[timetable/slot PUT]', err)
@@ -338,6 +359,7 @@ router.delete('/slot/:slotId', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
+    const slotId = getSingleQueryValue(req.params.slotId)
 
     const doc = await prisma.timetable.findFirst({ where: { user_id: userId, semester } })
     if (!doc || !doc.schedule) { fail(res, 'Timetable not found', 'NOT_FOUND', 404); return }
@@ -345,15 +367,21 @@ router.delete('/slot/:slotId', async (req: AuthRequest, res) => {
     const schedule = JSON.parse(JSON.stringify(doc.schedule)) as Record<string, Array<Record<string, unknown>>>
     let found = false
 
+    const fallback = {
+      day: getSingleQueryValue(req.query.day),
+      start_time: getSingleQueryValue(req.query.start_time),
+    }
+
     for (const day of Object.keys(schedule)) {
       const before = schedule[day].length
-      schedule[day] = schedule[day].filter(s => String(s.id || s._id || '') !== req.params.slotId)
+      schedule[day] = schedule[day].filter(s => !sameSlotIdentity(s, slotId, fallback.day && fallback.day !== day ? undefined : fallback))
       if (schedule[day].length < before) found = true
     }
 
     if (!found) { fail(res, 'Slot not found', 'NOT_FOUND', 404); return }
 
     await prisma.timetable.update({ where: { id: doc.id }, data: { schedule: JSON.parse(JSON.stringify(schedule)) } })
+    await clearUserViewCache(userId).catch(() => {})
     ok(res, { message: 'Slot deleted' })
   } catch (err) {
     console.error('[timetable/slot DELETE]', err)

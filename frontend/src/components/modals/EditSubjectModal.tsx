@@ -90,13 +90,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
         try {
             const id = subject.id || subject._id;
 
-            // Update full details including attendance count
             await attendanceService.updateSubjectFullDetails(id, formData);
-
-            // Also update attendance count if changed
-            if (formData.attended !== subject.attended || formData.total !== subject.total) {
-                await attendanceService.updateAttendanceCount(id, formData.attended, formData.total);
-            }
 
             showToast('success', 'Subject details updated successfully');
             onSuccess();

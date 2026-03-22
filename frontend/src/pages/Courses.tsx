@@ -71,16 +71,6 @@ const Courses: React.FC = () => {
         } catch { showToast('error', 'Sync Failed'); }
     };
 
-    const saveCourses = async (newCourses: Course[], previousCourses?: Course[]) => {
-        try {
-            await attendanceService.saveManualCourses(newCourses);
-            await loadCourses();
-        } catch {
-            if (previousCourses) setCourses(previousCourses);
-            showToast('error', 'Save Failed');
-        }
-    };
-
     const handleAddCourse = () => {
         setEditingCourse(null);
         setFormData({ title: '', platform: 'coursera', url: '', progress: 0, enrolledDate: new Date().toISOString().split('T')[0], instructor: '', notes: '' });
@@ -98,8 +88,13 @@ const Courses: React.FC = () => {
         const previous = courses;
         const updated = courses.filter(c => getCourseId(c) !== id);
         setCourses(updated);
-        await saveCourses(updated, previous);
-        showToast('success', 'Course Purged');
+        try {
+            await attendanceService.deleteManualCourse(id);
+            showToast('success', 'Course Purged');
+        } catch {
+            setCourses(previous);
+            showToast('error', 'Save Failed');
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -108,15 +103,26 @@ const Courses: React.FC = () => {
             const previous = courses;
             const updated = courses.map(c => getCourseId(c) === getCourseId(editingCourse) ? { ...c, ...formData } : c);
             setCourses(updated);
-            await saveCourses(updated, previous);
-            showToast('success', 'Profile Updated');
+            try {
+                await attendanceService.updateManualCourse(getCourseId(editingCourse), formData);
+                showToast('success', 'Profile Updated');
+            } catch {
+                setCourses(previous);
+                showToast('error', 'Save Failed');
+            }
         } else {
             const previous = courses;
             const newCourse = { ...formData, _id: Date.now().toString() } as Course;
             const next = [...courses, newCourse];
             setCourses(next);
-            await saveCourses(next, previous);
-            showToast('success', 'Course Initialized');
+            try {
+                await attendanceService.addManualCourse(formData);
+                await loadCourses();
+                showToast('success', 'Course Initialized');
+            } catch {
+                setCourses(previous);
+                showToast('error', 'Save Failed');
+            }
         }
         setIsModalOpen(false);
     };
@@ -186,8 +192,13 @@ const Courses: React.FC = () => {
                                             <div className="mt-auto flex gap-3">
                                                 <Button variant="secondary" onClick={() => window.open(course.url, '_blank')} className="flex-1 h-11 rounded-xl border-white/[0.04] text-[10px] font-black uppercase tracking-widest">Open</Button>
                                                 <Button variant="primary" onClick={() => {
+                                                    const previous = courses;
                                                     const updated = courses.map(c => getCourseId(c) === getCourseId(course) ? { ...c, progress: Math.min(100, c.progress + 10) } : c);
-                                                    void saveCourses(updated);
+                                                    setCourses(updated);
+                                                    void attendanceService.updateManualCourse(getCourseId(course), { progress: Math.min(100, course.progress + 10) }).catch(() => {
+                                                        setCourses(previous);
+                                                        showToast('error', 'Save Failed');
+                                                    });
                                                 }} className="flex-1 h-11 rounded-xl shadow-lg shadow-blue-500/20 text-[10px] font-black uppercase tracking-widest">+10% Sync</Button>
                                             </div>
                                         </div>

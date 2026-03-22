@@ -71,10 +71,20 @@ export const useMarkAttendance = () => {
                     });
                     const newOverall = totalClasses > 0 ? (totalAtt / totalClasses * 100) : 0;
 
+                    const targetThreshold = queryClient.getQueryData<any>(['user'])?.attendance_threshold || 75;
+                    const newSafeBunks = totalClasses > 0 ? Math.max(0, Math.floor((totalAtt * 100 - targetThreshold * totalClasses) / targetThreshold)) : 0;
+
                     return {
                         ...old,
                         subjects: updatedSubjects,
-                        overall_attendance: newOverall
+                        overall_attendance: newOverall,
+                        summary: {
+                            ...(old.summary || {}),
+                            overall_percentage: newOverall,
+                            total_attended: totalAtt,
+                            total_classes: totalClasses,
+                            safe_bunks_remaining: newSafeBunks
+                        }
                     };
                 });
             }

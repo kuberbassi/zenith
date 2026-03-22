@@ -5,26 +5,11 @@ import { prisma } from '../config/prisma.js'
 import { GradeCalculator } from '../lib/calculations.js'
 import { fetchIpuResults } from '../services/ipuClient.js'
 import { ok, created, fail } from '../utils/response.js'
+import { mergePreferredRecord } from '../utils/recordMerge.js'
+import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
 
 const router = Router()
 router.use(requireAuth)
-
-function isMeaningfulValue(value: unknown): boolean {
-    if (value === null || value === undefined) return false
-    if (typeof value === 'string') {
-        const normalized = value.trim()
-        return normalized !== '' && normalized !== '-' && normalized !== '---' && normalized.toLowerCase() !== 'null'
-    }
-    return true
-}
-
-function mergePreferredRecord<T extends Record<string, unknown>>(primary: T, fallback: T): T {
-    const merged: Record<string, unknown> = { ...fallback }
-    for (const [key, value] of Object.entries(primary)) {
-        if (isMeaningfulValue(value)) merged[key] = value
-    }
-    return merged as T
-}
 
 const SemesterParamSchema = z.object({ semester: z.string().regex(/^\d+$/).transform(Number) })
 
@@ -61,6 +46,8 @@ const UpdateSubjectSchema = z.object({
     credits: z.number().optional(),
     categories: z.array(z.string()).optional(),
     target: z.number().min(0).max(100).optional(),
+    attended: z.number().int().min(0).optional(),
+    total: z.number().int().min(0).optional(),
     syllabus: z.string().optional(),
     practicals: z.object({ total: z.number().optional(), completed: z.number().optional(), hardcopy: z.boolean().optional() }).optional(),
     assignments: z.object({ total: z.number().optional(), completed: z.number().optional(), hardcopy: z.boolean().optional() }).optional(),
@@ -77,6 +64,9 @@ router.get('/subjects', async (req: AuthRequest, res) => {
     try {
         const { semester } = SemesterQuerySchema.parse(req.query)
         const userId = req.userId!
+        const cacheId = buildViewCacheId('academic_subjects', { semester })
+        const cached = await readViewCache<any>(userId, cacheId)
+        if (cached) { ok(res, cached, 200, 0); return }
         const subjects = await prisma.subject.findMany({
             where: {
                 user_id: userId,
@@ -84,7 +74,9 @@ router.get('/subjects', async (req: AuthRequest, res) => {
             },
             orderBy: { name: 'asc' },
         })
-        ok(res, subjects.map((s: any) => ({ ...s, _id: s.id })))
+        const payload = subjects.map((s: any) => ({ ...s, _id: s.id }))
+        ok(res, payload, 200, 0)
+        void writeViewCache(userId, cacheId, payload, 120_000).catch(() => {})
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
         console.error('[academic/subjects GET]', err)
@@ -97,6 +89,9 @@ router.get('/full_subjects_data', async (req: AuthRequest, res) => {
     try {
         const { semester } = SemesterQuerySchema.parse(req.query)
         const userId = req.userId!
+        const cacheId = buildViewCacheId('full_subjects_data', { semester })
+        const cached = await readViewCache<any>(userId, cacheId)
+        if (cached) { ok(res, cached, 200, 0); return }
         const subjects = await prisma.subject.findMany({
             where: {
                 user_id: userId,
@@ -109,7 +104,8 @@ router.get('/full_subjects_data', async (req: AuthRequest, res) => {
             const pct = total > 0 ? Math.round((attended / total) * 1000) / 10 : 0
             return { ...sub, _id: sub.id, percentage: pct, status_message: pct < 75 ? 'Low Attendance' : 'On Track' }
         })
-        ok(res, enriched)
+        ok(res, enriched, 200, 0)
+        void writeViewCache(userId, cacheId, enriched, 120_000).catch(() => {})
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
         console.error('[academic/full_subjects_data GET]', err)
@@ -142,6 +138,7 @@ router.post('/subjects', async (req: AuthRequest, res) => {
             },
         })
         sysLog(req, userId, 'Subject Added', `Added '${body.name}' to semester ${body.semester}`).catch(() => { })
+        await clearUserViewCache(userId).catch(() => { })
         created(res, { _id: subject.id, ...subject })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, 'Validation failed', 'INVALID_PARAMS'); return }
@@ -173,7 +170,7 @@ async function handleUpdateSubject(req: AuthRequest, res: any) {
         const existing = await prisma.subject.findFirst({ where: { id: subjectId, user_id: userId } })
         if (!existing) { fail(res, 'Subject not found', 'NOT_FOUND', 404); return }
 
-        const allowedFields = ['name', 'semester', 'categories', 'type', 'code', 'professor', 'classroom', 'credits', 'syllabus', 'target']
+        const allowedFields = ['name', 'semester', 'categories', 'type', 'code', 'professor', 'classroom', 'credits', 'syllabus', 'target', 'attended', 'total']
         const updateData: Record<string, unknown> = {}
         for (const k of allowedFields) {
             if (k in data) updateData[k] = (data as Record<string, unknown>)[k]
@@ -202,6 +199,7 @@ async function handleUpdateSubject(req: AuthRequest, res: any) {
         }
 
         await prisma.subject.update({ where: { id: subjectId }, data: updateData })
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { message: 'Subject updated' })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
@@ -223,6 +221,7 @@ router.delete('/subjects/:id', async (req: AuthRequest, res) => {
         // onDelete: Cascade in schema auto-deletes attendance_logs
         await prisma.subject.delete({ where: { id: subjectId } })
         sysLog(req, userId, 'Subject Deleted', `Deleted subject '${subject.name}'`).catch(() => { })
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { message: 'Subject deleted' })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
@@ -245,6 +244,7 @@ router.post('/subjects/:id/attendance-count', async (req: AuthRequest, res) => {
         const existing = await prisma.subject.findFirst({ where: { id: subjectId, user_id: userId } })
         if (!existing) { fail(res, 'Subject not found', 'NOT_FOUND', 404); return }
         await prisma.subject.update({ where: { id: subjectId }, data: { attended, total } })
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { message: 'Attendance count updated' })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
@@ -278,6 +278,9 @@ router.get('/results', async (req: AuthRequest, res) => {
 router.get('/results/analytics', async (req: AuthRequest, res) => {
     try {
         const userId = req.userId!
+        const cacheId = buildViewCacheId('results_analytics', {})
+        const cached = await readViewCache<any>(userId, cacheId)
+        if (cached) { ok(res, cached, 200, 0); return }
         const results = await prisma.semesterResult.findMany({
             where: { user_id: userId },
             orderBy: { semester: 'asc' },
@@ -336,7 +339,7 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
 
         const academicStrength = totalMaxMarks > 0 ? Math.round((totalMarks / totalMaxMarks) * 100) : 0
 
-        ok(res, {
+        const payload = {
             enrollment_number: results.find((r: any) => r.enrollment_number)?.enrollment_number || userDoc?.enrollment_number || '',
             student_info: enrichedStudentInfo,
             last_updated: results.reduce((latest: Date, r: any) => {
@@ -347,7 +350,9 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
             semesters: mappedSemesters,
             gradeDistribution: gradeDist,
             academicStrength: academicStrength,
-        }, 200, 30)
+        }
+        ok(res, payload, 200, 0)
+        void writeViewCache(userId, cacheId, payload, 5 * 60 * 1000).catch(() => {})
     } catch (err) {
         console.error('[academic/results/analytics GET]', err)
         fail(res, 'Failed to fetch analytics', 'FETCH_FAILED', 500)
@@ -407,6 +412,7 @@ router.post('/results/sync', async (req: AuthRequest, res) => {
         }
 
         sysLog(req, userId, 'Results Synced', `Fetched results for Semester ${semester} via direct API`).catch(() => { })
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { message: 'Results synced successfully', sgpa: finalSgpa, subjects: processedSubjects.length, student_info: studentInfo })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
@@ -449,6 +455,7 @@ router.post('/results', async (req: AuthRequest, res) => {
         }
 
         sysLog(req, userId, 'Result Updated', `Semester ${semester} result saved. SGPA: ${sgpaCalc.sgpa}`).catch(() => { })
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { sgpa: sgpaCalc.sgpa })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
@@ -464,6 +471,7 @@ router.delete('/results/:semester', async (req: AuthRequest, res) => {
         const { count } = await prisma.semesterResult.deleteMany({ where: { user_id: userId, semester } })
         if (count === 0) { fail(res, 'Result not found', 'NOT_FOUND', 404); return }
         sysLog(req, userId, 'Result Deleted', `Deleted results for Semester ${semester}`).catch(() => { })
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { message: `Semester ${semester} results deleted` })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
@@ -526,8 +534,13 @@ function formatCourseForClient(c: { id: string; name: string | null; platform: s
 router.get('/courses/manual', async (req: AuthRequest, res) => {
     try {
         const userId = req.userId!
+        const cacheId = buildViewCacheId('manual_courses', {})
+        const cached = await readViewCache<any>(userId, cacheId)
+        if (cached) { ok(res, cached, 200, 0); return }
         const courses = await prisma.manualCourse.findMany({ where: { user_id: userId } })
-        ok(res, courses.map((c: any) => formatCourseForClient(c)))
+        const payload = courses.map((c: any) => formatCourseForClient(c))
+        ok(res, payload, 200, 0)
+        void writeViewCache(userId, cacheId, payload, 10 * 60 * 1000).catch(() => {})
     } catch (err) {
         console.error('[academic/courses/manual GET]', err)
         fail(res, 'Failed to fetch courses', 'FETCH_FAILED', 500)
@@ -542,10 +555,9 @@ router.post('/courses/manual', async (req: AuthRequest, res) => {
         if (Array.isArray(data)) {
             const items = data.map((c: any) => normalizeCourseForSave(ManualCourseSchema.parse(c)))
             await prisma.manualCourse.deleteMany({ where: { user_id: userId } })
-            
-            // Loop for creates as createMany transactions are not supported by Neon HTTP
-            for (const i of items) {
-                await prisma.manualCourse.create({
+
+            await Promise.all(items.map((i) =>
+                prisma.manualCourse.create({
                     data: {
                         user_id: userId,
                         name: i.name,
@@ -557,7 +569,7 @@ router.post('/courses/manual', async (req: AuthRequest, res) => {
                         extra: Object.keys(i.extra).length ? i.extra as any : undefined,
                     }
                 })
-            }
+            ))
         } else {
             const item = normalizeCourseForSave(ManualCourseSchema.parse(data))
             await prisma.manualCourse.create({
@@ -574,6 +586,7 @@ router.post('/courses/manual', async (req: AuthRequest, res) => {
             })
         }
 
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { message: 'Courses saved' })
     } catch (err) {
         if (err instanceof z.ZodError) {
@@ -624,6 +637,7 @@ router.put('/courses/manual/:id', async (req: AuthRequest, res) => {
                 extra: Object.keys(newExtra).length ? newExtra as any : undefined,
             },
         })
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { message: 'Course updated', course: formatCourseForClient(course) })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
@@ -639,6 +653,7 @@ router.delete('/courses/manual/:id', async (req: AuthRequest, res) => {
         const existing = await prisma.manualCourse.findFirst({ where: { id: courseId, user_id: userId } })
         if (!existing) { fail(res, 'Course not found', 'NOT_FOUND', 404); return }
         await prisma.manualCourse.delete({ where: { id: courseId } })
+        await clearUserViewCache(userId).catch(() => { })
         ok(res, { message: 'Course deleted' })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }

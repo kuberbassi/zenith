@@ -14,6 +14,7 @@ export interface AttendanceSummary {
   subject_count: number
   risk_level: string
   color: string
+  safe_bunks_remaining: number
 }
 
 export const AttendanceCalculator = {
@@ -84,6 +85,7 @@ export const AttendanceCalculator = {
         subject_count: 0,
         risk_level: 'No Data',
         color: 'gray',
+        safe_bunks_remaining: 0,
       }
     }
     const totalAttended = subjects.reduce((s, x) => s + x.attended, 0)
@@ -93,6 +95,7 @@ export const AttendanceCalculator = {
       totalClasses,
     )
     const { level, color } = AttendanceCalculator.getRiskLevel(pct, target, warning)
+    const safeBunks = totalClasses > 0 ? Math.max(0, Math.floor((totalAttended * 100 - target * totalClasses) / target)) : 0
     return {
       overall_percentage: pct,
       total_attended: totalAttended,
@@ -100,6 +103,7 @@ export const AttendanceCalculator = {
       subject_count: subjects.length,
       risk_level: level,
       color,
+      safe_bunks_remaining: safeBunks,
     }
   },
 }

@@ -5,8 +5,10 @@ import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import compression from 'compression'
 import { ENV } from './config/env.js'
+import { requireCsrf } from './middleware/auth.js'
 import { detectPlatform } from './middleware/platform.js'
 import { flaskRewrite, compatHandlers } from './routes/compat.js'
+import docsRoutes from './routes/docs.js'
 import v1Router from './routes/v1.js'
 
 const app = express()
@@ -46,6 +48,15 @@ const strictLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+/** AI limiter — keeps expensive chat completions under control */
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 8,
+  message: { success: false, error: 'AI request limit reached. Please wait before sending another prompt.', code: 'AI_RATE_LIMIT_EXCEEDED' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // Apply global protection to all /api/* routes
 app.use('/api', apiLimiter)
 
@@ -54,13 +65,17 @@ app.use('/api/v1/ipu', strictLimiter)
 app.use('/api/ipu', strictLimiter)
 app.use('/api/v1/auth', strictLimiter)
 app.use('/api/auth', strictLimiter)
+app.use('/api/v1/ai', aiLimiter)
+app.use('/api/ai', aiLimiter)
 
 /* ── Compression ─────────────────────────────────────────── */
 app.use(compression({ threshold: 1024 })) // skip tiny responses
 
 /* ── Body Parsing ────────────────────────────────────────── */
-app.use(express.json({ limit: '10mb' }))
-app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+app.use('/api/data/import_data', express.json({ limit: '10mb' }))
+app.use('/api/v1/data/import_data', express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '1mb' }))
+app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 if (ENV.NODE_ENV === 'development') {
   app.use(morgan('dev'))
 } else if (ENV.NODE_ENV !== 'test') {
@@ -69,6 +84,7 @@ if (ENV.NODE_ENV === 'development') {
 
 /* ── Platform Detection ──────────────────────────────────── */
 app.use(detectPlatform)
+app.use('/api', requireCsrf)
 
 /* ══════════════════════════════════════════════════════════════
  *  API-FIRST ROUTE ARCHITECTURE
@@ -98,6 +114,7 @@ const healthResponse = (_: unknown, res: express.Response) => {
 app.get('/health', healthResponse)
 // Also at /api/health so Vercel serverless (api/ catch-all) can serve it
 app.get('/api/health', healthResponse)
+app.use('/api/docs', docsRoutes)
 
 /* ── Flask URL Rewriting (must run before route mounts) ─── */
 app.use(flaskRewrite)

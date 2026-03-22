@@ -16,8 +16,9 @@ AcadHub is a full-stack student productivity app with a React web client and a N
 - frontend: web app
 - api-node: Node API (Primary Backend) - Express + Prisma + Neon DB
 - api: Vercel serverless entry point
-- frontend: React Web Client (PWA)
-- mobile: Legacy React Native app (Reference only)
+- archive/legacy: archived Flask, Next.js, and React Native legacy code
+- archive/scripts: archived MongoDB-era maintenance scripts
+- archive/root-legacy-configs: archived root-level legacy mobile/Python config files
 
 ## Performance & Optimization
 - **Near-Instant API**: Average response time ~150ms via composite indexing and query optimization.
@@ -45,3 +46,7 @@ NODE_ENV=development
 
 ## Deployment
 Deployed via Vercel with automatic serverless routing to the Node.js backend.
+
+## Repository Hygiene
+- Root contains only active app/runtime files plus repository metadata.
+- Legacy mobile and Python-era root files were moved under `archive/`.

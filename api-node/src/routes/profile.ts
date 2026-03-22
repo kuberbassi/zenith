@@ -5,6 +5,7 @@ import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
 import multer from 'multer'
 import sharp from 'sharp'
+import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -49,6 +50,11 @@ const ProfilePostSchema = z.object({
   linkedin_url: z.string().url().max(500).optional().or(z.literal('')),
   github_url: z.string().url().max(500).optional().or(z.literal('')),
   portfolio_url: z.string().url().max(500).optional().or(z.literal('')),
+}).strict()
+
+const DeleteAccountSchema = z.object({
+  confirmation_email: z.string().email(),
+  confirmation_text: z.literal('DELETE'),
 }).strict()
 
 async function sysLog(req: AuthRequest, user_id: string, action: string, description: string) {
@@ -123,6 +129,7 @@ router.put('/', async (req: AuthRequest, res) => {
 
     invalidateAuthCache(req.headers.authorization?.slice(7))
     sysLog(req, userId, 'Profile Updated', 'User updated their profile information.').catch(() => { })
+    await clearUserViewCache(userId).catch(() => { })
     ok(res, { message: 'Profile updated' })
   } catch (err) {
     console.error('[profile PUT]', err)
@@ -153,6 +160,7 @@ router.post('/', async (req: AuthRequest, res) => {
     await prisma.user.update({ where: { id: userId }, data: updateData as Parameters<typeof prisma.user.update>[0]['data'] })
 
     invalidateAuthCache(req.headers.authorization?.slice(7))
+    await clearUserViewCache(userId).catch(() => { })
     ok(res, { message: 'Profile updated' })
   } catch (err) {
     console.error('[profile POST]', err)
@@ -207,9 +215,14 @@ const DEFAULT_PREFS = {
 
 router.get('/preferences', async (req: AuthRequest, res) => {
   try {
-    const doc = await prisma.userPreference.findUnique({ where: { user_id: req.userId! } })
+    const userId = req.userId!
+    const cacheId = buildViewCacheId('preferences', {})
+    const cached = await readViewCache<any>(userId, cacheId)
+    if (cached) { ok(res, cached, 200, 0); return }
+    const doc = await prisma.userPreference.findUnique({ where: { user_id: userId } })
     const merged = { ...DEFAULT_PREFS, ...((doc?.preferences ?? {}) as Record<string, unknown>) }
-    ok(res, merged)
+    ok(res, merged, 200, 0)
+    void writeViewCache(userId, cacheId, merged, 10 * 60 * 1000).catch(() => {})
   } catch (err) {
     console.error('[profile/preferences GET]', err)
     fail(res, 'Failed to fetch preferences', 'FETCH_FAILED', 500)
@@ -248,6 +261,8 @@ router.post('/preferences', async (req: AuthRequest, res) => {
     invalidateAuthCache(req.headers.authorization?.slice(7))
     sysLog(req, userId, 'Preferences Updated', `Updated preferences: ${Object.keys(data).join(', ')}`).catch(() => { })
 
+    await clearUserViewCache(userId).catch(() => { })
+    await clearUserViewCache(userId).catch(() => { })
     ok(res, { message: 'Preferences saved' })
   } catch (err) {
     console.error('[profile/preferences POST]', err)
@@ -278,6 +293,7 @@ router.post('/sync-thresholds', async (req: AuthRequest, res) => {
     }
 
     sysLog(req, userId, 'Thresholds Synced', `Updated ${modified} subjects to ${threshold}% target${semester ? ` (semester ${semester})` : ''}`).catch(() => { })
+    await clearUserViewCache(userId).catch(() => { })
     ok(res, { message: `Updated ${modified} subjects`, threshold, modified })
   } catch (err) {
     console.error('[profile/sync-thresholds]', err)
@@ -308,15 +324,48 @@ router.post('/biometric/register', async (req: AuthRequest, res) => {
 
 router.get('/logs', async (req: AuthRequest, res) => {
   try {
+    const userId = req.userId!
+    const cacheId = buildViewCacheId('system_logs', {})
+    const cached = await readViewCache<any>(userId, cacheId)
+    if (cached) { ok(res, cached, 200, 0); return }
     const logs = await prisma.systemLog.findMany({
-      where: { user_id: req.userId! },
+      where: { user_id: userId },
       orderBy: { timestamp: 'desc' },
       take: 50,
     })
-    ok(res, logs)
+    ok(res, logs, 200, 0)
+    void writeViewCache(userId, cacheId, logs, 60_000).catch(() => {})
   } catch (err) {
     console.error('[profile/logs]', err)
     fail(res, 'Failed to fetch logs', 'FETCH_FAILED', 500)
+  }
+})
+
+router.delete('/account', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const parsed = DeleteAccountSchema.safeParse(req.body)
+    if (!parsed.success) {
+      fail(res, parsed.error.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400)
+      return
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      fail(res, 'User not found', 'USER_NOT_FOUND', 404)
+      return
+    }
+    if (user.email.toLowerCase() !== parsed.data.confirmation_email.toLowerCase()) {
+      fail(res, 'Confirmation email mismatch', 'EMAIL_MISMATCH', 403)
+      return
+    }
+
+    await prisma.user.delete({ where: { id: userId } })
+    invalidateAuthCache(req.headers.authorization?.slice(7))
+    ok(res, { message: 'Account deleted permanently' })
+  } catch (err) {
+    console.error('[profile/delete-account]', err)
+    fail(res, 'Failed to delete account', 'DELETE_FAILED', 500)
   }
 })
 

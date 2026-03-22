@@ -4,36 +4,11 @@ import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
 import { ENV } from '../config/env.js'
+import { isAttendedAttendanceStatus } from '../utils/attendanceStatus.js'
+import { getSlotType, scoreScheduleBySubjects } from '../utils/timetableSlots.js'
 
 const router = Router()
 router.use(requireAuth)
-
-function getSlotType(slot: Record<string, unknown>): string {
-    const explicit = String(slot.type ?? '').trim().toLowerCase()
-    if (explicit) return explicit
-
-    const hasSubjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim().length > 0
-    const hasLabel = String(slot.label ?? slot.name ?? '').trim().length > 0
-    if (!hasSubjectRef && hasLabel) return 'custom'
-
-    return 'class'
-}
-
-function scoreScheduleBySubjects(schedule: unknown, subjectIds: Set<string>): number {
-    if (!schedule || typeof schedule !== 'object') return 0
-    let score = 0
-    for (const slots of Object.values(schedule as Record<string, unknown>)) {
-        if (!Array.isArray(slots)) continue
-        for (const rawSlot of slots) {
-            if (!rawSlot || typeof rawSlot !== 'object') continue
-            const slot = rawSlot as Record<string, unknown>
-            if (getSlotType(slot) !== 'class') continue
-            const subjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim()
-            if (subjectRef && subjectIds.has(subjectRef)) score++
-        }
-    }
-    return score
-}
 
 const ChatSchema = z.object({
     message: z.string().min(1).max(2000),
@@ -91,12 +66,10 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
 
     if (user) {
         lines.push('## User Profile')
-        lines.push(`Name: ${user.name}`)
         if (user.college) lines.push(`College: ${user.college}`)
         if (user.course) lines.push(`Course: ${user.course}`)
         if (user.branch) lines.push(`Branch: ${user.branch}`)
         if (user.batch) lines.push(`Batch: ${user.batch}`)
-        if (user.enrollment_number) lines.push(`Enrollment: ${user.enrollment_number}`)
         lines.push(`Current Semester: ${semester}`)
         lines.push(`Attendance Target: ${user.attendance_threshold ?? 75}%`)
         lines.push(`Warning Threshold: ${user.warning_threshold ?? 76}%`)
@@ -221,7 +194,7 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         const dateSet = new Set<string>()
         if (recentLogs.length > 0) {
             for (const log of recentLogs) {
-                if (['present', 'late', 'approved_medical', 'substituted'].includes(log.status)) {
+                if (isAttendedAttendanceStatus(log.status)) {
                     dateSet.add(log.date)
                 }
             }

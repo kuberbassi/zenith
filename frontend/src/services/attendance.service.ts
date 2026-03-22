@@ -20,6 +20,33 @@ const extractApiData = <T>(response: any, fallback: T): T => {
 
 const CACHE_TTL_MS = 12_000;
 const requestCache = new Map<string, { expiresAt: number; data: unknown }>();
+const PERSISTENT_CACHE_PREFIX = 'acadhub_cache:';
+
+const getPersistentCached = <T>(key: string): T | null => {
+    try {
+        const raw = localStorage.getItem(`${PERSISTENT_CACHE_PREFIX}${key}`);
+        if (!raw) return null;
+        const entry = JSON.parse(raw) as { expiresAt: number; data: T };
+        if (!entry || Date.now() > entry.expiresAt) {
+            localStorage.removeItem(`${PERSISTENT_CACHE_PREFIX}${key}`);
+            return null;
+        }
+        return entry.data;
+    } catch {
+        return null;
+    }
+};
+
+const setPersistentCached = (key: string, data: unknown, ttlMs: number) => {
+    try {
+        localStorage.setItem(`${PERSISTENT_CACHE_PREFIX}${key}`, JSON.stringify({
+            expiresAt: Date.now() + ttlMs,
+            data,
+        }));
+    } catch {
+        // ignore quota/storage failures
+    }
+};
 
 const getCached = <T>(key: string): T | null => {
     const entry = requestCache.get(key);
@@ -35,10 +62,35 @@ const setCached = (key: string, data: unknown, ttlMs: number = CACHE_TTL_MS) => 
     requestCache.set(key, { expiresAt: Date.now() + ttlMs, data });
 };
 
+const getAnyCached = <T>(key: string): T | null => getCached<T>(key) ?? getPersistentCached<T>(key);
+
+const setAnyCached = (key: string, data: unknown, ttlMs: number = CACHE_TTL_MS, persistentTtlMs?: number) => {
+    setCached(key, data, ttlMs);
+    if (persistentTtlMs && persistentTtlMs > 0) setPersistentCached(key, data, persistentTtlMs);
+};
+
 const clearCacheByPrefix = (prefix: string) => {
     for (const key of requestCache.keys()) {
         if (key.startsWith(prefix)) requestCache.delete(key);
     }
+    try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key?.startsWith(`${PERSISTENT_CACHE_PREFIX}${prefix}`)) localStorage.removeItem(key);
+        }
+    } catch {
+        // ignore storage access issues
+    }
+};
+
+const clearDerivedCaches = () => {
+    clearCacheByPrefix('dashboard:');
+    clearCacheByPrefix('reports:');
+    clearCacheByPrefix('notifications:');
+    clearCacheByPrefix('analytics:');
+    clearCacheByPrefix('subjects:');
+    clearCacheByPrefix('timetable:');
+    clearCacheByPrefix('manualCourses');
 };
 
 export const attendanceService = {
@@ -62,9 +114,16 @@ export const attendanceService = {
     },
 
     // Dashboard
-    getDashboardData: async (semester: number = 1): Promise<DashboardData> => {
-        const response = await api.get(`/api/dashboard/data?semester=${semester}`);
-        return response.data.data;
+    getDashboardData: async (semester: number = 1, refresh = false): Promise<DashboardData> => {
+        const cacheKey = `dashboard:${semester}`;
+        if (!refresh) {
+            const cached = getAnyCached<DashboardData>(cacheKey);
+            if (cached) return cached;
+        }
+        const response = await api.get(`/api/dashboard/data?semester=${semester}${refresh ? '&refresh=1' : ''}`);
+        const data = response.data.data;
+        setCached(cacheKey, data, 15_000);
+        return data;
     },
 
     getDashboardSummary: async (semester: number = 1) => {
@@ -73,9 +132,16 @@ export const attendanceService = {
     },
 
     // Reports
-    getReportsData: async (semester: number = 1): Promise<ReportsData> => {
-        const response = await api.get(`/api/dashboard/reports_data?semester=${semester}`);
-        return response.data.data;
+    getReportsData: async (semester: number = 1, refresh = false): Promise<ReportsData> => {
+        const cacheKey = `reports:${semester}`;
+        if (!refresh) {
+            const cached = getAnyCached<ReportsData>(cacheKey);
+            if (cached) return cached;
+        }
+        const response = await api.get(`/api/dashboard/reports_data?semester=${semester}${refresh ? '&refresh=1' : ''}`);
+        const data = response.data.data;
+        setCached(cacheKey, data, 15_000);
+        return data;
     },
 
     // Attendance logs
@@ -92,8 +158,8 @@ export const attendanceService = {
         notes?: string,
         substitutedById?: string,
         semester?: number
-    ): Promise<void> => {
-        await api.post('/api/attendance/mark', {
+    ): Promise<any> => {
+        const res = await api.post('/api/attendance/mark', {
             subject_id: subjectId,
             status,
             date,
@@ -101,6 +167,8 @@ export const attendanceService = {
             substituted_by: substitutedById,
             semester,
         });
+        clearDerivedCaches();
+        return res.data?.data;
     },
 
     markAllAttendance: async (
@@ -118,6 +186,7 @@ export const attendanceService = {
         if (failures.length > 0) {
             throw new Error(`${failures.length} of ${subjectIds.length} marks failed`);
         }
+        clearDerivedCaches();
     },
 
     getCalendarData: async (year: number, month: number, semester?: number) => {
@@ -145,16 +214,20 @@ export const attendanceService = {
         return Array.isArray(data) ? data : [];
     },
 
-    editAttendance: async (logId: string, status: string, notes?: string, date?: string): Promise<void> => {
-        await api.put(`/api/attendance/logs/${logId}`, {
+    editAttendance: async (logId: string, status: string, notes?: string, date?: string): Promise<any> => {
+        const res = await api.put(`/api/attendance/logs/${logId}`, {
             status,
             notes,
             date
         });
+        clearDerivedCaches();
+        return res.data?.data;
     },
 
-    deleteAttendance: async (logId: string): Promise<void> => {
-        await api.delete(`/api/attendance/logs/${logId}`);
+    deleteAttendance: async (logId: string): Promise<any> => {
+        const res = await api.delete(`/api/attendance/logs/${logId}`);
+        clearDerivedCaches();
+        return res.data?.data;
     },
 
     // Classes
@@ -200,17 +273,17 @@ export const attendanceService = {
     // Subjects
     getSubjects: async (semester: number = 1): Promise<Subject[]> => {
         const cacheKey = `subjects:${semester}`;
-        const cached = getCached<Subject[]>(cacheKey);
+        const cached = getAnyCached<Subject[]>(cacheKey);
         if (cached) return cached;
 
         const response = await api.get(`/api/academic/subjects?semester=${semester}`);
         const payload = extractApiData<any>(response, []);
         if (Array.isArray(payload)) {
-            setCached(cacheKey, payload);
+            setAnyCached(cacheKey, payload, CACHE_TTL_MS, 5 * 60 * 1000);
             return payload as Subject[];
         }
         if (Array.isArray(payload?.subjects)) {
-            setCached(cacheKey, payload.subjects);
+            setAnyCached(cacheKey, payload.subjects, CACHE_TTL_MS, 5 * 60 * 1000);
             return payload.subjects as Subject[];
         }
         return [];
@@ -261,7 +334,7 @@ export const attendanceService = {
             professor,
             classroom,
         });
-        clearCacheByPrefix('subjects:');
+        clearDerivedCaches();
     },
 
     updateSubjectFullDetails: async (
@@ -270,7 +343,7 @@ export const attendanceService = {
     ): Promise<void> => {
 
         await api.put(`/api/academic/subjects/${subjectId}`, data);
-        clearCacheByPrefix('subjects:');
+        clearDerivedCaches();
     },
 
     updateAttendanceCount: async (
@@ -283,7 +356,7 @@ export const attendanceService = {
             attended,
             total,
         });
-        clearCacheByPrefix('subjects:');
+        clearDerivedCaches();
     },
 
     updatePracticals: async (
@@ -292,6 +365,7 @@ export const attendanceService = {
     ): Promise<void> => {
 
         await api.put(`/api/academic/subjects/${subjectId}`, { practicals: data });
+        clearDerivedCaches();
     },
 
     updateAssignments: async (
@@ -300,12 +374,13 @@ export const attendanceService = {
     ): Promise<void> => {
 
         await api.put(`/api/academic/subjects/${subjectId}`, { assignments: data });
+        clearDerivedCaches();
     },
 
     // Timetable
     getTimetable: async (semester: number = 1): Promise<{ schedule: TimetableSchedule; periods?: any[] }> => {
         const cacheKey = `timetable:${semester}`;
-        const cached = getCached<{ schedule: TimetableSchedule; periods?: any[] }>(cacheKey);
+        const cached = getAnyCached<{ schedule: TimetableSchedule; periods?: any[] }>(cacheKey);
         if (cached) return cached;
 
         const response = await api.get(`/api/timetable?semester=${semester}`);
@@ -314,33 +389,36 @@ export const attendanceService = {
             schedule: payload?.schedule || {},
             periods: Array.isArray(payload?.periods) ? payload.periods : [],
         };
-        setCached(cacheKey, mapped);
+        setAnyCached(cacheKey, mapped, CACHE_TTL_MS, 10 * 60 * 1000);
         return mapped;
     },
 
     saveTimetable: async (schedule: TimetableSchedule, semester: number = 1): Promise<void> => {
         await api.post(`/api/timetable?semester=${semester}`, { schedule });
-        requestCache.delete(`timetable:${semester}`);
+        clearCacheByPrefix('timetable:');
     },
 
     saveTimetableStructure: async (periods: any[], semester: number = 1): Promise<void> => {
         await api.post(`/api/timetable/structure?semester=${semester}`, periods);
-        requestCache.delete(`timetable:${semester}`);
+        clearCacheByPrefix('timetable:');
     },
 
     addTimetableSlot: async (slotData: any, semester: number = 1): Promise<void> => {
         await api.post(`/api/timetable/slot?semester=${semester}`, slotData);
-        requestCache.delete(`timetable:${semester}`);
+        clearCacheByPrefix('timetable:');
     },
 
     updateTimetableSlot: async (slotId: string, slotData: any, semester: number = 1): Promise<void> => {
         await api.put(`/api/timetable/slot/${slotId}?semester=${semester}`, slotData);
-        requestCache.delete(`timetable:${semester}`);
+        clearCacheByPrefix('timetable:');
     },
 
-    deleteTimetableSlot: async (slotId: string, semester: number = 1): Promise<void> => {
-        await api.delete(`/api/timetable/slot/${slotId}?semester=${semester}`);
-        requestCache.delete(`timetable:${semester}`);
+    deleteTimetableSlot: async (slotId: string, semester: number = 1, fallback?: { day?: string; start_time?: string }): Promise<void> => {
+        const params = new URLSearchParams({ semester: String(semester) });
+        if (fallback?.day) params.set('day', fallback.day);
+        if (fallback?.start_time) params.set('start_time', fallback.start_time);
+        await api.delete(`/api/timetable/slot/${slotId}?${params.toString()}`);
+        clearCacheByPrefix('timetable:');
     },
 
     getLogsForDate: async (date: string) => {
@@ -350,8 +428,13 @@ export const attendanceService = {
 
     // Analytics
     getDayOfWeekAnalytics: async (semester: number = 1) => {
+        const cacheKey = `analytics:day-of-week:${semester}`;
+        const cached = getAnyCached<any>(cacheKey);
+        if (cached) return cached;
         const response = await api.get(`/api/dashboard/analytics/day-of-week?semester=${semester}`);
-        return response.data.data;
+        const data = response.data.data;
+        setAnyCached(cacheKey, data, 30_000, 10 * 60 * 1000);
+        return data;
     },
 
     // Medical leaves (not yet ported to Node — return empty stubs)
@@ -473,31 +556,42 @@ export const attendanceService = {
 
     // Notices
     getNotices: async (category?: string) => {
+        const cacheKey = `notices:${category || 'all'}`;
+        const cached = getAnyCached<any[]>(cacheKey);
+        if (cached) return cached;
         const params = category ? `?category=${encodeURIComponent(category)}` : '';
         const response = await api.get(`/api/scraper/notices${params}`);
-        return response.data.data;
+        const data = response.data.data;
+        setAnyCached(cacheKey, data, 60_000, 60 * 60 * 1000);
+        return data;
     },
 
     // Notifications
-    getNotifications: async () => {
-        const response = await api.get('/api/dashboard/notifications');
-        return response.data.data;
+    getNotifications: async (semester?: number) => {
+        const cacheKey = `notifications:${semester || 'all'}`;
+        const cached = getAnyCached<any[]>(cacheKey);
+        if (cached) return cached;
+        const params = semester ? `?semester=${semester}` : '';
+        const response = await api.get(`/api/dashboard/notifications${params}`);
+        const data = response.data.data;
+        setAnyCached(cacheKey, data, 20_000, 5 * 60 * 1000);
+        return data;
     },
 
     // Manual Course Manager
     getManualCourses: async () => {
         const cacheKey = 'manualCourses';
-        const cached = getCached<any[]>(cacheKey);
+        const cached = getAnyCached<any[]>(cacheKey);
         if (cached) return cached;
 
         const response = await api.get('/api/academic/courses/manual');
         const payload = extractApiData<any>(response, []);
         if (Array.isArray(payload)) {
-            setCached(cacheKey, payload);
+            setAnyCached(cacheKey, payload, CACHE_TTL_MS, 10 * 60 * 1000);
             return payload;
         }
         if (Array.isArray(payload?.courses)) {
-            setCached(cacheKey, payload.courses);
+            setAnyCached(cacheKey, payload.courses, CACHE_TTL_MS, 10 * 60 * 1000);
             return payload.courses;
         }
         return [];
@@ -505,7 +599,25 @@ export const attendanceService = {
 
     saveManualCourses: async (courses: any[]) => {
         const response = await api.post('/api/academic/courses/manual', courses);
-        requestCache.delete('manualCourses');
+        clearDerivedCaches();
+        return response.data;
+    },
+
+    addManualCourse: async (course: any) => {
+        const response = await api.post('/api/academic/courses/manual', course);
+        clearDerivedCaches();
+        return response.data;
+    },
+
+    updateManualCourse: async (id: string, course: any) => {
+        const response = await api.put(`/api/academic/courses/manual/${id}`, course);
+        clearDerivedCaches();
+        return response.data;
+    },
+
+    deleteManualCourse: async (id: string) => {
+        const response = await api.delete(`/api/academic/courses/manual/${id}`);
+        clearDerivedCaches();
         return response.data;
     },
 
@@ -556,3 +668,4 @@ export const attendanceService = {
         return response.data.data;
     },
 };
+

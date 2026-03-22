@@ -1,14 +1,14 @@
 import { Router } from 'express'
 import { createHash } from 'crypto'
-import https from 'https'
 import { z } from 'zod'
-import axios, { type AxiosInstance } from 'axios'
+import { type AxiosInstance } from 'axios'
 import * as cheerio from 'cheerio'
-import { LRUCache } from 'lru-cache'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
 import { fetchIpuResults, fetchAllIpuResults, fetchAllIpuResultsWithClient, parseIpuResultsPayload, type ProcessedSubject } from '../services/ipuResultsFetcher.service.js'
+import { destroyIpuSessionEverywhere, getHydratedIpuSession, isIpuSessionAuthenticated, persistIpuSessionState, type IpuSession } from '../services/ipuSession.service.js'
+import { isMeaningfulValue, mergePreferredRecord } from '../utils/recordMerge.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -34,17 +34,6 @@ const HEADERS = {
 
 /* ── Per-user axios session store (keeps cookies across requests) ────── */
 
-interface IpuSession {
-  client: AxiosInstance
-  getCookieString: () => string
-  markCaptchaIssued: () => void
-  markLoginAttempt: () => void
-  markLoginFailure: () => void
-  markLoginSuccess: () => void
-  canAttemptLogin: () => { ok: boolean; reason?: string }
-  authenticatedAt?: number
-}
-
 type ResultStudentInfo = Record<string, unknown>
 type PersistableSemester = {
   semester: string
@@ -58,91 +47,6 @@ type PersistableSemester = {
   student_info?: Record<string, string>
 }
 
-const _sessions = new LRUCache<string, IpuSession>({ max: 100, ttl: 30 * 60 * 1000 })
-
-function destroySession(userId: string) {
-  _sessions.delete(userId)
-}
-
-function isSessionAuthenticated(session: IpuSession | undefined) {
-  if (!session?.authenticatedAt) return false
-  return Date.now() - session.authenticatedAt < 10 * 60 * 1000
-}
-
-function getSession(userId: string): IpuSession {
-  if (!_sessions.has(userId)) {
-    const jar: Record<string, string> = {}
-    let captchaIssuedAt = 0
-    let attemptsForCaptcha = 0
-    let failedLoginAttempts = 0
-
-    const client = axios.create({
-      headers: HEADERS,
-      timeout: 20_000,
-      maxRedirects: 5,
-      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-    })
-
-    // ── cookie interceptors (lightweight cookie-jar) ──
-    client.interceptors.response.use((resp) => {
-      const setCookies = resp.headers['set-cookie']
-      if (setCookies) {
-        for (const raw of setCookies) {
-          const m = raw.match(/^([^=]+)=([^;]*)/) 
-          if (m) jar[m[1]] = m[2]
-        }
-      }
-      return resp
-    })
-
-    client.interceptors.request.use((cfg) => {
-      const cookieStr = Object.entries(jar)
-        .map(([k, v]) => `${k}=${v}`)
-        .join('; ')
-      if (cookieStr) cfg.headers.Cookie = cookieStr
-      return cfg
-    })
-
-    const getCookieString = () =>
-      Object.entries(jar)
-        .map(([k, v]) => `${k}=${v}`)
-        .join('; ')
-
-    const markCaptchaIssued = () => {
-      captchaIssuedAt = Date.now()
-      attemptsForCaptcha = 0
-    }
-    const markLoginAttempt = () => {
-      attemptsForCaptcha += 1
-    }
-    const markLoginFailure = () => {
-      failedLoginAttempts += 1
-    }
-    const markLoginSuccess = () => {
-      attemptsForCaptcha = 0
-      failedLoginAttempts = 0
-    }
-    const canAttemptLogin = () => {
-      if (!captchaIssuedAt || Date.now() - captchaIssuedAt > 5 * 60 * 1000) {
-        return { ok: false, reason: 'CAPTCHA expired. Refresh it before trying again.' }
-      }
-      if (attemptsForCaptcha >= 1) {
-        return { ok: false, reason: 'This CAPTCHA was already submitted once. Refresh it before retrying so the portal does not count repeated failures.' }
-      }
-      if (failedLoginAttempts >= 2) {
-        return { ok: false, reason: 'Portal login retries were blocked locally after multiple failures to protect your account. Wait a bit and fetch a fresh CAPTCHA before retrying.' }
-      }
-      return { ok: true }
-    }
-
-    _sessions.set(userId, { client, getCookieString, markCaptchaIssued, markLoginAttempt, markLoginFailure, markLoginSuccess, canAttemptLogin, authenticatedAt: undefined })
-  }
-  return _sessions.get(userId)!
-}
-
-/* ── Helpers ──────────────────────────────────────────────────────────── */
-
-/* ── Scrape IPU student profile page for extended info ─────────────── */
 async function scrapeIpuProfile(client: AxiosInstance): Promise<Record<string, string>> {
   const info: Record<string, string> = {}
   try {
@@ -320,23 +224,6 @@ function buildStudentInfoFromSemesters(semesters: PersistableSemester[]): Record
     const semesterInfo = normalizeStudentInfo((semester as unknown as { student_info?: Record<string, unknown> }).student_info || {})
     return mergePreferredRecord(semesterInfo, acc)
   }, {} as Record<string, string>)
-}
-
-function isMeaningfulValue(value: unknown): boolean {
-  if (value === null || value === undefined) return false
-  if (typeof value === 'string') {
-    const normalized = value.trim()
-    return normalized !== '' && normalized !== '-' && normalized !== '---' && normalized.toLowerCase() !== 'null'
-  }
-  return true
-}
-
-function mergePreferredRecord<T extends Record<string, unknown>>(primary: T, fallback: T): T {
-  const merged: Record<string, unknown> = { ...fallback }
-  for (const [key, value] of Object.entries(primary)) {
-    if (isMeaningfulValue(value)) merged[key] = value
-  }
-  return merged as T
 }
 
 function normalizeStudentInfo(info: Record<string, unknown> = {}): Record<string, string> {
@@ -660,8 +547,8 @@ async function saveResultsToDB(req: AuthRequest, results: {
 router.get('/captcha', async (req: AuthRequest, res) => {
   const userId = req.userId!
   try {
-    destroySession(userId)
-    const session = getSession(userId)
+    await destroyIpuSessionEverywhere(userId)
+    const session = await getHydratedIpuSession(userId, HEADERS, { forceFresh: true })
     const resp = await session.client.get(IPU_LOGIN_URL, { responseType: 'text' })
     const html = resp.data
     const $ = cheerio.load(html)
@@ -673,6 +560,7 @@ router.get('/captcha', async (req: AuthRequest, res) => {
     const b64 = Buffer.from(imgResp.data, 'binary').toString('base64')
     
     session.markCaptchaIssued()
+    await persistIpuSessionState(userId, session)
 
     ok(res, {
       captcha_image: `data:image/png;base64,${b64}`,
@@ -698,7 +586,7 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
   if (!enrollment || !pwd) return fail(res, 'Enrollment number and password are required.', 'MISSING_FIELDS', 400)
 
   try {
-    const session = getSession(req.userId!)
+    const session = await getHydratedIpuSession(req.userId!, HEADERS, { forceFresh: true })
     const resp = await session.client.get(IPU_LOGIN_URL, { responseType: 'text' })
     const html = resp.data
     const $ = cheerio.load(html)
@@ -711,6 +599,7 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
 
     // 4. Extract fields
     session.markCaptchaIssued()
+    await persistIpuSessionState(req.userId!, session)
 
     // 5. No OCR in Node — always return captcha for manual entry
     ok(res, {
@@ -732,7 +621,6 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
 /* ── POST /api/ipu/fetch-results ──────────────────────────────────────── */
 router.post('/fetch-results', async (req: AuthRequest, res) => {
   const userId = req.userId!
-  const browserSession = getSession(userId)
   const { enrollment_number = '', password = '', captcha = '', hidden_fields = {}, field_names = {}, login_action = '' } = req.body || {}
   const enrollment = enrollment_number.trim()
   const pwd = password.trim()
@@ -741,15 +629,14 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
   if (!enrollment || !pwd || !cap) {
     return fail(res, 'Enrollment number, password and CAPTCHA are required.', 'MISSING_FIELDS', 400)
   }
-  if (!browserSession) {
-    return fail(res, 'CAPTCHA session expired. Refresh it before trying again.', 'SESSION_EXPIRED', 401)
-  }
-  const loginSafety = browserSession.canAttemptLogin()
-  if (!loginSafety.ok) {
-    return fail(res, loginSafety.reason || 'Portal login blocked for safety.', 'LOGIN_BLOCKED', 429)
-  }
 
+  let browserSession: IpuSession | undefined
   try {
+    browserSession = await getHydratedIpuSession(userId, HEADERS)
+    const loginSafety = browserSession.canAttemptLogin()
+    if (!loginSafety.ok) {
+      return fail(res, loginSafety.reason || 'Portal login blocked for safety.', 'LOGIN_BLOCKED', 429)
+    }
     const usernameField = field_names.username || 'username'
     const passwordField = field_names.password || 'passwd'
     const captchaField = field_names.captcha || 'captcha'
@@ -796,6 +683,7 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     const lockoutMsg = detectAccountLockout(pageText)
     if (lockoutMsg) {
       browserSession.markLoginFailure()
+      await persistIpuSessionState(userId, browserSession)
       console.warn('[IPU] Account lockout detected:', lockoutMsg)
       return fail(res, lockoutMsg, 'ACCOUNT_LOCKED', 423)
     }
@@ -803,6 +691,7 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     // Check for captcha validation failure
     if (pageLower.includes('captcha validation fail') || pageLower.includes('captcha fail')) {
       browserSession.markLoginFailure()
+      await persistIpuSessionState(userId, browserSession)
       return fail(res, 'CAPTCHA validation failed. Please try again with a new CAPTCHA.', 'CAPTCHA_FAILED', 401)
     }
 
@@ -823,17 +712,20 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     })
     if (loginError) {
       browserSession.markLoginFailure()
+      await persistIpuSessionState(userId, browserSession)
       return fail(res, loginError, 'LOGIN_FAILED', 401)
     }
 
     if (stillOnLogin) {
       browserSession.markLoginFailure()
+      await persistIpuSessionState(userId, browserSession)
       return fail(res, 'Login failed — incorrect credentials or CAPTCHA. Please try again.', 'LOGIN_FAILED', 401)
     }
 
     // Successful login — scrape profile first, then fetch results
     browserSession.markLoginSuccess()
     browserSession.authenticatedAt = Date.now()
+    await persistIpuSessionState(userId, browserSession)
     console.log('[IPU] Login successful, scraping profile + fetching JSON API data...')
     
     let profileInfo: Record<string, string> = {}
@@ -939,9 +831,10 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     }
     fail(res, `Unexpected error: ${e.message}`, 'INTERNAL_ERROR', 500)
   } finally {
-    const currentSession = getSession(userId)
-    if (!isSessionAuthenticated(currentSession)) {
-      destroySession(userId)
+    if (!isIpuSessionAuthenticated(browserSession)) {
+      await destroyIpuSessionEverywhere(userId)
+    } else if (browserSession) {
+      await persistIpuSessionState(userId, browserSession)
     }
   }
 })
@@ -1055,8 +948,8 @@ router.post('/change-password', async (req: AuthRequest, res) => {
     return fail(res, 'New password must include uppercase, lowercase, number, and special character (!@#$%^&*).', 'VALIDATION_ERROR', 400)
   }
 
-  const browserSession = getSession(req.userId!)
-  if (!isSessionAuthenticated(browserSession)) {
+  const browserSession = await getHydratedIpuSession(req.userId!, HEADERS)
+  if (!isIpuSessionAuthenticated(browserSession)) {
     return fail(res, 'Active IPU session expired. Sync results once, then change password within 10 minutes.', 'SESSION_EXPIRED', 401)
   }
 
@@ -1066,6 +959,7 @@ router.post('/change-password', async (req: AuthRequest, res) => {
 
     if (html.toLowerCase().includes('j_username') || html.toLowerCase().includes('captchaservlet')) {
       browserSession!.authenticatedAt = undefined
+      await persistIpuSessionState(req.userId!, browserSession)
       return fail(res, 'Active IPU session expired. Sync results again before changing password.', 'SESSION_EXPIRED', 401)
     }
 
@@ -1110,6 +1004,7 @@ router.post('/change-password', async (req: AuthRequest, res) => {
 
     if (respLow.includes('j_username') || respLow.includes('captchaservlet')) {
       browserSession!.authenticatedAt = undefined
+      await persistIpuSessionState(req.userId!, browserSession)
       return fail(res, 'IPU session expired during password change. Sync results again.', 'SESSION_EXPIRED', 401)
     }
     if (respLow.includes('incorrect') || respLow.includes('wrong') || respLow.includes('mismatch') || respLow.includes('invalid') || respLow.includes('does not match')) {
@@ -1117,7 +1012,7 @@ router.post('/change-password', async (req: AuthRequest, res) => {
     }
     if (respLow.includes('success') || respLow.includes('changed') || respLow.includes('updated') || (submitResp.status >= 200 && submitResp.status < 300 && !respLow.includes('error'))) {
       browserSession!.authenticatedAt = undefined
-      destroySession(req.userId!)
+      await destroyIpuSessionEverywhere(req.userId!)
       return ok(res, { message: 'Password changed successfully on the IPU portal.' })
     }
     // Ambiguous — likely worked if no error message

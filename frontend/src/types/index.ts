@@ -87,6 +87,7 @@ export interface DashboardData {
     };
     daily_attendance: any[];
     weekly_overview: any[];
+    summary?: any;
 }
 
 export interface Notice {
@@ -176,6 +177,7 @@ export interface ReportsData {
         focus_label?: string;
         cgpa?: number;
         academic_score?: number;
+        academic_standing?: number;
     };
     subject_breakdown: any[];
     heatmap_data?: Record<string, string[]>;

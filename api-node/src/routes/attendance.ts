@@ -3,12 +3,12 @@ import { z } from 'zod'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, created, fail } from '../utils/response.js'
+import { ATTENDED_ATTENDANCE_STATUSES, COUNTED_ATTENDANCE_STATUSES, isAttendedAttendanceStatus, isCountedAttendanceStatus } from '../utils/attendanceStatus.js'
+import { getSlotType, scoreScheduleBySubjects } from '../utils/timetableSlots.js'
+import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
 
 const router = Router()
 router.use(requireAuth)
-
-const COUNTED_STATUSES = ['present', 'absent', 'late', 'approved_medical', 'medical', 'duty']
-const ATTENDED_STATUSES = ['present', 'late', 'approved_medical', 'medical', 'duty']
 
 async function sysLog(req: AuthRequest, user_id: string, action: string, description: string) {
   const ip = req.ip || req.socket?.remoteAddress || null
@@ -16,8 +16,45 @@ async function sysLog(req: AuthRequest, user_id: string, action: string, descrip
   await prisma.systemLog.create({ data: { user_id, action, description, ip, user_agent } }).catch(() => null)
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
+function isCountedStatus(status: string | null | undefined): boolean {
+  return isCountedAttendanceStatus(status)
+}
+
+function isAttendedStatus(status: string | null | undefined): boolean {
+  return isAttendedAttendanceStatus(status)
+}
+
+function getStatusCounters(status: string | null | undefined) {
+  return {
+    total: isCountedStatus(status) ? 1 : 0,
+    attended: isAttendedStatus(status) ? 1 : 0,
+  }
+}
+
+async function applySubjectAttendanceDelta(subjectId: string, totalDelta: number, attendedDelta: number) {
+  if (!totalDelta && !attendedDelta) return
+  await prisma.subject.update({
+    where: { id: subjectId },
+    data: {
+      ...(totalDelta ? { total: { increment: totalDelta } } : {}),
+      ...(attendedDelta ? { attended: { increment: attendedDelta } } : {}),
+    },
+  })
+}
+
+function today(req?: AuthRequest): string {
+  const timezone = String(req?.headers['x-timezone'] ?? '').trim() || 'Asia/Kolkata'
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    return formatter.format(new Date())
+  } catch {
+    return new Date().toISOString().slice(0, 10)
+  }
 }
 
 function parseTimeToMinutes(raw: string): number {
@@ -41,42 +78,6 @@ function buildSemesterAwareAttendanceFilter(semester: number) {
       { subject: { is: { semester } } },
     ],
   }
-}
-
-function getSlotType(slot: Record<string, unknown>): string {
-  const explicit = String(slot.type ?? '').trim().toLowerCase()
-  if (explicit) return explicit
-
-  const hasSubjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim().length > 0
-  const hasLabel = String(slot.label ?? slot.name ?? '').trim().length > 0
-  if (!hasSubjectRef && hasLabel) return 'custom'
-
-  return 'class'
-}
-
-function scoreScheduleBySubjects(schedule: unknown, subjectIds: Set<string>): number {
-  if (!schedule || typeof schedule !== 'object') return 0
-  let score = 0
-  for (const slots of Object.values(schedule as Record<string, unknown>)) {
-    if (!Array.isArray(slots)) continue
-    for (const rawSlot of slots) {
-      if (!rawSlot || typeof rawSlot !== 'object') continue
-      const slot = rawSlot as Record<string, unknown>
-      const slotType = getSlotType(slot)
-      if (slotType !== 'class') continue
-      const subjectRef = String(slot.subject_id ?? slot.subjectId ?? '').trim()
-      if (subjectRef && subjectIds.has(subjectRef)) score++
-    }
-  }
-  return score
-}
-
-async function recomputeSubjectStats(subjectId: string, userId: string): Promise<void> {
-  const [total, attended] = await Promise.all([
-    prisma.attendanceLog.count({ where: { subject_id: subjectId, user_id: userId, status: { in: COUNTED_STATUSES as any[] } } }),
-    prisma.attendanceLog.count({ where: { subject_id: subjectId, user_id: userId, status: { in: ATTENDED_STATUSES as any[] } } }),
-  ])
-  await prisma.subject.update({ where: { id: subjectId }, data: { attended, total } })
 }
 
 // ─── schemas ──────────────────────────────────────────────────────────────────
@@ -117,7 +118,7 @@ router.post('/mark', async (req: AuthRequest, res) => {
     const body = MarkSchema.parse(req.body)
     const userId = req.userId!
     const subjectId = body.subject_id
-    const markDate = body.date ?? today()
+    const markDate = body.date ?? today(req)
     const logType = body.type ?? 'Lecture'
 
     const subject = await prisma.subject.findFirst({ where: { id: subjectId, user_id: userId } })
@@ -174,14 +175,18 @@ router.post('/mark', async (req: AuthRequest, res) => {
           } else {
             substituteLog = existingSubLog
           }
-          await recomputeSubjectStats(subById, userId)
+          if (!existingSubLog) {
+            await applySubjectAttendanceDelta(subById, 1, 1)
+          }
         }
       }
 
-      await recomputeSubjectStats(subjectId, userId)
+      const counters = getStatusCounters(body.status)
+      await applySubjectAttendanceDelta(subjectId, counters.total, counters.attended)
 
     const updatedSubject = await prisma.subject.findUnique({ where: { id: subjectId } })
-    sysLog(req, userId, 'Attendance Marked', `Marked ${subject.name} as ${body.status} on ${markDate}`).catch(() => { })
+    await clearUserViewCache(userId).catch(() => {})
+    void sysLog(req, userId, 'Attendance Marked', `Marked ${subject.name} as ${body.status} on ${markDate}`).catch(() => { })
 
     created(res, {
       log: { ...log, _id: log.id },
@@ -202,6 +207,9 @@ router.get('/logs', async (req: AuthRequest, res) => {
     const query = LogsQuerySchema.parse(req.query)
     const { limit, page, subject_id, date, start_date, end_date, semester, status } = query
     const userId = req.userId!
+    const cacheId = buildViewCacheId('attendance_logs', { limit, page, subject_id, date, start_date, end_date, semester, status })
+    const cached = await readViewCache<any>(userId, cacheId)
+    if (cached) { ok(res, cached, 200, 0); return }
 
     const where: any = { user_id: userId }
     if (subject_id) where.subject_id = subject_id
@@ -240,7 +248,9 @@ router.get('/logs', async (req: AuthRequest, res) => {
       substituted_subject_info: l.substituted_by ? (subSubjectMap.get(l.substituted_by) ?? null) : null,
     }))
 
-    ok(res, { logs: enriched, total, page, limit, pages: Math.ceil(total / limit) })
+    const payload = { logs: enriched, total, page, limit, pages: Math.ceil(total / limit) }
+    ok(res, payload, 200, 0)
+    void writeViewCache(userId, cacheId, payload, 60_000).catch(() => {})
   } catch (err) {
     if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[attendance/logs]', err)
@@ -259,8 +269,11 @@ router.get('/classes-for-date', async (req: AuthRequest, res) => {
   try {
     const query = ClassesQuerySchema.parse(req.query)
     const userId = req.userId!
-    const date = query.date ?? today()
+    const date = query.date ?? today(req)
     const semester = query.semester ?? (req.user?.current_semester ?? 1)
+    const cacheId = buildViewCacheId('classes_for_date', { date, semester })
+    const cached = await readViewCache<any>(userId, cacheId)
+    if (cached) { ok(res, cached, 200, 0); return }
 
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const dayName = dayNames[new Date(date + 'T00:00:00').getDay()]
@@ -364,14 +377,16 @@ router.get('/classes-for-date', async (req: AuthRequest, res) => {
       ...substitutionLogs,
     ]
 
-    ok(res, {
+    const payload = {
       date,
       day: dayName,
       classes,
       extra_logs: extraLogs,
       total_scheduled: daySlots.length,
       total_marked: logsForDate.length,
-    })
+    }
+    ok(res, payload, 200, 0)
+    void writeViewCache(userId, cacheId, payload, 60_000).catch(() => {})
   } catch (err) {
     console.error('[attendance/classes-for-date]', err)
     fail(res, 'Failed to fetch classes for date', 'FETCH_FAILED', 500)
@@ -397,7 +412,7 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
         await prisma.attendanceLog.deleteMany({
           where: { user_id: userId, subject_id: log.substituted_by!, date: log.date, type: 'substitution_class' },
         })
-        await recomputeSubjectStats(log.substituted_by!, userId)
+        await applySubjectAttendanceDelta(log.substituted_by!, -1, -1)
         newSubstitutedBy = null
       }
 
@@ -410,7 +425,7 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
             await prisma.attendanceLog.deleteMany({
               where: { user_id: userId, subject_id: log.substituted_by, date: log.date, type: 'substitution_class' },
             })
-            await recomputeSubjectStats(log.substituted_by, userId)
+            await applySubjectAttendanceDelta(log.substituted_by, -1, -1)
           }
           await prisma.attendanceLog.create({
             data: {
@@ -424,7 +439,7 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
               semester: log.semester,
             },
           })
-          await recomputeSubjectStats(newSubById, userId)
+          await applySubjectAttendanceDelta(newSubById, 1, 1)
           newSubstitutedBy = newSubById
         }
       }
@@ -439,11 +454,14 @@ router.put('/logs/:logId', async (req: AuthRequest, res) => {
           ...(newSubstitutedBy !== undefined ? { substituted_by: newSubstitutedBy } : {}),
         },
       })
-      await recomputeSubjectStats(log.subject_id, userId)
+      const before = getStatusCounters(log.status)
+      const after = getStatusCounters(updatedLog.status)
+      await applySubjectAttendanceDelta(log.subject_id, after.total - before.total, after.attended - before.attended)
 
     const updatedSubject = await prisma.subject.findUnique({ where: { id: log.subject_id } })
+    await clearUserViewCache(userId).catch(() => {})
 
-    sysLog(req, userId, 'Attendance Edited', `Edited ${log.subject_name || 'subject'} to ${updatedLog.status} on ${updatedLog.date}`).catch(() => { })
+    void sysLog(req, userId, 'Attendance Edited', `Edited ${log.subject_name || 'subject'} to ${updatedLog.status} on ${updatedLog.date}`).catch(() => { })
 
     ok(res, { log: { ...updatedLog, _id: updatedLog.id }, subject: updatedSubject ? { ...updatedSubject, _id: updatedSubject.id } : null })
   } catch (err) {
@@ -469,15 +487,17 @@ router.delete('/logs/:logId', async (req: AuthRequest, res) => {
         await prisma.attendanceLog.deleteMany({
           where: { user_id: userId, subject_id: log.substituted_by, date: log.date, type: 'substitution_class' },
         })
-        await recomputeSubjectStats(log.substituted_by, userId)
+        await applySubjectAttendanceDelta(log.substituted_by, -1, -1)
       }
 
       await prisma.attendanceLog.delete({ where: { id: logId } })
-      await recomputeSubjectStats(subjectId, userId)
+      const counters = getStatusCounters(log.status)
+      await applySubjectAttendanceDelta(subjectId, -counters.total, -counters.attended)
 
     const updatedSubject = await prisma.subject.findUnique({ where: { id: subjectId } })
+    await clearUserViewCache(userId).catch(() => {})
 
-    sysLog(req, userId, 'Attendance Deleted', `Deleted ${log.subject_name} (${log.status}) on ${log.date}`).catch(() => { })
+    void sysLog(req, userId, 'Attendance Deleted', `Deleted ${log.subject_name} (${log.status}) on ${log.date}`).catch(() => { })
 
     ok(res, { message: 'Log deleted', subject: updatedSubject ? { ...updatedSubject, _id: updatedSubject.id } : null })
   } catch (err) {
@@ -519,6 +539,10 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
       endDate = `${y}-${m}-${String(last).padStart(2, '0')}`
     }
 
+    const cacheId = buildViewCacheId('calendar_data', { startDate, endDate, semester: semester ?? 'all' })
+    const cached = await readViewCache<any>(userId, cacheId)
+    if (cached) { ok(res, cached, 200, 0); return }
+
     const where: any = { user_id: userId, date: { gte: startDate, lte: endDate } }
     if (semester !== undefined) {
       where.AND = [buildSemesterAwareAttendanceFilter(semester)]
@@ -537,8 +561,8 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
       byDate[log.date].push(log)
     }
     for (const [d, dlogs] of Object.entries(byDate)) {
-      const total = dlogs.filter((l: any) => COUNTED_STATUSES.includes(l.status as any)).length
-      const attended = dlogs.filter((l: any) => ATTENDED_STATUSES.includes(l.status as any)).length
+      const total = dlogs.filter((l: any) => COUNTED_ATTENDANCE_STATUSES.includes(l.status as any)).length
+      const attended = dlogs.filter((l: any) => ATTENDED_ATTENDANCE_STATUSES.includes(l.status as any)).length
       calendar[d] = {
         logs: dlogs,
         total,
@@ -548,7 +572,9 @@ router.get('/calendar_data', async (req: AuthRequest, res) => {
       }
     }
 
-    ok(res, { calendar, start_date: startDate, end_date: endDate, total_logs: logs.length })
+    const payload = { calendar, start_date: startDate, end_date: endDate, total_logs: logs.length }
+    ok(res, payload, 200, 0)
+    void writeViewCache(userId, cacheId, payload, 120_000).catch(() => {})
   } catch (err) {
     if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400); return }
     console.error('[attendance/calendar_data]', err)

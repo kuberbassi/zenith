@@ -31,6 +31,7 @@ const Notifications = lazy(() => import('./pages/Notifications.tsx'));
 const Results = lazy(() => import('./pages/Results.tsx'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy.tsx'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService.tsx'));
+const NotFound = lazy(() => import('./pages/NotFound.tsx'));
 
 const SkillTracker = lazy(() => import('./pages/SkillTracker.tsx'));
 
@@ -100,6 +101,14 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+      <Route
+        path="/404"
+        element={
+          <Suspense fallback={<LoadingSpinner fullScreen />}>
+            <NotFound />
+          </Suspense>
+        }
+      />
         <Route
           path="/analytics"
           element={
@@ -194,7 +203,14 @@ const AppRoutes: React.FC = () => {
       </Route>
 
       {/* Default redirect */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route
+        path="*"
+        element={
+          <Suspense fallback={<LoadingSpinner fullScreen />}>
+            <NotFound />
+          </Suspense>
+        }
+      />
     </Routes>
   );
 };
@@ -221,15 +237,13 @@ const AppContent: React.FC = () => {
   );
 };
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com'
-
-if (GOOGLE_CLIENT_ID === '86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com' && import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-  // Using env var - good
-} else if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-  console.warn('[AcadHub] VITE_GOOGLE_CLIENT_ID env var not set, using hardcoded fallback. Set it in .env or Vercel dashboard.')
-}
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 const App: React.FC = () => {
+  if (!GOOGLE_CLIENT_ID) {
+    throw new Error('Missing VITE_GOOGLE_CLIENT_ID. Configure the frontend environment before starting the app.')
+  }
+
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <QueryClientProvider client={queryClient}>

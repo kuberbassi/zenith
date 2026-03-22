@@ -3,6 +3,13 @@ import { dispatchGlobalToast } from '@/components/ui/Toast';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+let refreshPromise: Promise<unknown> | null = null;
+
+const readCookie = (name: string): string | null => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : null;
+};
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
@@ -16,10 +23,13 @@ const api: AxiosInstance = axios.create({
 // Request interceptor
 api.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
-        // Add auth token if available
-        const token = localStorage.getItem('auth_token');
-        if (token && config.headers) {
-            config.headers.Authorization = `Bearer ${token}`;
+        if (config.headers) {
+            const csrfToken = readCookie('acadhub_csrf_token');
+            if (csrfToken && config.method && !['get', 'head', 'options'].includes(config.method.toLowerCase())) {
+                config.headers['X-CSRF-Token'] = csrfToken;
+            }
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (timezone) config.headers['X-Timezone'] = timezone;
         }
         return config;
     },
@@ -33,17 +43,30 @@ api.interceptors.response.use(
     (response) => response,
     async (error: AxiosError) => {
         const config = error.config as InternalAxiosRequestConfig & { _retry?: number };
-        const errorData = error.response?.data as { code?: string; error?: string };
+        const requestUrl = String(config?.url ?? '');
 
         if (error.response?.status === 401) {
-            if (errorData?.code === 'TOKEN_EXPIRED' || errorData?.error?.includes('expired')) {
-                localStorage.removeItem('auth_token');
-                localStorage.removeItem('user');
-                console.error('Session expired. Please login again.');
-                window.location.href = '/login';
-                return Promise.reject(error);
+            const isRefreshRequest = requestUrl.includes('/api/auth/refresh');
+            const isLoginRequest = requestUrl.includes('/api/auth/google');
+            const hasRetriedAuth = Boolean((config as any)?._authRefreshed);
+
+            if (!isRefreshRequest && !isLoginRequest && !hasRetriedAuth) {
+                try {
+                    if (!refreshPromise) {
+                        refreshPromise = api.post('/api/auth/refresh');
+                    }
+                    await refreshPromise;
+                    (config as any)._authRefreshed = true;
+                    return api.request(config);
+                } catch {
+                    localStorage.removeItem('user');
+                    window.location.href = '/login';
+                    return Promise.reject(error);
+                } finally {
+                    refreshPromise = null;
+                }
             }
-            localStorage.removeItem('auth_token');
+
             localStorage.removeItem('user');
             window.location.href = '/login';
         }

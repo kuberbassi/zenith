@@ -61,6 +61,20 @@ const SkillTracker: React.FC = () => {
 
     const handleSave = async () => {
         if (!formData.name) { showToast('error', 'Identity Required'); return; }
+        
+        const tempId = editingSkill?._id || `temp-${Date.now()}`;
+        const updatedSkill: Skill = { ...formData, _id: tempId };
+        
+        // Optimistic Update
+        const previousSkills = [...skills];
+        if (editingSkill) {
+            setSkills(prev => prev.map(s => s._id === editingSkill._id ? updatedSkill : s));
+        } else {
+            setSkills(prev => [updatedSkill, ...prev]);
+        }
+        
+        setIsModalOpen(false);
+
         try {
             setIsSaving(true);
             if (editingSkill?._id) {
@@ -70,10 +84,11 @@ const SkillTracker: React.FC = () => {
                 await skillsService.addSkill(formData);
                 showToast('success', 'Sequence Initiated');
             }
-            setIsModalOpen(false);
-            loadSkills();
+            // Silent sync for truth (debounced for cache propagation)
+            setTimeout(() => loadSkills(), 500);
         } catch {
             showToast('error', 'Operation Failed');
+            setSkills(previousSkills); // Rollback
         } finally {
             setIsSaving(false);
         }
@@ -81,11 +96,20 @@ const SkillTracker: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         if (!confirm('Terminate this capability sequence?')) return;
+        
+        const previousSkills = [...skills];
+        // Optimistic Update
+        setSkills(prev => prev.filter(s => s._id !== id));
+
         try {
             await skillsService.deleteSkill(id);
             showToast('success', 'Sequence Terminated');
-            loadSkills();
-        } catch { showToast('error', 'Termination Failed'); }
+            // Silent sync for truth
+            setTimeout(() => loadSkills(), 500);
+        } catch { 
+            showToast('error', 'Termination Failed');
+            setSkills(previousSkills); // Rollback
+        }
     };
 
     const filteredSkills = filter === 'all' ? skills : skills.filter(s => s.category === filter);

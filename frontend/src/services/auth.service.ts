@@ -14,15 +14,9 @@ export const authService = {
             // Send the Google ID token to our Node backend for verification
             const response = await api.post('/api/auth/google', { credential });
 
-            // Backend wraps response in { success, data: { token, user } }
+            // Backend wraps response in { success, data: { user } } and sets auth cookies.
             const payload = response.data?.data ?? response.data;
-            const token = payload?.token;
             const user = payload?.user;
-
-            // Store the JWT token from our backend
-            if (token) {
-                localStorage.setItem('auth_token', token);
-            }
 
             return user || null;
         } catch (error) {
@@ -48,10 +42,19 @@ export const authService = {
         } catch (error) {
             console.error('Logout error:', error);
         } finally {
-            localStorage.removeItem('auth_token');
             localStorage.removeItem('user');
             window.location.href = '/login';
         }
+    },
+
+    deleteAccount: async (confirmationEmail: string): Promise<void> => {
+        await api.delete('/api/profile/account', {
+            data: {
+                confirmation_email: confirmationEmail,
+                confirmation_text: 'DELETE',
+            },
+        });
+        localStorage.removeItem('user');
     },
 
     // Check if user is authenticated

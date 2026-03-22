@@ -2,99 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    User, Settings as SettingsIcon, Download, Upload,
-    Trash2,
-    Activity, Clock, FileText, Camera,
+    User,
+    Activity, Camera, Clock, RefreshCw,
     GraduationCap,
-    Mail, Hash, Shield, ShieldAlert, History, RefreshCw, ShieldCheck
+    Mail, Hash, Shield, ShieldCheck
 } from 'lucide-react';
-import type { SystemLog } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSemester } from '@/contexts/SemesterContext';
-import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
 import { attendanceService } from '@/services/attendance.service';
 import { authService } from '@/services/auth.service';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
+import SystemLogsSection from '@/components/settings/SystemLogsSection';
+import SettingsDataSection from '@/components/settings/SettingsDataSection';
 
 
 
 
 
 /* ── System Logs Sub-Component ─────────────────────────────────────────── */
-const SystemLogsSection: React.FC = () => {
-    const [groupedLogs, setGroupedLogs] = useState<Record<string, SystemLog[]>>({});
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => { loadLogs(); }, []);
-
-    const loadLogs = async () => {
-        try {
-            const data = await attendanceService.getSystemLogs();
-            const grouped = data.reduce((acc: Record<string, SystemLog[]>, log) => {
-                const date = typeof log.timestamp === 'string'
-                    ? new Date(log.timestamp).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-                    : new Date((log.timestamp as any).$date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-                if (!acc[date]) acc[date] = [];
-                acc[date].push(log);
-                return acc;
-            }, {});
-            setGroupedLogs(grouped);
-        } catch (err) { console.error(err); } finally { setLoading(false); }
-    };
-
-    const getLogIcon = (action: string) => {
-        const a = action.toLowerCase();
-        if (a.includes('profile')) return <User size={14} className="text-blue-500" />;
-        if (a.includes('attendance') || a.includes('subject')) return <Activity size={14} className="text-blue-500" />;
-        if (a.includes('delete') || a.includes('reset') || a.includes('wipe')) return <Trash2 size={14} className="text-red-500" />;
-        if (a.includes('setting') || a.includes('preference')) return <SettingsIcon size={14} className="text-blue-400" />;
-        return <FileText size={14} className="text-white/40" />;
-    };
-
-    if (loading) return <div className="h-48 flex items-center justify-center"><RefreshCw className="animate-spin text-blue-500/40" /></div>;
-
-    const dates = Object.keys(groupedLogs);
-
-    return (
-        <div className="space-y-6">
-            {dates.length === 0 ? (
-                <div className="rounded-3xl border border-white/[0.06] bg-[#0a0a0a] p-12 flex flex-col items-center justify-center text-center">
-                    <History size={32} className="text-white/10 mb-4" />
-                    <h3 className="text-sm font-bold text-white tracking-widest uppercase mb-1">Station Clean</h3>
-                    <p className="text-xs text-white/30 max-w-xs">No activity has been logged in your terminal yet.</p>
-                </div>
-            ) : (
-                dates.map(date => (
-                    <div key={date} className="space-y-3">
-                        <div className="flex items-center gap-3 px-2">
-                            <div className="h-px flex-1 bg-white/[0.04]" />
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">{date}</h3>
-                            <div className="h-px flex-1 bg-white/[0.04]" />
-                        </div>
-                        <div className="rounded-3xl border border-white/[0.06] bg-[#0a0a0a] overflow-hidden divide-y divide-white/[0.03]">
-                            {groupedLogs[date].map((log, index) => (
-                                <div key={index} className="flex gap-4 p-5 hover:bg-white/[0.01] transition-colors group">
-                                    <div className="w-10 h-10 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center shrink-0 group-hover:border-blue-500/30 transition-all">{getLogIcon(log.action)}</div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between gap-2 mb-1">
-                                            <h4 className="text-sm font-bold text-white/80 group-hover:text-white transition-colors uppercase tracking-tight">{log.action}</h4>
-                                            <span className="text-[10px] font-black text-white/20">{typeof log.timestamp === 'string' ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                                        </div>
-                                        <p className="text-xs text-white/40 font-medium leading-relaxed">{log.description}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))
-            )}
-        </div>
-    );
-};
-
 /* ── Main Settings Component ───────────────────────────────────────────── */
 type TabKey = 'profile' | 'activity' | 'data';
 
@@ -211,6 +139,27 @@ const Settings: React.FC = () => {
         } catch (err: any) { 
             console.error(err);
             showToast('error', err.response?.data?.message || 'Purge Failed'); 
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!user?.email) {
+            showToast('error', 'Account email unavailable');
+            return;
+        }
+        if (!confirm('Delete your account permanently? This removes access and all linked data.')) return;
+        const confirmation = prompt(`Type ${user.email} to confirm permanent account deletion:`);
+        if (confirmation !== user.email) return;
+
+        try {
+            await authService.deleteAccount(user.email);
+            showToast('success', 'Account deleted');
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 800);
+        } catch (err: any) {
+            console.error(err);
+            showToast('error', err.response?.data?.error || 'Account deletion failed');
         }
     };
 
@@ -377,54 +326,12 @@ const Settings: React.FC = () => {
 
                     {/* STORAGE TAB */}
                     {activeTab === 'data' && (
-                        <div className="space-y-4">
-                            <div className="rounded-3xl border border-white/[0.06] bg-[#0a0a0a] p-8">
-                                <div className="flex items-center justify-between mb-8">
-                                    <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400"><Shield size={20} /></div><div><h3 className="text-base font-black text-white tracking-tight">Encryption & Storage</h3><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Local Records Management</p></div></div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/[0.04]">
-                                        <div className="flex items-center gap-4 mb-6"><div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-blue-400"><Download size={18} /></div><div><h4 className="text-sm font-bold text-white tracking-tight">Backup Records</h4><p className="text-[10px] font-bold text-white/20 uppercase">Export to .JSON</p></div></div>
-                                        <p className="text-xs text-white/30 mb-6 leading-relaxed">Save your entire profile, attendance logs, and settings to a secure offline file.</p>
-                                        <Button variant="secondary" className="w-full justify-center rounded-2xl h-11" onClick={() => attendanceService.exportData().then(b => {
-                                            const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `acadhub_config_${new Date().toISOString().split('T')[0]}.json`; a.click();
-                                        })}>Extract Data</Button>
-                                    </div>
-                                    <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/[0.04]">
-                                        <div className="flex items-center gap-4 mb-6"><div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-blue-400"><Upload size={18} /></div><div><h4 className="text-sm font-bold text-white tracking-tight">Restore Session</h4><p className="text-[10px] font-bold text-white/20 uppercase">Load from .JSON</p></div></div>
-                                        <p className="text-xs text-white/30 mb-6 leading-relaxed">Overwrite current terminal records with a previously saved backup file.</p>
-                                        <label className="block w-full cursor-pointer transition-all border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 h-11 rounded-2xl flex items-center justify-center text-blue-400 text-[11px] font-black uppercase tracking-widest">
-                                            Initialize Load
-                                            <input type="file" className="hidden" accept=".json" onChange={async (e) => {
-                                                const file = e.target.files?.[0]; if (!file) return;
-                                                const txt = await file.text(); 
-                                                try {
-                                                    const data = JSON.parse(txt);
-                                                    if (!confirm('Are you sure you want to import this data? Current data will be merged/overwritten and a safety backup will be created.')) return;
-                                                    
-                                                    showToast('info', 'Importing data...');
-                                                    await attendanceService.importData(data); 
-                                                    showToast('success', 'Terminal Updated'); 
-                                                    setTimeout(() => window.location.reload(), 1000);
-                                                } catch (err: any) {
-                                                    console.error('Import Error:', err);
-                                                    showToast('error', 'Import failed: ' + (err.message || 'Invalid JSON'));
-                                                }
-                                            }} />
-                                        </label>
-                                    </div>
-                                </div>
-                                <div className="mt-8 pt-8 border-t border-white/[0.03]">
-                                    <div className="p-6 rounded-3xl bg-red-500/[0.02] border border-red-500/[0.06] flex flex-col md:flex-row items-center justify-between gap-6">
-                                        <div className="flex items-center gap-4 text-center md:text-left"><div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 shrink-0"><ShieldAlert size={24} /></div><div><h4 className="text-sm font-bold text-red-500 tracking-tight">Zero Purge Protocol</h4><p className="text-[10px] font-bold text-red-500/40 uppercase tracking-widest">Permanent Data Erasure</p></div></div>
-                                        <div className="flex gap-2">
-                                            <button onClick={logout} className="px-5 py-2.5 rounded-xl border border-white/[0.06] text-[10px] font-black uppercase text-white hover:bg-white/5 transition-all">Detach Session</button>
-                                            <button onClick={handleDeleteAllData} className="px-5 py-2.5 rounded-xl bg-red-500 text-white text-[10px] font-black uppercase shadow-xl shadow-red-500/20 hover:bg-red-600 transition-all">Wipe Terminal</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <SettingsDataSection
+                            onLogout={logout}
+                            onDeleteAllData={handleDeleteAllData}
+                            onDeleteAccount={handleDeleteAccount}
+                            showToast={showToast}
+                        />
                     )}
                 </motion.div>
             </AnimatePresence>

@@ -40,6 +40,7 @@ const SlotModal: React.FC<SlotModalProps> = ({ isOpen, onClose, onSuccess, slot,
     }, [slot, isOpen]);
 
     const handleSave = async () => {
+        if (loading) return;
         try {
             setLoading(true);
             const normalizedType = String(formData.type || 'class').toLowerCase();
@@ -72,11 +73,15 @@ const SlotModal: React.FC<SlotModalProps> = ({ isOpen, onClose, onSuccess, slot,
     };
 
     const handleDelete = async () => {
+        if (loading) return;
         const slotId = slot?._id || slot?.id;
         if (!slotId) return;
         try {
             setLoading(true);
-            await attendanceService.deleteTimetableSlot(slotId, semester);
+            await attendanceService.deleteTimetableSlot(slotId, semester, {
+                day: String(slot?.day || day || ''),
+                start_time: String((slot as any)?.start_time || (slot as any)?.startTime || period?.startTime || period?.start_time || ''),
+            });
             onSuccess();
             onClose();
         } catch (error) {

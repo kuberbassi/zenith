@@ -3,6 +3,8 @@ import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { AttendanceCalculator, GradeCalculator } from '../lib/calculations.js'
 import { ok, fail } from '../utils/response.js'
+import { isAttendedAttendanceStatus } from '../utils/attendanceStatus.js'
+import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -13,6 +15,16 @@ router.get('/data', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
+    const cacheId = buildViewCacheId('dashboard_data', { semester })
+    if (req.query.refresh === '1') {
+      await clearUserViewCache(userId).catch(() => {})
+    } else {
+      const cached = await readViewCache<any>(userId, cacheId)
+      if (cached) {
+        ok(res, cached, 200, 0)
+        return
+      }
+    }
 
     const [subjects, recentLogs] = await Promise.all([
       prisma.subject.findMany({
@@ -38,14 +50,20 @@ router.get('/data', async (req: AuthRequest, res) => {
       }
     })
 
-    ok(res, {
+    const payload = {
       overall_attendance: summary.overall_percentage,
       total_subjects: subjects.length,
       subjects: enriched,
       recent_logs: recentLogs,
-      summary,
+      summary: {
+        ...summary,
+        academic_standing: GradeCalculator.calculateCGPA(subjects as any).cgpa || 0,
+      },
       last_updated: new Date().toISOString(),
-    }, 200, 30) // 30s cache
+    }
+    console.log(`[DEBUG] Dashboard Bunks: Att:${summary.total_attended}, Tot:${summary.total_classes}, Target:${req.user?.attendance_threshold} => SafeBunks:${summary.safe_bunks_remaining}`);
+    ok(res, payload, 200, 0)
+    void writeViewCache(userId, cacheId, payload, 60_000)
   } catch (err) {
     console.error('[dashboard/data]', err)
     fail(res, 'Failed to fetch dashboard data', 'FETCH_FAILED', 500)
@@ -58,6 +76,16 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : 1
+    const cacheId = buildViewCacheId('reports_data', { semester })
+    if (req.query.refresh === '1') {
+      await clearUserViewCache(userId).catch(() => {})
+    } else {
+      const cached = await readViewCache<any>(userId, cacheId)
+      if (cached) {
+        ok(res, cached, 200, 0)
+        return
+      }
+    }
     const userTarget = req.user?.attendance_threshold ?? 75
 
     const [subjects, logs] = await Promise.all([
@@ -111,16 +139,39 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
     const dateSet = new Set<string>()
     const recentDailyPct = new Map<string, { attended: number; total: number }>()
     for (const log of logs) {
-      if (['present', 'late', 'approved_medical', 'substituted'].includes(log.status)) {
+      if (isAttendedAttendanceStatus(log.status)) {
         // Only count weekday attendance dates for streak
         const day = new Date(log.date + 'T00:00:00').getDay()
         if (day !== 0 && day !== 6) dateSet.add(log.date)
       }
       const bucket = recentDailyPct.get(log.date) ?? { attended: 0, total: 0 }
       bucket.total += 1
-      if (['present', 'late', 'approved_medical', 'substituted'].includes(log.status)) bucket.attended += 1
+      if (isAttendedAttendanceStatus(log.status)) bucket.attended += 1
       recentDailyPct.set(log.date, bucket)
     }
+    // Latest 10 dates (most recent first)
+    const sortedDates = [...recentDailyPct.keys()].sort().reverse()
+    const latest5 = sortedDates.slice(0, 5)
+    const previous5 = sortedDates.slice(5, 10)
+
+    const calcAvg = (dates: string[]) => {
+      if (!dates.length) return 0
+      const sum = dates.reduce((acc, d) => {
+        const val = recentDailyPct.get(d)!
+        return acc + (val.attended / val.total) * 100
+      }, 0)
+      return sum / dates.length
+    }
+
+    const latestAvg = calcAvg(latest5)
+    const previousAvg = calcAvg(previous5)
+    
+    // Momentum is latest performance minus previous performance
+    const attendanceMomentum = previous5.length > 0 
+      ? Math.round((latestAvg - previousAvg) * 10) / 10 
+      : 0
+
+    // Restore Streak Logic
     // Sort descending (most recent first)
     const weekdayDates = [...dateSet].sort().reverse()
     if (weekdayDates.length > 0) {
@@ -144,18 +195,6 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
       heatmapData[log.date].push(log.status)
     }
 
-    const recentDates = [...recentDailyPct.entries()]
-      .sort((a, b) => a[0] < b[0] ? 1 : -1)
-      .slice(0, 10)
-      .reverse()
-    const recentPercentages = recentDates.map(([, value]) => value.total > 0 ? (value.attended / value.total) * 100 : 0)
-    const recentAverage = recentPercentages.length
-      ? recentPercentages.reduce((sum, value) => sum + value, 0) / recentPercentages.length
-      : overallPct
-    const earlierAverage = recentPercentages.length > 4
-      ? recentPercentages.slice(0, Math.floor(recentPercentages.length / 2)).reduce((sum, value) => sum + value, 0) / Math.floor(recentPercentages.length / 2)
-      : recentAverage
-    const attendanceMomentum = Math.round((recentAverage - earlierAverage) * 10) / 10
     const consistencyScore = Math.max(0, Math.min(100, Math.round((overallPct * 0.65) + (Math.min(streak, 10) * 3.5))))
     const achievementLevel =
       overallPct >= 90 ? 'legend' :
@@ -178,7 +217,7 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
       ? Math.round(completedResultSubjects.reduce((sum: number, subject: any) => sum + Number(subject.grade_point ?? 0), 0) / completedResultSubjects.length * 10)
       : 0
 
-    ok(res, {
+    const payload = {
       kpis: {
         best_subject_name: bestSubject?.name ?? 'N/A',
         best_subject_percent: bestSubject ? `${bestSubject.percentage}%` : '0%',
@@ -190,17 +229,23 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
         at_risk_count: atRiskCount,
         total_subjects: subjects.length,
         target_threshold: userTarget,
-        safe_bunks_remaining: safeBunksRemaining,
+        safe_bunks_remaining: (() => {
+          const val = totalClasses > 0 ? Math.max(0, Math.floor((totalAttended * 100 - userTarget * totalClasses) / userTarget)) : 0;
+          console.log(`[DEBUG] Reports Bunks: Att:${totalAttended}, Tot:${totalClasses}, Target:${userTarget} => SafeBunks:${val}`);
+          return val;
+        })(),
         consistency_score: consistencyScore,
         attendance_momentum: attendanceMomentum,
         achievement_level: achievementLevel,
         focus_label: focusLabel,
-        cgpa: cgpaCalc.cgpa,
         academic_score: academicScore,
+        academic_standing: cgpaCalc.cgpa > 0 ? Number(cgpaCalc.cgpa.toFixed(2)) : Number((academicScore / 10).toFixed(2)),
       },
       subject_breakdown: processedSubjects,
       heatmap_data: heatmapData,
-    }, 200, 15)
+    }
+    ok(res, payload, 200, 0)
+    void writeViewCache(userId, cacheId, payload, 90_000)
   } catch (err) {
     console.error('[dashboard/reports_data]', err)
     fail(res, 'Failed to fetch reports data', 'FETCH_FAILED', 500)
@@ -234,7 +279,7 @@ router.get('/analytics/day-of-week', async (req: AuthRequest, res) => {
       const dayIdx = dt.getDay() + 1 // 1=Sun, 2=Mon, ..., 7=Sat
 
       if (!dayCounts[dayIdx]) dayCounts[dayIdx] = { present: 0, absent: 0 }
-      if (['present', 'late', 'approved_medical', 'substituted'].includes(log.status)) {
+      if (isAttendedAttendanceStatus(log.status)) {
         dayCounts[dayIdx].present++
       } else if (log.status === 'absent') {
         dayCounts[dayIdx].absent++
@@ -256,7 +301,7 @@ router.get('/analytics/day-of-week', async (req: AuthRequest, res) => {
       }
     })
 
-    ok(res, { days: daysData }, 200, 120) // 2 min cache
+    ok(res, { days: daysData }, 200, 0) // No browser cache
   } catch (err) {
     console.error('[dashboard/analytics/day-of-week]', err)
     fail(res, 'Failed to fetch analytics', 'ANALYTICS_FAILED', 500)
@@ -269,6 +314,12 @@ router.get('/notifications', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
     const semester = req.query.semester ? parseInt(String(req.query.semester)) : undefined
+    const cacheId = buildViewCacheId('notifications', { semester: semester ?? 'all', warning: req.user?.warning_threshold ?? 76 })
+    const cached = await readViewCache<any[]>(userId, cacheId)
+    if (cached) {
+      ok(res, cached, 200, 0)
+      return
+    }
     const subjects = await prisma.subject.findMany({
       where: { user_id: userId, ...(semester ? { semester } : {}) },
       select: { name: true, attended: true, total: true, target: true },
@@ -292,7 +343,8 @@ router.get('/notifications', async (req: AuthRequest, res) => {
       }
     }
 
-    ok(res, notifications, 200, 30) // 30s cache
+    ok(res, notifications, 200, 0)
+    void writeViewCache(userId, cacheId, notifications, 120_000)
   } catch (err) {
     console.error('[dashboard/notifications]', err)
     fail(res, 'Failed to fetch notifications', 'FETCH_FAILED', 500)

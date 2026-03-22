@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
+import { normalizeAttendanceStatus } from '../utils/attendanceStatus.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -59,6 +60,229 @@ async function collectUserData(userId: string): Promise<UserData> {
   return { subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs }
 }
 
+async function createInBatches<T>(items: T[], worker: (item: T) => Promise<unknown>, batchSize: number = 25) {
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize)
+    await Promise.all(batch.map(worker))
+  }
+}
+
+function normalizeValue(val: any): any {
+  if (val && typeof val === 'object') {
+    if ('$oid' in val) return String(val.$oid)
+    if ('$date' in val) return val.$date
+    if ('$numberInt' in val) return Number(val.$numberInt)
+    if ('$numberLong' in val) return Number(val.$numberLong)
+    if ('$numberDouble' in val) return Number(val.$numberDouble)
+    if ('$numberDecimal' in val) return Number(val.$numberDecimal)
+  }
+  return val
+}
+
+async function clearUserData(userId: string) {
+  const subs = await prisma.subject.findMany({ where: { user_id: userId }, select: { id: true } })
+  await prisma.subject.deleteMany({ where: { id: { in: subs.map((s: any) => s.id) } } })
+  await prisma.attendanceLog.deleteMany({ where: { user_id: userId } })
+  await prisma.timetable.deleteMany({ where: { user_id: userId } })
+  await prisma.semesterResult.deleteMany({ where: { user_id: userId } })
+  await prisma.manualCourse.deleteMany({ where: { user_id: userId } })
+  await prisma.userPreference.deleteMany({ where: { user_id: userId } })
+  await prisma.skill.deleteMany({ where: { user_id: userId } })
+  await prisma.systemLog.deleteMany({ where: { user_id: userId } })
+}
+
+function getSafeProfileUpdate(profile: any) {
+  const allowedProfileFields = [
+    'name', 'course', 'branch', 'college', 'batch', 'current_semester',
+    'enrollment_number', 'target_attendance', 'attendance_threshold', 'warning_threshold',
+    'phone_number', 'headline', 'linkedin_url', 'github_url', 'portfolio_url', 'admission_year',
+  ]
+
+  const filteredProfile = Object.fromEntries(
+    Object.entries(profile ?? {}).filter(([key]) => allowedProfileFields.includes(key))
+  ) as Record<string, any>
+
+  if (filteredProfile.admission_year) filteredProfile.admission_year = String(normalizeValue(filteredProfile.admission_year))
+  if (filteredProfile.current_semester) filteredProfile.current_semester = Number(normalizeValue(filteredProfile.current_semester))
+  if (filteredProfile.target_attendance) filteredProfile.target_attendance = Number(normalizeValue(filteredProfile.target_attendance))
+  if (filteredProfile.attendance_threshold) filteredProfile.attendance_threshold = Number(normalizeValue(filteredProfile.attendance_threshold))
+  if (filteredProfile.warning_threshold) filteredProfile.warning_threshold = Number(normalizeValue(filteredProfile.warning_threshold))
+
+  return filteredProfile
+}
+
+async function restoreUserData(userId: string, rawData: UserData) {
+  const idMap = new Map<string, string>()
+
+  if (rawData.subjects?.length) {
+    const subjectsData = (rawData.subjects as any[]).map((s) => {
+      const oldId = normalizeValue(s.id ?? s._id)
+      const newId = randomUUID()
+      if (oldId) idMap.set(String(oldId), newId)
+      return {
+        id: newId,
+        user_id: userId,
+        name: String(s.name ?? ''),
+        code: String(s.code ?? ''),
+        professor: String(s.professor ?? ''),
+        classroom: String(s.classroom ?? ''),
+        semester: Number(normalizeValue(s.semester) ?? 1),
+        type: String(s.type ?? 'theory').toLowerCase(),
+        credits: s.credits != null ? Number(normalizeValue(s.credits)) : null,
+        attended: Number(normalizeValue(s.attended) ?? 0),
+        total: Number(normalizeValue(s.total) ?? 0),
+        target: Number(normalizeValue(s.target) ?? 75),
+        categories: Array.isArray(s.categories) ? s.categories : ['Theory'],
+        practicals: s.practicals ?? null,
+        assignments: s.assignments ?? null,
+        syllabus: s.syllabus ?? null,
+      }
+    })
+    await createInBatches(subjectsData, (row) => prisma.subject.create({ data: row as any }))
+  }
+
+  if (rawData.attendance_logs?.length) {
+    const logsData = (rawData.attendance_logs as any[]).map((l) => {
+      const oldSubIdVal = normalizeValue(l.subject_id)
+      if (!oldSubIdVal) return null
+      const newSubId = idMap.get(String(oldSubIdVal))
+      if (!newSubId) return null
+      const timestamp = normalizeValue(l.timestamp)
+      return {
+        id: randomUUID(),
+        user_id: userId,
+        subject_id: newSubId,
+        subject_name: String(l.subject_name ?? ''),
+        date: String(normalizeValue(l.date) ?? ''),
+        status: normalizeAttendanceStatus(normalizeValue(l.status)),
+        type: String(l.type ?? 'Lecture'),
+        notes: l.notes ?? null,
+        semester: l.semester != null ? Number(normalizeValue(l.semester)) : null,
+        substituted_by: l.substituted_by ? (idMap.get(String(normalizeValue(l.substituted_by))) || null) : null,
+        timestamp: timestamp ? new Date(timestamp) : new Date(),
+      }
+    }).filter(Boolean) as any[]
+    await createInBatches(logsData, (row) => prisma.attendanceLog.create({ data: row as any }))
+  }
+
+  const ttable = rawData.timetable || rawData.timetables
+  if (ttable?.length) {
+    const timetableData = (ttable as any[]).map((t) => {
+      const schedule = JSON.parse(JSON.stringify(t.schedule ?? {}))
+      for (const day of Object.keys(schedule)) {
+        if (!Array.isArray(schedule[day])) continue
+        for (const slot of schedule[day]) {
+          const slotType = String(slot.type ?? '').trim().toLowerCase()
+          const hasSubjectRef = String(normalizeValue(slot.subject_id ?? slot.subjectId) ?? '').trim().length > 0
+          const hasLabel = String(slot.label ?? slot.name ?? '').trim().length > 0
+          slot.id = String(normalizeValue(slot.id ?? slot._id) ?? randomUUID())
+          delete slot._id
+          if (slot.startTime && !slot.start_time) slot.start_time = slot.startTime
+          if (slot.endTime && !slot.end_time) slot.end_time = slot.endTime
+          delete slot.startTime
+          delete slot.endTime
+          if (!slot.type) slot.type = hasSubjectRef ? 'class' : (hasLabel ? 'custom' : 'class')
+          else slot.type = slotType || 'class'
+          const sRef = String(normalizeValue(slot.subject_id ?? slot.subjectId) ?? '')
+          if (sRef && idMap.has(sRef)) slot.subject_id = idMap.get(sRef)
+          else if (sRef) slot.subject_id = sRef
+          delete slot.subjectId
+          if (slot.type !== 'class') slot.subject_id = ''
+        }
+      }
+      return {
+        id: randomUUID(),
+        user_id: userId,
+        semester: Number(normalizeValue(t.semester) ?? 1),
+        schedule,
+        periods: t.periods ?? null,
+      }
+    })
+    await createInBatches(timetableData as any[], (row) => prisma.timetable.create({ data: row as any }))
+  }
+
+  if (rawData.semester_results?.length) {
+    const resultsData = (rawData.semester_results as any[]).map((r) => ({
+      id: randomUUID(),
+      user_id: userId,
+      semester: Number(r.semester ?? 1),
+      subjects: r.subjects ?? [],
+      sgpa: Number(r.sgpa ?? 0),
+      total_credits: Number(r.total_credits ?? 0),
+      student_info: r.student_info ?? null,
+      source: String(r.source ?? 'manual').toLowerCase().includes('ipu') ? 'ipu_scraper' : 'manual',
+      enrollment_number: r.enrollment_number ?? null,
+      semester_label: r.semester_label ?? null,
+      total_marks: r.total_marks ?? null,
+      max_marks: r.max_marks ?? null,
+    }))
+    await createInBatches(resultsData as any[], (row) => prisma.semesterResult.create({ data: row as any }))
+  }
+
+  if (rawData.manual_courses?.length) {
+    const coursesData = (rawData.manual_courses as any[]).map((c) => {
+      const extra = c.extra ?? {}
+      if (c.instructor && !extra.instructor) extra.instructor = c.instructor
+      if (c.enrolledDate && !extra.enrolledDate) extra.enrolledDate = c.enrolledDate
+      if (c.targetCompletionDate && !extra.targetCompletionDate) extra.targetCompletionDate = c.targetCompletionDate
+      return {
+        id: randomUUID(),
+        user_id: userId,
+        name: String(c.name ?? c.title ?? ''),
+        platform: String(c.platform ?? c.provider ?? ''),
+        status: String(c.status ?? 'not_started'),
+        progress: Number(c.progress ?? c.percentage ?? 0),
+        url: c.url ? String(c.url) : null,
+        notes: c.notes ? String(c.notes) : null,
+        extra: Object.keys(extra).length ? extra : null,
+      }
+    })
+    await createInBatches(coursesData as any[], (row) => prisma.manualCourse.create({ data: row as any }))
+  }
+
+  const prefData = rawData.user_preferences || rawData.user_preference
+  if (Array.isArray(prefData) ? prefData.length : !!prefData) {
+    const pref = Array.isArray(prefData) ? (prefData as any[])[0] : prefData
+    await prisma.userPreference.upsert({
+      where: { user_id: userId },
+      create: { user_id: userId, preferences: pref.preferences ?? {} },
+      update: { preferences: pref.preferences ?? {} },
+    })
+  }
+
+  if (rawData.skills?.length) {
+    const skillsData = (rawData.skills as any[]).map((s) => ({
+      id: randomUUID(),
+      user_id: userId,
+      name: String(s.name ?? ''),
+      category: s.category ?? null,
+      level: s.level ?? null,
+      progress: Number(s.progress ?? 0),
+      notes: s.notes ?? '',
+    }))
+    await createInBatches(skillsData as any[], (row) => prisma.skill.create({ data: row as any }))
+  }
+
+  if (rawData.system_logs?.length) {
+    const systemLogsData = (rawData.system_logs as any[]).map((entry) => ({
+      user_id: userId,
+      action: String(entry.action ?? 'Imported Log'),
+      description: String(entry.description ?? ''),
+      ip: entry.ip ? String(entry.ip) : null,
+      user_agent: entry.user_agent ? String(entry.user_agent) : null,
+      timestamp: entry.timestamp ? new Date(normalizeValue(entry.timestamp)) : new Date(),
+    }))
+    await createInBatches(systemLogsData as any[], (row) => prisma.systemLog.create({ data: row as any }))
+  }
+
+  if (rawData.user_profile) {
+    const filteredProfile = getSafeProfileUpdate(rawData.user_profile)
+    if (Object.keys(filteredProfile).length) {
+      await prisma.user.update({ where: { id: userId }, data: filteredProfile as any })
+    }
+  }
+}
+
 
 // ─── Export ──────────────────────────────────────────────────────────────────
 
@@ -96,15 +320,11 @@ router.get('/export_data', async (req: AuthRequest, res) => {
 router.post('/import_data', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const body = req.body as { data?: UserData }
-    if (!body?.data) { fail(res, 'Invalid import file format', 'INVALID_FORMAT'); return }
-
-    const importData = req.body as UserData
-    const idMap = new Map<string, string>()
+    const body = req.body as { data?: UserData; metadata?: Record<string, unknown> } | UserData
+    const importData = ((body as { data?: UserData })?.data ?? body) as UserData
     console.log('[data/import] Received keys:', Object.keys(importData))
     if (!importData || typeof importData !== 'object') { fail(res, 'Invalid import file format', 'INVALID_FORMAT'); return }
 
-    // 1. Create auto-backup first
     const [user, backupData] = await Promise.all([
       prisma.user.findUnique({ where: { id: userId } }),
       collectUserData(userId),
@@ -115,270 +335,21 @@ router.post('/import_data', async (req: AuthRequest, res) => {
     await prisma.userBackup.create({
       data: { user_id: userId, backup_type: 'pre_import_auto', data: backupData as any, expires_at: expires },
     })
-
-    function normalizeValue(val: any): any {
-      if (val && typeof val === 'object') {
-        if ('$oid' in val) return String(val.$oid)
-        if ('$date' in val) return val.$date
-        if ('$numberInt' in val) return Number(val.$numberInt)
-        if ('$numberLong' in val) return Number(val.$numberLong)
-        if ('$numberDouble' in val) return Number(val.$numberDouble)
-        if ('$numberDecimal' in val) return Number(val.$numberDecimal)
-      }
-      return val
-    }
-
-    function mapAttendanceStatus(status: string): any {
-      const s = String(status || 'present').toLowerCase().trim()
-      if (s.includes('present')) return 'present'
-      if (s.includes('absent')) return 'absent'
-      if (s.includes('late')) return 'late'
-      if (s.includes('medical')) return 'medical'
-      if (s.includes('duty')) return 'duty'
-      if (s.includes('substituted')) return 'substituted'
-      if (s.includes('cancelled')) return 'cancelled'
-      return 'present'
-    }
-
-    // 2. Clear existing data and 3-9. Insert new data sequentially
     try {
-      // Clear existing records
-      console.log(`[data/import] Clearing data for user: ${userId}`);
-      const subs = await prisma.subject.findMany({ where: { user_id: userId }, select: { id: true } })
-      await prisma.subject.deleteMany({ where: { id: { in: subs.map((s: any) => s.id) } } })
-      await prisma.attendanceLog.deleteMany({ where: { user_id: userId } })
-      await prisma.timetable.deleteMany({ where: { user_id: userId } })
-      await prisma.semesterResult.deleteMany({ where: { user_id: userId } })
-      await prisma.manualCourse.deleteMany({ where: { user_id: userId } })
-      await prisma.userPreference.deleteMany({ where: { user_id: userId } })
-      await prisma.skill.deleteMany({ where: { user_id: userId } })
-      await prisma.systemLog.deleteMany({ where: { user_id: userId } })
-
-      // Insert subjects
-      if (importData.subjects?.length) {
-        const subjectsData = (importData.subjects as any[]).map(s => {
-          const oldId = normalizeValue(s.id ?? s._id)
-          const newId = randomUUID()
-          if (oldId) {
-            idMap.set(String(oldId), newId)
-          } else {
-            console.warn('[data/import] Subject has no ID:', s.name);
-          }
-
-          return {
-            id: newId,
-            user_id: userId,
-            name: String(s.name ?? ''),
-            code: String(s.code ?? ''),
-            professor: String(s.professor ?? ''),
-            classroom: String(s.classroom ?? ''),
-            semester: Number(normalizeValue(s.semester) ?? 1),
-            type: String(s.type ?? 'theory').toLowerCase(),
-            credits: s.credits != null ? Number(normalizeValue(s.credits)) : null,
-            attended: Number(normalizeValue(s.attended) ?? 0),
-            total: Number(normalizeValue(s.total) ?? 0),
-            target: Number(normalizeValue(s.target) ?? 75),
-            categories: Array.isArray(s.categories) ? s.categories : ['Theory'],
-            practicals: s.practicals ?? null,
-            assignments: s.assignments ?? null,
-            syllabus: s.syllabus ?? null,
-          }
-        })
-        try {
-          await prisma.subject.createMany({ data: subjectsData, skipDuplicates: true })
-          console.log(`[data/import] Subjects created: ${subjectsData.length}`);
-        } catch (e: any) {
-          console.error('[data/import] Subjects creation failed:', e.message);
-          throw new Error(`FAILED_SUBJECTS: ${e.message}`);
-        }
-      }
-
-      // Insert attendance logs
-      if (importData.attendance_logs?.length) {
-        console.log(`[data/import] Processing attendance logs: ${importData.attendance_logs.length}`);
-        const logsData = (importData.attendance_logs as any[]).map(l => {
-          const oldSubIdVal = normalizeValue(l.subject_id)
-          if (!oldSubIdVal) return null;
-          const oldSubId = String(oldSubIdVal)
-          const newSubId = idMap.get(oldSubId)
-          
-          // Skip logs that refer to subjects not present in the mapping
-          if (!newSubId) {
-            // console.warn(`[data/import] Skipping log for unknown subject ID: ${oldSubId}`);
-            return null;
-          }
-
-          const timestamp = normalizeValue(l.timestamp)
-          return {
-            id: randomUUID(),
-            user_id: userId,
-            subject_id: newSubId,
-            subject_name: String(l.subject_name ?? ''),
-            date: String(normalizeValue(l.date) ?? ''),
-            status: mapAttendanceStatus(String(normalizeValue(l.status) ?? 'present')),
-            type: String(l.type ?? 'Lecture'),
-            notes: l.notes ?? null,
-            semester: l.semester != null ? Number(normalizeValue(l.semester)) : null,
-            substituted_by: l.substituted_by ? (idMap.get(String(normalizeValue(l.substituted_by))) || null) : null,
-            timestamp: timestamp ? new Date(timestamp) : new Date(),
-          }
-        }).filter(Boolean) as any[]
-        
-        try {
-          await prisma.attendanceLog.createMany({ data: logsData, skipDuplicates: true })
-          console.log(`[data/import] Attendance logs created: ${logsData.length}`);
-        } catch (e: any) {
-          console.error('[data/import] Attendance logs creation failed:', e.message);
-          throw new Error('FAILED_LOGS');
-        }
-      }
-
-      // Insert timetable
-      const ttable = importData.timetable || importData.timetables
-      if (ttable?.length) {
-        const timetableData = (ttable as any[]).map(t => {
-          const schedule = JSON.parse(JSON.stringify(t.schedule ?? {}))
-          for (const day of Object.keys(schedule)) {
-            if (Array.isArray(schedule[day])) {
-              for (const slot of schedule[day]) {
-                const sRef = String(normalizeValue(slot.subject_id ?? slot.subjectId) ?? '')
-                if (sRef && idMap.has(sRef)) {
-                  slot.subject_id = idMap.get(sRef)
-                  delete slot.subjectId
-                }
-              }
-            }
-          }
-          return {
-            id: randomUUID(),
-            user_id: userId,
-            semester: Number(normalizeValue(t.semester) ?? 1),
-            schedule,
-            periods: t.periods ?? null,
-          }
-        })
-        try {
-          await prisma.timetable.createMany({ data: timetableData as any, skipDuplicates: true })
-          console.log(`[data/import] Timetable created: ${timetableData.length}`);
-        } catch (e: any) {
-          console.error('[data/import] Timetable creation failed:', e.message);
-          // throw new Error('FAILED_TIMETABLE'); // Non-critical
-        }
-      }
-
-      // Semester results
-      if (importData.semester_results?.length) {
-        const resultsData = (importData.semester_results as any[]).map(r => ({
-          id: randomUUID(),
-          user_id: userId,
-          semester: Number(r.semester ?? 1),
-          subjects: r.subjects ?? [],
-          sgpa: Number(r.sgpa ?? 0),
-          total_credits: Number(r.total_credits ?? 0),
-          student_info: r.student_info ?? null,
-          source: String(r.source ?? 'manual').toLowerCase().includes('ipu') ? 'ipu_scraper' : 'manual',
-          enrollment_number: r.enrollment_number ?? null,
-          semester_label: r.semester_label ?? null,
-        }))
-        try {
-          await prisma.semesterResult.createMany({ data: resultsData as any, skipDuplicates: true })
-          console.log(`[data/import] Semester results created: ${resultsData.length}`);
-        } catch (e: any) {
-          console.error('[data/import] Semester results creation failed:', e.message);
-        }
-      }
-
-      // Manual courses
-      if (importData.manual_courses?.length) {
-        const coursesData = (importData.manual_courses as any[]).map(c => {
-          const extra = c.extra ?? {}
-          if (c.instructor && !extra.instructor) extra.instructor = c.instructor
-          if (c.enrolledDate && !extra.enrolledDate) extra.enrolledDate = c.enrolledDate
-          if (c.targetCompletionDate && !extra.targetCompletionDate) extra.targetCompletionDate = c.targetCompletionDate
-          
-          return {
-            id: randomUUID(),
-            user_id: userId,
-            name: String(c.name ?? c.title ?? ''),
-            platform: String(c.platform ?? c.provider ?? ''),
-            status: String(c.status ?? 'not_started'),
-            progress: Number(c.progress ?? c.percentage ?? 0),
-            url: c.url ? String(c.url) : null,
-            notes: c.notes ? String(c.notes) : null,
-            extra: Object.keys(extra).length ? extra : null,
-          }
-        })
-        try {
-          await prisma.manualCourse.createMany({ data: coursesData as any, skipDuplicates: true })
-          console.log(`[data/import] Manual courses created: ${coursesData.length}`);
-        } catch (e: any) {
-          console.error('[data/import] Manual courses creation failed:', e.message);
-        }
-      }
-
-      // User preferences
-      const prefData = importData.user_preferences || importData.user_preference
-      if (prefData?.length) {
-        const pref = (prefData as any[])[0]
-        await prisma.userPreference.upsert({
-          where: { user_id: userId },
-          create: { user_id: userId, preferences: pref.preferences ?? {} },
-          update: { preferences: pref.preferences ?? {} },
-        })
-      }
-
-      // Skills
-      if (importData.skills?.length) {
-        const skillsData = (importData.skills as any[]).map(s => ({
-          id: randomUUID(),
-          user_id: userId,
-          name: String(s.name ?? ''),
-          category: s.category ?? null,
-          level: s.level ?? null,
-          progress: Number(s.progress ?? 0),
-          notes: s.notes ?? '',
-        }))
-        try {
-          await prisma.skill.createMany({ data: skillsData as any, skipDuplicates: true })
-          console.log(`[data/import] Skills created: ${skillsData.length}`);
-        } catch (e: any) {
-          console.error('[data/import] Skills creation failed:', e.message);
-        }
-      }
-
-      // Restore profile
-      const profile = importData.user_profile
-      if (profile) {
-        console.log('[data/import] Restoring user profile');
-        const allowedProfileFields = [
-          'name', 'course', 'branch', 'college', 'batch', 'current_semester',
-          'enrollment_number', 'target_attendance', 'attendance_threshold', 'warning_threshold',
-          'phone_number', 'headline', 'linkedin_url', 'github_url', 'portfolio_url', 'admission_year'
-        ]
-
-        // Only include fields that exist in the backup and are in the safe list
-        const filteredProfile = Object.fromEntries(
-          Object.entries(profile).filter(([key]) => allowedProfileFields.includes(key))
-        );
-
-        // Explicitly handle admission_year as string and numeric fields
-        if (filteredProfile.admission_year) filteredProfile.admission_year = String(normalizeValue(filteredProfile.admission_year))
-        if (filteredProfile.current_semester) filteredProfile.current_semester = Number(normalizeValue(filteredProfile.current_semester))
-        if (filteredProfile.target_attendance) filteredProfile.target_attendance = Number(normalizeValue(filteredProfile.target_attendance))
-        if (filteredProfile.attendance_threshold) filteredProfile.attendance_threshold = Number(normalizeValue(filteredProfile.attendance_threshold))
-        if (filteredProfile.warning_threshold) filteredProfile.warning_threshold = Number(normalizeValue(filteredProfile.warning_threshold))
-
-        try {
-          await prisma.user.update({ where: { id: userId }, data: filteredProfile as any })
-          console.log('[data/import] User profile updated');
-        } catch (e: any) {
-          console.error('[data/import] Profile update failed:', e.message);
-        }
-      }
+      console.log(`[data/import] Clearing data for user: ${userId}`)
+      await clearUserData(userId)
+      await restoreUserData(userId, importData)
       ok(res, { message: 'Data imported successfully' })
     } catch (txErr: any) {
       console.error('[data/import] Transaction failed at:', txErr.table || 'unknown', txErr)
-      fail(res, `Import failed during transaction: ${txErr.message}`, 'IMPORT_FAILED', 500)
+      try {
+        console.warn(`[data/import] Rolling back import for user: ${userId}`)
+        await clearUserData(userId)
+        await restoreUserData(userId, backupData)
+      } catch (rollbackErr) {
+        console.error('[data/import] Rollback failed:', rollbackErr)
+      }
+      fail(res, `Import failed and previous data was restored: ${txErr.message}`, 'IMPORT_FAILED', 500)
       return
     }
 
@@ -529,81 +500,8 @@ router.post('/restore_backup/:backupId', async (req: AuthRequest, res) => {
     }
 
     const data = backup.data as UserData
-
-    // Clear current data and restore all sequentially
-    try {
-      // Clear current records
-      await prisma.subject.deleteMany({ where: { user_id: userId } })
-      await prisma.attendanceLog.deleteMany({ where: { user_id: userId } })
-      await prisma.timetable.deleteMany({ where: { user_id: userId } })
-      await prisma.semesterResult.deleteMany({ where: { user_id: userId } })
-      await prisma.manualCourse.deleteMany({ where: { user_id: userId } })
-      await prisma.userPreference.deleteMany({ where: { user_id: userId } })
-      await prisma.skill.deleteMany({ where: { user_id: userId } })
-      await prisma.systemLog.deleteMany({ where: { user_id: userId } })
-
-      // Restore subjects with ID mapping
-      const idMap = new Map<string, string>()
-      if (data.subjects?.length) {
-        const subjectsData = (data.subjects as any[]).map(s => {
-          const oldId = String(s._id ?? s.id ?? '')
-          const newId = randomUUID()
-          if (oldId) idMap.set(oldId, newId)
-          return { id: newId, user_id: userId, name: String(s.name ?? ''), code: String(s.code ?? ''), professor: String(s.professor ?? ''), classroom: String(s.classroom ?? ''), semester: Number(s.semester ?? 1), type: String(s.type ?? 'theory'), credits: s.credits != null ? Number(s.credits) : null, attended: Number(s.attended ?? 0), total: Number(s.total ?? 0), target: Number(s.target ?? 75), categories: Array.isArray(s.categories) ? s.categories : ['Theory'], practicals: s.practicals ?? null, assignments: s.assignments ?? null, syllabus: s.syllabus ?? null }
-        })
-        await prisma.subject.createMany({ data: subjectsData })
-      }
-
-      if (data.attendance_logs?.length) {
-        await prisma.attendanceLog.createMany({
-          data: (data.attendance_logs as any[]).map(l => ({ id: randomUUID(), user_id: userId, subject_id: idMap.get(String(l.subject_id ?? '')) ?? String(l.subject_id ?? ''), subject_name: String(l.subject_name ?? ''), date: String(l.date ?? ''), status: l.status ?? 'present', type: String(l.type ?? 'Lecture'), notes: l.notes ?? null, semester: l.semester != null ? Number(l.semester) : null, substituted_by: l.substituted_by ? (idMap.get(String(l.substituted_by)) ?? String(l.substituted_by)) : null, timestamp: l.timestamp ? new Date(l.timestamp) : new Date() })) as any,
-        })
-      }
-
-      if (data.timetable?.length) {
-        await prisma.timetable.createMany({
-          data: (data.timetable as any[]).map(t => { const schedule = JSON.parse(JSON.stringify(t.schedule ?? {})); for (const day of Object.keys(schedule)) { if (Array.isArray(schedule[day])) for (const slot of schedule[day]) { const sRef = String(slot.subject_id ?? ''); if (sRef && idMap.has(sRef)) slot.subject_id = idMap.get(sRef) } } return { id: randomUUID(), user_id: userId, semester: Number(t.semester ?? 1), schedule, periods: t.periods ?? null } }) as any,
-        })
-      }
-
-      if (data.semester_results?.length) {
-        await prisma.semesterResult.createMany({ data: (data.semester_results as any[]).map(r => ({ id: randomUUID(), user_id: userId, semester: Number(r.semester ?? 1), subjects: r.subjects ?? [], sgpa: Number(r.sgpa ?? 0), total_credits: Number(r.total_credits ?? 0), student_info: r.student_info ?? null, source: r.source ?? 'manual' })) })
-      }
-
-      if (data.manual_courses?.length) {
-        await prisma.manualCourse.createMany({
-          data: (data.manual_courses as any[]).map(c => {
-            const extra = c.extra ?? {}
-            if (c.instructor && !extra.instructor) extra.instructor = c.instructor
-            if (c.enrolledDate && !extra.enrolledDate) extra.enrolledDate = c.enrolledDate
-            if (c.targetCompletionDate && !extra.targetCompletionDate) extra.targetCompletionDate = c.targetCompletionDate
-            
-            return {
-              id: randomUUID(),
-              user_id: userId,
-              name: String(c.name ?? c.title ?? ''),
-              platform: String(c.platform ?? c.provider ?? ''),
-              status: String(c.status ?? 'not_started'),
-              progress: Number(c.progress ?? c.percentage ?? 0),
-              url: c.url ? String(c.url) : null,
-              notes: c.notes ? String(c.notes) : null,
-              extra: Object.keys(extra).length ? extra : null
-            }
-          })
-        })
-      }
-
-      if (data.user_preferences?.length) {
-        const pref = (data.user_preferences as any[])[0]
-        await prisma.userPreference.upsert({ where: { user_id: userId }, create: { user_id: userId, preferences: pref.preferences ?? {} }, update: { preferences: pref.preferences ?? {} } })
-      }
-
-      if (data.skills?.length) {
-        await prisma.skill.createMany({ data: (data.skills as any[]).map(s => ({ id: randomUUID(), user_id: userId, name: String(s.name ?? ''), category: s.category ?? null, level: s.level ?? null, progress: Number(s.progress ?? 0), notes: s.notes ?? '' })) })
-      }
-    } catch (txErr) {
-        throw txErr;
-    }
+    await clearUserData(userId)
+    await restoreUserData(userId, data)
 
     ok(res, { message: 'Backup restored successfully' })
   } catch (err) {

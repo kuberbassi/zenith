@@ -5,16 +5,32 @@ import Header from './Header';
 import AmbientBackground from '../ui/AmbientBackground';
 import AIChat from './AIChat';
 import { attendanceService } from '@/services/attendance.service';
+import { useSemester } from '@/contexts/SemesterContext';
+
+const CACHE_KEY_PREFIX = 'acadhub_cache:notifications:';
 
 const AppLayout: React.FC = () => {
     const [notificationCount, setNotificationCount] = useState(0);
     const location = useLocation();
+    const { currentSemester } = useSemester();
+
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(`${CACHE_KEY_PREFIX}${currentSemester || 'all'}`);
+            if (!raw) return;
+            const parsed = JSON.parse(raw) as { data?: Array<{ read?: boolean }> };
+            const cached = parsed?.data || [];
+            setNotificationCount(cached.filter((n) => !n.read).length);
+        } catch {
+            // ignore cache parse failures
+        }
+    }, [currentSemester]);
 
     // Fetch unread notification count
     useEffect(() => {
         const fetchNotifications = async () => {
             try {
-                const notifications = await attendanceService.getNotifications();
+                const notifications = await attendanceService.getNotifications(currentSemester);
                 const unread = notifications.filter((n: any) => !n.read).length;
                 setNotificationCount(unread);
             } catch (error) {
@@ -22,7 +38,7 @@ const AppLayout: React.FC = () => {
             }
         };
         fetchNotifications();
-    }, [location.pathname]); // Refresh on route change
+    }, [location.pathname, currentSemester]);
 
     return (
         <div className="min-h-screen bg-background font-sans text-on-background flex flex-col relative overflow-x-hidden">

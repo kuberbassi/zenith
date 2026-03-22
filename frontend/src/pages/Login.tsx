@@ -67,8 +67,8 @@ const Login: React.FC = () => {
                     {/* Icon */}
                     <div className="mb-8 flex justify-center relative">
                         <div className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-full" />
-                        <div className="w-24 h-24 rounded-[2rem] bg-[#050508] border border-white/10 flex items-center justify-center shadow-2xl relative z-10">
-                            <img src="/icon-trans.png" alt="AcadHub" className="w-16 h-16 object-contain" />
+                        <div className="w-20 h-20 rounded-3xl bg-[#050508] border border-white/10 flex items-center justify-center shadow-2xl relative z-10 overflow-hidden">
+                            <img src="/icon-trans.png" alt="AcadHub" className="w-[70%] h-[70%] object-contain transition-transform duration-700 hover:scale-110" />
                         </div>
                     </div>
 
@@ -99,7 +99,7 @@ const Login: React.FC = () => {
                                 }}
                                 theme="filled_black"
                                 size="large"
-                                width={320}
+                                width={280}
                                 text="continue_with"
                                 shape="pill"
                             />

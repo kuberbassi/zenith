@@ -3,8 +3,8 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/png" href="/icon-trans.png?v=5" />
-  <link rel="apple-touch-icon" href="/icon-trans.png?v=5" />
+  <link rel="icon" type="image/png" href="/favicon-cropped.png?v=7" />
+  <link rel="apple-touch-icon" href="/favicon-cropped.png?v=7" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- <link rel="manifest" href="/manifest.json" /> Handled by VitePWA -->
@@ -16,7 +16,7 @@
   <meta name="keywords" content="AcadHub, IPU student dashboard, attendance tracker, timetable manager, CGPA calculator, skill tracker, IPU results, academic dashboard, student productivity" />
   <meta name="author" content="AcadHub" />
   <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="https://acadhub.kuberbassi.com/login" />
+  <link rel="canonical" href="https://acadhub.kuberbassi.com/" />
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
@@ -24,9 +24,9 @@
   <meta property="og:site_name" content="AcadHub" />
   <meta property="og:title" content="AcadHub | Student Center" />
   <meta property="og:description" content="AcadHub is your all-in-one student dashboard for IPU. Track attendance, sync results, manage timetables, develop skills, and stay on top of academics — all in one place." />
-  <meta property="og:image" content="https://acadhub.kuberbassi.com/icon-trans.png" />
-  <meta property="og:image:width" content="512" />
-  <meta property="og:image:height" content="512" />
+  <meta property="og:image" content="https://acadhub.kuberbassi.com/og-image.svg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
   <meta property="og:locale" content="en_IN" />
 
   <!-- Twitter / X Card -->
@@ -34,18 +34,41 @@
   <meta name="twitter:site" content="@acadhub" />
   <meta name="twitter:title" content="AcadHub | Student Center" />
   <meta name="twitter:description" content="AcadHub is your all-in-one student dashboard for IPU. Track attendance, sync results, manage timetables, develop skills, and stay on top of academics — all in one place." />
-  <meta name="twitter:image" content="https://acadhub.kuberbassi.com/icon-trans.png" />
+  <meta name="twitter:image" content="https://acadhub.kuberbassi.com/og-image.svg" />
 
   <!-- Theme -->
   <meta name="theme-color" content="#050508" />
 
   <!-- Google Site Verification -->
   <meta name="google-site-verification" content="1CiGyHveijg9MlO_IiLh243aXj-44cL8UIIYt9j-GYU" />
+
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "AcadHub",
+      "url": "https://acadhub.kuberbassi.com/",
+      "description": "All-in-one student dashboard for IPU with attendance tracking, results, timetables, and academic analytics.",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "INR"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Kuber Bassi"
+      }
+    }
+  </script>
 </head>
 
-<body oncontextmenu="return false;">
+<body>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
 </html>
+
+

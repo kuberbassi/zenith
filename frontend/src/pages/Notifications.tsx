@@ -11,6 +11,8 @@ interface Notice {
     date: string;
 }
 
+const NOTICE_CACHE_KEY = 'acadhub_cache:notices:all';
+
 const parseNoticeDate = (raw: string) => {
     if (!raw) return 0;
     const normalized = raw.trim();
@@ -34,8 +36,16 @@ const formatNoticeDate = (raw: string) => {
 };
 
 const Notifications: React.FC = () => {
-    const [notices, setNotices] = useState<Notice[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [notices, setNotices] = useState<Notice[]>(() => {
+        try {
+            const raw = localStorage.getItem(NOTICE_CACHE_KEY);
+            const parsed = raw ? JSON.parse(raw) as { data?: Notice[] } : null;
+            return parsed?.data || [];
+        } catch {
+            return [];
+        }
+    });
+    const [loading, setLoading] = useState(notices.length === 0);
     const [error, setError] = useState<boolean>(false);
 
     usePageMeta({

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, created, fail } from '../utils/response.js'
+import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -24,11 +25,16 @@ const SkillSchema = z.object({
 /* GET /api/skills */
 router.get('/', async (req: AuthRequest, res) => {
   try {
+    const userId = req.userId!
+    const cacheId = buildViewCacheId('skills', {})
+    const cached = await readViewCache<any>(userId, cacheId)
+    if (cached) { ok(res, cached, 200, 0); return }
     const skills = await prisma.skill.findMany({
-      where: { user_id: req.userId! },
+      where: { user_id: userId },
       orderBy: { created_at: 'desc' },
     })
-    ok(res, skills)
+    ok(res, skills, 200, 0)
+    void writeViewCache(userId, cacheId, skills, 5 * 60 * 1000).catch(() => {})
   } catch (err) {
     console.error('[skills GET]', err)
     fail(res, 'Failed to fetch skills', 'FETCH_FAILED', 500)
@@ -42,6 +48,7 @@ router.post('/', async (req: AuthRequest, res) => {
     const body = SkillSchema.parse(req.body)
     const skill = await prisma.skill.create({ data: { ...body, user_id: userId } })
     sysLog(req, userId, 'Skill Added', `Added skill: ${body.name}`).catch(() => {})
+    await clearUserViewCache(userId).catch(() => {})
     created(res, skill)
   } catch (err) {
     if (err instanceof z.ZodError) { fail(res, 'Validation failed', 'INVALID_PARAMS'); return }
@@ -61,6 +68,7 @@ router.put('/:id', async (req: AuthRequest, res) => {
 
     await prisma.skill.update({ where: { id: skillId }, data })
     sysLog(req, userId, 'Skill Updated', `Updated skill: ${data.name ?? skillId}`).catch(() => {})
+    await clearUserViewCache(userId).catch(() => {})
     ok(res, { message: 'Skill updated successfully' })
   } catch (err) {
     if (err instanceof z.ZodError) { fail(res, 'Validation failed', 'INVALID_PARAMS'); return }
@@ -78,6 +86,7 @@ router.delete('/:id', async (req: AuthRequest, res) => {
     if (!skill) { fail(res, 'Skill not found', 'NOT_FOUND', 404); return }
     await prisma.skill.delete({ where: { id: skillId } })
     sysLog(req, userId, 'Skill Deleted', `Deleted skill: ${skill.name}`).catch(() => {})
+    await clearUserViewCache(userId).catch(() => {})
     ok(res, { message: 'Skill deleted successfully' })
   } catch (err) {
     console.error('[skills DELETE]', err)

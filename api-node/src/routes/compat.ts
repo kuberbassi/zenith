@@ -2,9 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
-
-const ATTENDED_STATUSES = ['present', 'late', 'approved_medical', 'substituted']
-const COUNTED_STATUSES = ['present', 'absent', 'late', 'approved_medical', 'medical', 'duty', 'substituted']
+import { ATTENDED_ATTENDANCE_STATUSES, COUNTED_ATTENDANCE_STATUSES } from '../utils/attendanceStatus.js'
 
 const STATIC_REWRITES: Record<string, { path: string; method?: string }> = {
   '/api/current_user': { path: '/api/auth/me' },
@@ -109,10 +107,10 @@ compatHandlers.post('/mark_all_attendance', requireAuth, async (req: AuthRequest
 
       const [present, total] = await Promise.all([
         prisma.attendanceLog.count({
-          where: { subject_id: sid, user_id: userId, status: { in: ATTENDED_STATUSES as never[] } },
+          where: { subject_id: sid, user_id: userId, status: { in: [...ATTENDED_ATTENDANCE_STATUSES] as never[] } },
         }),
         prisma.attendanceLog.count({
-          where: { subject_id: sid, user_id: userId, status: { in: COUNTED_STATUSES as never[] } },
+          where: { subject_id: sid, user_id: userId, status: { in: [...COUNTED_ATTENDANCE_STATUSES] as never[] } },
         }),
       ])
 
@@ -156,11 +154,11 @@ compatHandlers.get('/all_semesters_overview', requireAuth, async (req: AuthReque
 })
 
 compatHandlers.get('/pending_leaves', requireAuth, (_req, res) => {
-  ok(res, [])
+  fail(res, 'Pending leaves endpoint is not implemented in the Node API.', 'NOT_IMPLEMENTED', 501)
 })
 
 compatHandlers.get('/unresolved_substitutions', requireAuth, (_req, res) => {
-  ok(res, [])
+  fail(res, 'Unresolved substitutions endpoint is not implemented in the Node API.', 'NOT_IMPLEMENTED', 501)
 })
 
 compatHandlers.post('/mark_substituted', requireAuth, (_req, res) => {

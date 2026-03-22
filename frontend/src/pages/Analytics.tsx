@@ -200,7 +200,7 @@ const Analytics: React.FC = () => {
                     { label: 'Consistency', val: `${kpis.consistency_score ?? overallAttendance}`, sub: currentLevel.label, icon: <TrendingUp size={18} />, color: '#10b981' },
                     { label: 'Subjects at Risk', val: `${kpis.at_risk_count ?? 0}`, sub: `of ${kpis.total_subjects ?? subjects.length} Tracks`, icon: <AlertTriangle size={18} />, color: '#ef4444' },
                     { label: 'Smart Bunks Left', val: `${kpis.safe_bunks_remaining ?? 0}`, sub: 'Safe margin before dropping below target', icon: <CalendarDays size={18} />, color: '#22c55e' },
-                    { label: 'Academic Sync', val: Number(kpis.cgpa || 0).toFixed(2), sub: kpis.focus_label || 'Maintain current trajectory', icon: <Award size={18} />, color: currentLevel.color },
+                    { label: 'Academic Standing', val: Number(kpis.academic_standing || kpis.cgpa || 0).toFixed(2), sub: 'Academic integrity and growth', icon: <Award size={18} />, color: currentLevel.color },
                 ].map((k, i) => (
                     <div key={i} className="rounded-[2rem] border border-white/[0.04] bg-[#0a0a0a] p-8 flex flex-col justify-between group hover:bg-white/[0.01] transition-all duration-500 hover:border-blue-500/20 shadow-xl overflow-hidden relative">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-transparent to-white/[0.02] opacity-0 group-hover:opacity-100 transition-opacity" />

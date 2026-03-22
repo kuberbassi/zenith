@@ -48,8 +48,8 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSucc
         setPeriods(currentPeriods.map(p => ({
             ...p,
             id: p.id || Math.random().toString(36).substr(2, 9),
-            startTime: to24Hour(p.startTime),
-            endTime: to24Hour(p.endTime)
+            startTime: to24Hour(p.startTime || p.start_time || ''),
+            endTime: to24Hour(p.endTime || p.end_time || '')
         })));
     }, [currentPeriods, isOpen]);
 

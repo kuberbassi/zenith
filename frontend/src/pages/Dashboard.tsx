@@ -24,6 +24,7 @@ import { LazyBarChartWrapper, LazyLineChartWrapper } from '@/components/ui/LazyC
 import Skeleton from '@/components/ui/Skeleton';
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend, Filler);
 
+const ATTENDED_STATUSES = new Set(['present', 'late', 'approved_medical', 'medical', 'duty', 'substituted']);
 
 
 /* ── Animated Number ────────────────────────────────────────────── */
@@ -166,7 +167,7 @@ const Dashboard: React.FC = () => {
     const riskCount = subjects.filter(s => (s.attendance_percentage || 0) < targetThreshold).length || 0;
     const subjectCount = dashboardData?.total_subjects || subjects.length || 0;
     const totalAttended = subjects.reduce((sum, subject) => sum + (subject.attended || 0), 0);
-    const safeBunks = subjects.reduce((sum, subject) => sum + classesCanSkip(subject.attended || 0, subject.total || 0), 0);
+    const safeBunks = dashboardData?.summary?.safe_bunks_remaining ?? 0;
     const mostCriticalSubject = [...subjects]
         .filter(subject => (subject.total || 0) > 0)
         .sort((a, b) => (a.attendance_percentage || 0) - (b.attendance_percentage || 0))[0];
@@ -198,7 +199,7 @@ const Dashboard: React.FC = () => {
             if (!log?.date) return acc;
             if (!acc[log.date]) acc[log.date] = { attended: 0, total: 0 };
             acc[log.date].total += 1;
-            if (['present', 'late', 'approved_medical', 'substituted'].includes(log.status)) acc[log.date].attended += 1;
+            if (ATTENDED_STATUSES.has(log.status)) acc[log.date].attended += 1;
             return acc;
         }, {});
         const labels = Object.keys(grouped).sort().slice(-10);

@@ -15,9 +15,10 @@ interface AttendanceModalProps {
     // If provided, default to this date, otherwise today
     defaultDate?: Date;
     onSuccess?: () => void;
+    onLogsUpdate?: (dateStr: string, logs: any[]) => void;
 }
 
-const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defaultDate, onSuccess }) => {
+const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defaultDate, onSuccess, onLogsUpdate }) => {
     const { showToast } = useToast();
     const { currentSemester } = useSemester();
     const [selectedDate, setSelectedDate] = useState<Date>(defaultDate || new Date());
@@ -25,7 +26,14 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
     const [scheduledClasses, setScheduledClasses] = useState<any[]>([]);
     const [allSubjects, setAllSubjects] = useState<any[]>([]);
     const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
-    const [actionInProgress, setActionInProgress] = useState(false);
+    const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+
+    const debounceTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const debouncedOnSuccess = React.useCallback(() => {
+        if (!onSuccess) return;
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(() => onSuccess(), 500);
+    }, [onSuccess]);
 
     // Detailed marking state
     const [expandedSubjectId, setExpandedSubjectId] = useState<string | null>(null);
@@ -40,6 +48,14 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
             fetchAttendanceLogs(defaultDate || new Date());
         }
     }, [isOpen, defaultDate]);
+
+    // Instantly sync our local (optimistic & fetched) logs to the parent Calendar view
+    useEffect(() => {
+        if (onLogsUpdate && selectedDate) {
+            const dateStr = getDateStr(selectedDate);
+            onLogsUpdate(dateStr, attendanceLogs);
+        }
+    }, [attendanceLogs, selectedDate, onLogsUpdate]);
 
     const loadClassesForDate = async (date: Date, silent = false) => {
         if (!silent) setLoading(true);
@@ -94,6 +110,8 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
         }
     };
 
+
+
     const applyOptimisticMark = (subject: any, status: 'present' | 'absent', dateStr: string) => {
         const prevScheduled = [...scheduledClasses];
         const prevLogs = [...attendanceLogs];
@@ -113,7 +131,11 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
         }));
 
         setAttendanceLogs((prev) => {
-            const existingIndex = prev.findIndex((l: any) => String(l?._id || l?.id) === String(subject?.log_id));
+            // Check by both log_id and subject_id to prevent duplicates on the same date
+            const existingIndex = prev.findIndex((l: any) => 
+                (subject?.log_id && String(l?._id || l?.id) === String(subject?.log_id)) ||
+                (String(l?.subject_id) === subjectId && l?.date === dateStr)
+            );
             if (existingIndex >= 0) {
                 const next = [...prev];
                 next[existingIndex] = { ...next[existingIndex], status };
@@ -132,7 +154,10 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
         return { prevScheduled, prevLogs };
     };
 
-    const deleteLog = async (logId: string) => {
+    const deleteLog = async (logId: string, subjectId?: string) => {
+        if (subjectId && processingIds.has(subjectId)) return;
+        if (subjectId) setProcessingIds(prev => new Set(prev).add(subjectId));
+        
         try {
             await attendanceService.deleteAttendance(logId);
             showToast('success', 'Log deleted');
@@ -141,49 +166,63 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                 loadClassesForDate(selectedDate, true),
             ]);
             if (onSuccess) onSuccess();
-        } catch (error) {
-            showToast('error', 'Failed to delete log');
+        } catch (error: any) {
+            showToast('error', error.response?.data?.error || 'Failed to delete log');
+        } finally {
+            if (subjectId) {
+                setProcessingIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(subjectId);
+                    return next;
+                });
+            }
         }
     };
 
     const markSimple = async (subject: any, status: 'present' | 'absent') => {
-        if (actionInProgress) return;
-        setActionInProgress(true);
+        const subjectId = String(subject?._id || subject?.id || subject?.subject_id || '');
+        if (processingIds.has(subjectId)) return;
+        setProcessingIds(prev => new Set(prev).add(subjectId));
         const dateStr = getDateStr(selectedDate);
         const snapshot = applyOptimisticMark(subject, status, dateStr);
         try {
-            if (subject.log_id) {
-                await attendanceService.editAttendance(subject.log_id, status, undefined, dateStr);
+            let res;
+            if (subject.log_id && !subject.log_id.startsWith('optimistic-')) {
+                res = await attendanceService.editAttendance(subject.log_id, status, undefined, dateStr);
                 showToast('success', `Updated to ${status}`);
             } else {
-                await attendanceService.markAttendance(subject._id || subject.id, status, dateStr, undefined, undefined, currentSemester);
+                res = await attendanceService.markAttendance(subjectId, status, dateStr, undefined, undefined, currentSemester);
                 showToast('success', `Marked ${status}`);
             }
-
-            await Promise.all([
-                loadClassesForDate(selectedDate, true),
-                fetchAttendanceLogs(selectedDate),
-            ]);
-            if (onSuccess) onSuccess();
+            if (res?.log?._id) {
+                const realId = String(res.log._id);
+                setScheduledClasses(prev => prev.map(r => String(r._id) === subjectId ? { ...r, log_id: realId, marked: true, marked_status: status } : r));
+                setAttendanceLogs(prev => prev.map(l => (String(l.subject_id) === subjectId && l.date === dateStr) ? { ...l, _id: realId, status } : l));
+            }
+            debouncedOnSuccess();
         } catch (error: any) {
             setScheduledClasses(snapshot.prevScheduled);
             setAttendanceLogs(snapshot.prevLogs);
             showToast('error', error.response?.data?.error || 'Failed to mark');
         } finally {
-            setActionInProgress(false);
+            setProcessingIds(prev => {
+                const next = new Set(prev);
+                next.delete(subjectId);
+                return next;
+            });
         }
     };
 
     const handleDelete = async (subject: any) => {
-        if (actionInProgress) return;
+        const subjectId = String(subject?._id || subject?.id || subject?.subject_id || '');
+        if (processingIds.has(subjectId)) return;
         if (!subject.log_id) {
             showToast('error', 'No attendance record found to delete.');
             return;
         }
-        setActionInProgress(true);
+        setProcessingIds(prev => new Set(prev).add(subjectId));
         const prevScheduled = [...scheduledClasses];
         const prevLogs = [...attendanceLogs];
-        const subjectId = String(subject?._id || subject?.id || subject?.subject_id || '');
         const logId = String(subject?.log_id || '');
         setScheduledClasses((prev) => prev.map((row) => {
             const rowId = String(row?._id || row?.id || row?.subject_id || '');
@@ -192,72 +231,89 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
         }));
         setAttendanceLogs((prev) => prev.filter((log: any) => String(log?._id || log?.id) !== logId));
         try {
-            await attendanceService.deleteAttendance(subject.log_id);
+            if (!logId.startsWith('optimistic-')) {
+                await attendanceService.deleteAttendance(logId);
+            }
             showToast('success', 'Attendance cleared');
-            await Promise.all([
-                loadClassesForDate(selectedDate, true),
-                fetchAttendanceLogs(selectedDate),
-            ]);
-            if (onSuccess) onSuccess();
+            debouncedOnSuccess();
         } catch (error: any) {
             setScheduledClasses(prevScheduled);
             setAttendanceLogs(prevLogs);
             showToast('error', error.response?.data?.error || 'Failed to delete');
         } finally {
-            setActionInProgress(false);
+            setProcessingIds(prev => {
+                const next = new Set(prev);
+                next.delete(subjectId);
+                return next;
+            });
         }
     };
 
     const submitDetailedMark = async (subject: any) => {
+        const subjectId = String(subject?._id || subject?.id || subject?.subject_id || '');
+        if (processingIds.has(subjectId)) return;
+        
         try {
             const dateStr = getDateStr(selectedDate);
-            const subjectId = subject._id || subject.id;
-
             // If substituted, ensure we selected a substitute subject
             if (detailStatus === 'substituted' && !detailSubstitutedBy) {
                 showToast('error', 'Please select the substituting subject');
                 return;
             }
 
-            // Special handling for Substitution or if switching TO/FROM substitution:
-            // Since editAttendance doesn't support changing substitution details easily,
-            // we delete and re-mark if substitution is involved.
-            // Check if backend response has log_id
+            setProcessingIds(prev => new Set(prev).add(subjectId));
             const isSubstitution = detailStatus === 'substituted' || (subject.marked_status === 'substituted');
 
-            if (subject.log_id && !isSubstitution) {
-                // Regular Edit (Status/Notes)
-                await attendanceService.editAttendance(
-                    subject.log_id,
-                    detailStatus,
-                    detailNotes,
-                    dateStr
-                );
+            let res;
+            if (subject.log_id && !subject.log_id.startsWith('optimistic-') && !isSubstitution) {
+                res = await attendanceService.editAttendance(subject.log_id, detailStatus, detailNotes, dateStr);
                 showToast('success', 'Attendance updated');
             } else {
-                // New Mark OR Substitution (Delete + Mark)
-                if (subject.log_id && isSubstitution) {
+                if (subject.log_id && !subject.log_id.startsWith('optimistic-') && isSubstitution) {
                     await attendanceService.deleteAttendance(subject.log_id);
                 }
-
-                await attendanceService.markAttendance(
-                    subjectId,
-                    detailStatus,
-                    dateStr,
-                    detailNotes,
-                    detailStatus === 'substituted' ? detailSubstitutedBy : undefined,
-                    currentSemester
+                res = await attendanceService.markAttendance(
+                    subjectId, detailStatus, dateStr, detailNotes,
+                    detailStatus === 'substituted' ? detailSubstitutedBy : undefined, currentSemester
                 );
                 showToast('success', 'Attendance marked successfully');
             }
 
+            if (res?.log?._id) {
+                const realId = String(res.log._id);
+                setScheduledClasses(prev => prev.map(r => String(r._id) === subjectId ? { ...r, log_id: realId, marked: true, marked_status: detailStatus } : r));
+                setAttendanceLogs(prev => {
+                    const existingIndex = prev.findIndex((l: any) => 
+                        (subject.log_id && String(l?._id || l?.id) === String(subject.log_id)) ||
+                        (String(l.subject_id) === subjectId && l.date === dateStr)
+                    );
+                    if (existingIndex >= 0) {
+                        const next = [...prev];
+                        next[existingIndex] = { ...next[existingIndex], _id: realId, status: detailStatus };
+                        return next;
+                    }
+                    return [{
+                        _id: realId,
+                        subject_id: subjectId,
+                        subject_name: subject.name || subject.subject_name || 'Unknown Subject',
+                        date: dateStr,
+                        status: detailStatus,
+                        type: String(subject?.type || 'class'),
+                    }, ...prev];
+                });
+            }
+
             setExpandedSubjectId(null);
             resetDetailForm();
-            loadClassesForDate(selectedDate, true);
-            fetchAttendanceLogs(selectedDate); // Refresh logs section
-            if (onSuccess) onSuccess();
+            debouncedOnSuccess();
         } catch (error: any) {
             showToast('error', error.response?.data?.error || 'Failed to mark');
+        } finally {
+            setProcessingIds(prev => {
+                const next = new Set(prev);
+                next.delete(subjectId);
+                return next;
+            });
         }
     };
 
@@ -442,7 +498,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                                     onClick={() => {
                                                         const subName = log.subject_name || log.subject_info?.name || logSubject?.name || 'this subject';
                                                         if (confirm(`Delete this ${log.status} entry for ${subName}?`)) {
-                                                            deleteLog(logId);
+                                                            deleteLog(logId, logSubjectId);
                                                         }
                                                     }}
                                                     className="p-2 hover:bg-red-500/10 rounded-xl transition-colors"

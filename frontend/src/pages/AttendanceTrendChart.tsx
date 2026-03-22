@@ -1,5 +1,17 @@
 import React from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+    CategoryScale,
+    Chart as ChartJS,
+    Filler,
+    LineElement,
+    LinearScale,
+    PointElement,
+    Tooltip,
+    type ChartOptions,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
 
 interface Log { date: string; subject: string; status: string; }
 interface Props { logs: Log[]; }
@@ -20,49 +32,54 @@ const AttendanceTrendChart: React.FC<Props> = ({ logs }) => {
         return acc;
     }, {} as Record<string, { present: number; absent: number }>);
 
-    const data = Object.keys(aggregated).sort().slice(-10).map(date => {
+    const points = Object.keys(aggregated).sort().slice(-10).map(date => {
         const d = aggregated[date];
         const total = d.present + d.absent;
         return {
-            date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            label: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             engagement: total > 0 ? Math.round((d.present / total) * 100) : 0,
         };
     });
 
-    return (
-        <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                    <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                </defs>
-                <XAxis dataKey="date" hide />
-                <YAxis hide domain={[0, 100]} />
-                <Tooltip
-                    contentStyle={{
-                        backgroundColor: '#111',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '12px',
-                        fontSize: '13px',
-                        padding: '8px 14px',
-                    }}
-                    itemStyle={{ color: '#ededed', fontWeight: 600 }}
-                    labelStyle={{ color: 'rgba(255,255,255,0.3)' }}
-                />
-                <Area
-                    type="monotone"
-                    dataKey="engagement"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#trendGrad)"
-                    isAnimationActive
-                />
-            </AreaChart>
-        </ResponsiveContainer>
-    );
+    const data = {
+        labels: points.map((point) => point.label),
+        datasets: [
+            {
+                data: points.map((point) => point.engagement),
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59,130,246,0.2)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.35,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+            },
+        ],
+    };
+
+    const options: ChartOptions<'line'> = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: '#111',
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+                cornerRadius: 12,
+                displayColors: false,
+                callbacks: {
+                    label: (ctx) => `Engagement: ${Number(ctx.raw).toFixed(0)}%`,
+                },
+            },
+        },
+        scales: {
+            x: { display: false },
+            y: { display: false, min: 0, max: 100 },
+        },
+    };
+
+    return <Line data={data} options={options} />;
 };
 
 export default AttendanceTrendChart;

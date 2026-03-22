@@ -24,6 +24,7 @@ const Calendar: React.FC = () => {
     const [attendanceData, setAttendanceData] = useState<Record<string, AttendanceRecord[]>>({});
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isMarkModalOpen, setIsMarkModalOpen] = useState(false);
+    const fetchToken = React.useRef(0);
 
     usePageMeta({
         title: 'Calendar | AcadHub',
@@ -33,11 +34,14 @@ const Calendar: React.FC = () => {
     useEffect(() => { loadData(); }, [currentDate, currentSemester]);
 
     const loadData = async (showLoading = true) => {
+        const token = ++fetchToken.current;
         try {
             if (showLoading) setLoading(true);
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth() + 1;
             const calendarData = await attendanceService.getCalendarData(year, month, currentSemester);
+
+            if (token !== fetchToken.current) return;
 
             const dataMap: Record<string, AttendanceRecord[]> = {};
             if (Array.isArray(calendarData)) {
@@ -82,6 +86,10 @@ const Calendar: React.FC = () => {
         setSelectedDate(clickedDate);
         setIsMarkModalOpen(true);
     };
+
+    const handleLogsUpdate = React.useCallback((dateStr: string, logs: any[]) => {
+        setAttendanceData(prev => ({ ...prev, [dateStr]: logs }));
+    }, []);
 
     const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentDate);
     const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
@@ -191,7 +199,13 @@ const Calendar: React.FC = () => {
                 </div>
             </div>
 
-            <AttendanceModal isOpen={isMarkModalOpen} onClose={() => setIsMarkModalOpen(false)} defaultDate={selectedDate || new Date()} onSuccess={() => loadData(false)} />
+            <AttendanceModal 
+                isOpen={isMarkModalOpen} 
+                onClose={() => setIsMarkModalOpen(false)} 
+                defaultDate={selectedDate || new Date()} 
+                onSuccess={() => loadData(false)} 
+                onLogsUpdate={handleLogsUpdate}
+            />
         </motion.div >
     );
 };

@@ -10,7 +10,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon-trans.png', 'acadhub-brand-v3.png'],
+      includeAssets: ['icon-trans.png', 'acadhub-brand-v3.png', 'favicon-cropped.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'AcadHub v3.0.0',
         short_name: 'AcadHub',
@@ -19,25 +19,25 @@ export default defineConfig({
         background_color: '#000000',
         icons: [
           {
-            src: 'icon-trans.png',
+            src: 'pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'icon-trans.png',
+            src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'icon-trans.png',
+            src: 'pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'maskable'
           },
           {
-            src: 'icon-trans.png',
+            src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
@@ -89,7 +89,7 @@ export default defineConfig({
         ]
       },
       devOptions: {
-        enabled: false
+        enabled: true
       }
     })
   ],
