@@ -214,7 +214,7 @@ async function chatHandler(req: AuthRequest, res: any) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-specdec',
+                model: 'llama-3.3-70b-versatile',
                 messages,
                 temperature: 0.2,
                 max_tokens: 1024,
