@@ -26,7 +26,7 @@ router.get('/data', async (req: AuthRequest, res) => {
       }
     }
 
-    const [subjects, recentLogs] = await Promise.all([
+    const [subjects, recentLogs, resultRows] = await Promise.all([
       prisma.subject.findMany({
         where: { user_id: userId, semester },
         orderBy: { name: 'asc' },
@@ -35,6 +35,10 @@ router.get('/data', async (req: AuthRequest, res) => {
         where: { user_id: userId, semester },
         orderBy: [{ date: 'desc' }, { timestamp: 'desc' }],
         take: 30,
+      }),
+      prisma.semesterResult.findMany({
+        where: { user_id: userId },
+        select: { subjects: true },
       }),
     ])
     const summary = AttendanceCalculator.getAttendanceSummary(subjects, req.user?.attendance_threshold, req.user?.warning_threshold)
@@ -50,6 +54,8 @@ router.get('/data', async (req: AuthRequest, res) => {
       }
     })
 
+    const cgpaCalc = resultRows.length ? GradeCalculator.calculateCGPA(resultRows.map((row: any) => row.subjects as Array<Record<string, unknown>>)) : { cgpa: 0 }
+
     const payload = {
       overall_attendance: summary.overall_percentage,
       total_subjects: subjects.length,
@@ -57,7 +63,7 @@ router.get('/data', async (req: AuthRequest, res) => {
       recent_logs: recentLogs,
       summary: {
         ...summary,
-        academic_standing: GradeCalculator.calculateCGPA(subjects as any).cgpa || 0,
+        academic_standing: cgpaCalc.cgpa > 0 ? Number(cgpaCalc.cgpa.toFixed(2)) : 0,
       },
       last_updated: new Date().toISOString(),
     }
