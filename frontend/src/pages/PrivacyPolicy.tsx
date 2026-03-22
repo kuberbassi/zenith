@@ -82,8 +82,8 @@ const PrivacyPolicy: React.FC = () => {
                         className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 hover:border-white/[0.1] transition-all"
                     >
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                                <section.icon size={16} className="text-blue-400" />
+                            <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                                <section.icon size={16} className="text-white" />
                             </div>
                             <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white/80">{i + 1}. {section.title}</h2>
                         </div>
@@ -94,7 +94,7 @@ const PrivacyPolicy: React.FC = () => {
                             <div className="mt-4 space-y-2">
                                 {section.list.map((item) => (
                                     <div key={item.label} className="flex gap-3 items-start rounded-xl bg-white/[0.02] border border-white/[0.04] p-3">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500/50 mt-1.5 flex-shrink-0" />
+                                        <div className="w-1.5 h-1.5 rounded-full bg-white/25 mt-1.5 flex-shrink-0" />
                                         <div>
                                             <span className="text-xs font-bold text-white/60">{item.label}</span>
                                             <span className="text-xs text-white/30 ml-1">— {item.desc}</span>
@@ -106,12 +106,12 @@ const PrivacyPolicy: React.FC = () => {
 
                         {section.note && (
                             <div className="mt-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 px-4 py-3">
-                                <p className="text-xs font-bold text-emerald-400/80">{section.note}</p>
+                                <p className="text-xs font-bold text-white/80">{section.note}</p>
                             </div>
                         )}
 
                         {section.link && (
-                            <a href={section.link.url} target="_blank" rel="noreferrer" className="inline-block mt-3 text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors underline underline-offset-2">
+                            <a href={section.link.url} target="_blank" rel="noreferrer" className="inline-block mt-3 text-xs font-bold text-white hover:text-white transition-colors underline underline-offset-2">
                                 {section.link.text} →
                             </a>
                         )}

@@ -174,17 +174,17 @@ const TimeTable: React.FC = () => {
     return (
         <div className="pb-32 max-w-[1600px] mx-auto px-4 lg:px-8">
             {/* ── Cinematic Hero ────────────────────────────────────────── */}
-            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="mb-12 relative rounded-[3rem] border border-white/[0.06] bg-[#0a0a0a] p-10 md:p-14 overflow-hidden shadow-2xl" style={{ boxShadow: '0 0 100px rgba(59,130,246,0.05), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                <div className="absolute top-0 right-0 w-[800px] h-[400px] bg-blue-500/[0.03] blur-[150px] pointer-events-none" />
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="mb-12 relative rounded-[3rem] border border-white/[0.06] glass-panel p-10 md:p-14 overflow-hidden shadow-2xl" style={{ boxShadow: '0 0 100px rgba(255,255,255,0.05), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                <div className="absolute top-0 right-0 w-[800px] h-[400px] bg-white/10/[0.03] blur-[150px] pointer-events-none" />
                 <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
                     <div className="text-center lg:text-left">
                         <div className="flex items-center justify-center lg:justify-start gap-6 mb-6">
-                            <div className="w-16 h-16 rounded-[2rem] bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/10">
+                            <div className="w-16 h-16 rounded-[2rem] bg-white/5 flex items-center justify-center text-white border border-white/10 shadow-lg shadow-white/5">
                                 <Clock size={32} />
                             </div>
                             <div>
                                 <h1 className="text-4xl md:text-6xl font-black text-white tracking-tighter uppercase leading-none mb-1">Weekly Mission</h1>
-                                <div className="flex items-center justify-center lg:justify-start gap-3 text-blue-400/60 font-mono text-[10px] uppercase tracking-[0.3em] font-black">
+                                <div className="flex items-center justify-center lg:justify-start gap-3 text-white/60 font-mono text-[10px] uppercase tracking-[0.3em] font-black">
                                     <ShieldCheck size={14} className="animate-pulse" />
                                     Synchronized // Sector {currentSemester}
                                 </div>
@@ -194,11 +194,11 @@ const TimeTable: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap justify-center gap-4">
-                        <div className="flex bg-[#050508] p-1.5 rounded-2xl border border-white/[0.04]">
-                            <button onClick={() => handleSetView('grid')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'grid' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/20 hover:text-white/40'}`}>
+                        <div className="flex glass-panel p-1.5 rounded-2xl border border-white/[0.04]">
+                            <button onClick={() => handleSetView('grid')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'grid' ? 'bg-white/10 text-white shadow-lg shadow-white/10' : 'text-white/20 hover:text-white/40'}`}>
                                 <LayoutGrid size={14} className="inline mr-2" /> Grid
                             </button>
-                            <button onClick={() => handleSetView('list')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-white/20 hover:text-white/40'}`}>
+                            <button onClick={() => handleSetView('list')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === 'list' ? 'bg-white/10 text-white shadow-lg shadow-white/10' : 'text-white/20 hover:text-white/40'}`}>
                                 <List size={14} className="inline mr-2" /> Sequence
                             </button>
                         </div>
@@ -213,7 +213,7 @@ const TimeTable: React.FC = () => {
                 <div className="flex justify-center py-40"><LoadingSpinner /></div>
             ) : view === 'grid' ? (
                 <div className="pb-10">
-                    <div className="bg-[#0a0a0a] rounded-2xl border border-white/[0.06] overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}>
+                    <div className="glass-panel rounded-2xl border border-white/[0.06] overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}>
                         <div className="grid grid-cols-[60px_repeat(5,_1fr)]">
                             <div className="h-10 flex items-center justify-center text-[9px] font-black text-white/20 uppercase tracking-widest border-b border-r border-white/[0.06] bg-white/[0.02]"></div>
                             {DAYS.map(day => (
@@ -223,7 +223,7 @@ const TimeTable: React.FC = () => {
                             {periods.map((period: any) => (
                                 <React.Fragment key={period.id}>
                                     <div className="flex flex-col justify-center items-center px-1 py-2 border-b border-r border-white/[0.06] bg-white/[0.01]">
-                                        <span className="text-blue-400 font-black text-[9px] leading-none tracking-tight">{getPeriodName(period)}</span>
+                                        <span className="text-white font-black text-[9px] leading-none tracking-tight">{getPeriodName(period)}</span>
                                         <span className="text-[8px] font-bold text-white/25 mt-0.5 leading-none">{getPeriodStartTime(period)}</span>
                                     </div>
                                     {DAYS.map(day => {
@@ -235,14 +235,14 @@ const TimeTable: React.FC = () => {
                                         return (
                                             <div key={`${day}-${period.id}`} className="min-h-[72px] border-b border-r border-white/[0.06] last:border-r-0 p-0.5">
                                                 {slot ? (
-                                                    <motion.div onClick={() => handleEditSlot(slot)} whileHover={{ scale: 1.02 }} className={`h-full w-full rounded-lg p-2 flex flex-col justify-center items-center text-center cursor-pointer transition-all ${isBreak ? 'bg-white/[0.02] opacity-40 hover:opacity-60' : 'bg-blue-500/5 hover:bg-blue-500/10'}`}>
-                                                        <span className={`text-[7px] font-bold uppercase tracking-wider opacity-60 ${isBreak ? 'text-white/40' : 'text-blue-400'}`}>{slot.type}</span>
+                                                    <motion.div onClick={() => handleEditSlot(slot)} whileHover={{ scale: 1.02 }} className={`h-full w-full rounded-lg p-2 flex flex-col justify-center items-center text-center cursor-pointer transition-all ${isBreak ? 'bg-white/[0.02] opacity-40 hover:opacity-60' : 'bg-white/2 hover:bg-white/5'}`}>
+                                                        <span className={`text-[7px] font-bold uppercase tracking-wider opacity-60 ${isBreak ? 'text-white/40' : 'text-white'}`}>{slot.type}</span>
                                                         <span className={`text-[10px] font-black uppercase tracking-tight leading-tight mt-0.5 ${isBreak ? 'text-white/40' : 'text-white'}`}>{subject?.name || slot.subject_name || slot.subjectName || slot.label || slot.name || (isBreak ? 'Break' : '—')}</span>
                                                         {slot.classroom && <span className="text-[7px] font-bold text-white/15 uppercase tracking-wider mt-0.5 leading-none">{slot.classroom}</span>}
                                                     </motion.div>
                                                 ) : (
                                                     <button onClick={() => handleAddSlot(day, period)} className="h-full w-full rounded-lg hover:bg-white/[0.02] transition-all flex items-center justify-center group">
-                                                        <Plus size={14} className="text-white/5 group-hover:text-blue-500/40 transition-colors" />
+                                                        <Plus size={14} className="text-white/5 group-hover:text-white/40 transition-colors" />
                                                     </button>
                                                 )}
                                             </div>
@@ -265,16 +265,16 @@ const TimeTable: React.FC = () => {
                                 {([...(timetable[day] || [])]).sort((a: any, b: any) => parseTimeForSort(getSlotStartTime(a)) - parseTimeForSort(getSlotStartTime(b))).map((slot: any, idx: number) => {
                                     const subject = findSubjectForSlot(subjects, slot);
                                     return (
-                                        <motion.div key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }} onClick={() => handleEditSlot(slot)} className="p-6 rounded-[2rem] border border-white/[0.06] bg-[#0a0a0a] flex items-center justify-between group hover:border-blue-500/20 transition-all shadow-xl">
+                                        <motion.div key={idx} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }} onClick={() => handleEditSlot(slot)} className="p-6 rounded-[2rem] border border-white/[0.06] glass-panel flex items-center justify-between group hover:border-white/10 transition-all shadow-xl">
                                             <div className="flex items-center gap-6">
-                                                <div className="w-14 h-14 rounded-2xl bg-white/5 flex flex-col items-center justify-center border border-white/5 group-hover:bg-blue-500/10 group-hover:border-blue-500/20 transition-all">
-                                                    <span className="text-[10px] font-black text-white/40 group-hover:text-blue-400 transition-colors uppercase tracking-tighter leading-none">{getSlotStartTime(slot)}</span>
-                                                    <div className="w-4 h-px bg-white/10 my-1 group-hover:bg-blue-500/20" />
-                                                    <span className="text-[10px] font-black text-white/40 group-hover:text-blue-400 transition-colors uppercase tracking-tighter leading-none">{getSlotEndTime(slot)}</span>
+                                                <div className="w-14 h-14 rounded-2xl bg-white/5 flex flex-col items-center justify-center border border-white/5 group-hover:bg-white/5 group-hover:border-white/10 transition-all">
+                                                    <span className="text-[10px] font-black text-white/40 group-hover:text-white transition-colors uppercase tracking-tighter leading-none">{getSlotStartTime(slot)}</span>
+                                                    <div className="w-4 h-px bg-white/10 my-1 group-hover:bg-white/10" />
+                                                    <span className="text-[10px] font-black text-white/40 group-hover:text-white transition-colors uppercase tracking-tighter leading-none">{getSlotEndTime(slot)}</span>
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span className="text-[8px] font-black text-blue-500 uppercase tracking-widest">{slot.type}</span>
+                                                        <span className="text-[8px] font-black text-white uppercase tracking-widest">{slot.type}</span>
                                                         {slot.classroom && (
                                                             <>
                                                                 <span className="h-1 w-1 rounded-full bg-white/10" />
@@ -282,15 +282,15 @@ const TimeTable: React.FC = () => {
                                                             </>
                                                         )}
                                                     </div>
-                                                    <h3 className="text-sm font-black text-white uppercase tracking-tight group-hover:text-blue-400 transition-colors">{subject?.name || slot.subject_name || slot.subjectName || slot.label || slot.name || (slot.type?.toLowerCase() === 'break' ? 'Rest Interval' : 'Operational Unit')}</h3>
+                                                    <h3 className="text-sm font-black text-white uppercase tracking-tight group-hover:text-white transition-colors">{subject?.name || slot.subject_name || slot.subjectName || slot.label || slot.name || (slot.type?.toLowerCase() === 'break' ? 'Rest Interval' : 'Operational Unit')}</h3>
                                                 </div>
                                             </div>
-                                            <Edit3 size={16} className="text-white/10 group-hover:text-blue-500 transition-colors" />
+                                            <Edit3 size={16} className="text-white/10 group-hover:text-white transition-colors" />
                                         </motion.div>
                                     );
                                 })}
                                 {(!timetable[day] || timetable[day].length === 0) && (
-                                    <div className="col-span-full py-12 text-center rounded-[2rem] border border-dashed border-white/[0.04] bg-[#050508]/40">
+                                    <div className="col-span-full py-12 text-center rounded-[2rem] border border-dashed border-white/[0.04] glass-panel/40">
                                         <p className="text-[10px] font-black text-white/10 uppercase tracking-[0.4em]">No operations scheduled</p>
                                     </div>
                                 )}

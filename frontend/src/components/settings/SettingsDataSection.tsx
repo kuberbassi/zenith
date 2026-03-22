@@ -40,10 +40,10 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
 
     return (
         <div className="space-y-4">
-            <div className="rounded-3xl border border-white/[0.06] bg-[#0a0a0a] p-8">
+            <div className="rounded-3xl border border-white/[0.06] glass-panel p-8">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                        <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white">
                             <Shield size={20} />
                         </div>
                         <div>
@@ -55,7 +55,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/[0.04]">
                         <div className="flex items-center gap-4 mb-6">
-                            <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-blue-400"><Download size={18} /></div>
+                            <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white"><Download size={18} /></div>
                             <div>
                                 <h4 className="text-sm font-bold text-white tracking-tight">Backup Records</h4>
                                 <p className="text-[10px] font-bold text-white/20 uppercase">Export to .JSON</p>
@@ -66,14 +66,14 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                     </div>
                     <div className="p-6 rounded-3xl bg-white/[0.02] border border-white/[0.04]">
                         <div className="flex items-center gap-4 mb-6">
-                            <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-blue-400"><Upload size={18} /></div>
+                            <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white"><Upload size={18} /></div>
                             <div>
                                 <h4 className="text-sm font-bold text-white tracking-tight">Restore Session</h4>
                                 <p className="text-[10px] font-bold text-white/20 uppercase">Load from .JSON</p>
                             </div>
                         </div>
                         <p className="text-xs text-white/30 mb-6 leading-relaxed">Overwrite current terminal records with a previously saved backup file.</p>
-                        <label className="block w-full cursor-pointer transition-all border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 h-11 rounded-2xl flex items-center justify-center text-blue-400 text-[11px] font-black uppercase tracking-widest">
+                        <label className="block w-full cursor-pointer transition-all border border-white/10 bg-white/2 hover:bg-white/5 h-11 rounded-2xl flex items-center justify-center text-white text-[11px] font-black uppercase tracking-widest">
                             Initialize Load
                             <input
                                 type="file"

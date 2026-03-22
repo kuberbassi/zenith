@@ -78,8 +78,8 @@ const TermsOfService: React.FC = () => {
                         className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 hover:border-white/[0.1] transition-all"
                     >
                         <div className="flex items-center gap-3 mb-4">
-                            <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                                <section.icon size={16} className="text-blue-400" />
+                            <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                                <section.icon size={16} className="text-white" />
                             </div>
                             <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white/80">{i + 1}. {section.title}</h2>
                         </div>

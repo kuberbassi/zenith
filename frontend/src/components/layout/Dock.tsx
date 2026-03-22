@@ -165,7 +165,7 @@ function DesktopDock() {
                     onMouseMove={(e) => mouseX.set(e.clientX)}
                     onMouseEnter={() => setIsHoveredGlobal(true)}
                     onMouseLeave={() => { mouseX.set(Infinity); setIsHoveredGlobal(false); }}
-                    className="flex items-center gap-3 px-5 py-3 rounded-3xl bg-[#080808]/92 backdrop-blur-2xl border border-white/[0.1] shadow-2xl"
+                    className="flex items-center gap-3 px-5 py-3 rounded-3xl glass-panel/92 backdrop-blur-2xl border border-white/[0.1] shadow-2xl"
                     style={{ boxShadow: '0 0 30px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.06)' }}
                 >
                     <div ref={pfpRef} className="relative mr-2">
@@ -210,7 +210,7 @@ function DesktopDock() {
                                 width: 224,
                                 boxShadow: '0 -16px 48px rgba(0,0,0,0.8), 0 0 20px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.05)',
                             }}
-                            className="rounded-2xl border border-white/[0.08] bg-[#0d0d0d] backdrop-blur-2xl overflow-hidden"
+                            className="rounded-2xl border border-white/[0.08] glass-panel backdrop-blur-2xl overflow-hidden"
                         >
                             <div className="p-4 flex items-center gap-3 bg-white/[0.02]">
                                 <div className="w-10 h-10 rounded-full overflow-hidden border border-white/[0.1] flex-shrink-0">
@@ -452,7 +452,7 @@ function MobileBubble() {
                                     className={`w-[52px] h-[52px] rounded-[18px] flex items-center justify-center border transition-all ${
                                         isActive
                                             ? 'bg-white/10 border-white/20 text-white'
-                                            : 'bg-[#111]/95 border-white/[0.09] text-white/55'
+                                            : 'glass-panel/95 border-white/[0.09] text-white/55'
                                     }`}
                                     style={{
                                         boxShadow: isActive
@@ -516,7 +516,7 @@ function MobileBubble() {
                             <motion.circle
                                 cx="28" cy="28" r="25"
                                 fill="none"
-                                stroke="rgba(139,92,246,0.85)"
+                                stroke="rgba(255,255,255,0.85)"
                                 strokeWidth="2.5"
                                 strokeLinecap="round"
                                 strokeDasharray={CIRCUMFERENCE}

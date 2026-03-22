@@ -74,12 +74,12 @@ const Select: React.FC<SelectProps> = ({
                     border transition-all duration-200
                     text-white text-sm font-medium
                     disabled:opacity-40 disabled:cursor-not-allowed
-                    focus:outline-none focus:ring-2 focus:ring-blue-500/20
+                    focus:outline-none focus:ring-2 focus:ring-white/10
                     cursor-pointer flex items-center justify-between gap-2
                     ${error
                         ? 'border-red-500/40 focus:border-red-500'
                         : isOpen
-                            ? 'border-blue-500/40 ring-2 ring-blue-500/10'
+                            ? 'border-white/20 ring-2 ring-white/10'
                             : 'border-white/[0.08] hover:border-white/[0.15]'
                     }
                     ${className}
@@ -122,13 +122,13 @@ const Select: React.FC<SelectProps> = ({
                                         w-full px-5 py-3 text-left text-sm font-medium flex items-center justify-between
                                         transition-all duration-100
                                         ${isSelected
-                                            ? 'bg-blue-500/15 text-blue-400'
+                                            ? 'bg-white/7 text-white'
                                             : 'text-white/70 hover:bg-white/[0.06] hover:text-white'
                                         }
                                     `}
                                 >
                                     <span>{opt.label}</span>
-                                    {isSelected && <Check size={14} className="text-blue-400" />}
+                                    {isSelected && <Check size={14} className="text-white" />}
                                 </button>
                             );
                         })}

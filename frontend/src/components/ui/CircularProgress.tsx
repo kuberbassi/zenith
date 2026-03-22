@@ -17,7 +17,7 @@ export default function CircularProgress({
     max = 100,
     size = 120,
     strokeWidth = 12,
-    primaryColor = '#3b82f6', // Tailwind blue-500
+    primaryColor = '#ffffff', // Tailwind blue-500
     secondaryColor = 'rgba(255, 255, 255, 0.1)',
     glowColor = 'rgba(59, 130, 246, 0.5)',
     children

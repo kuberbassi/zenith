@@ -76,14 +76,14 @@ const Notifications: React.FC = () => {
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-12 relative rounded-[2.5rem] border border-white/[0.06] bg-[#0a0a0a] p-8 md:p-12 overflow-hidden shadow-2xl"
-                style={{ boxShadow: '0 0 80px rgba(59,130,246,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}
+                className="mb-12 relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden shadow-2xl"
+                style={{ boxShadow: '0 0 80px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}
             >
-                <div className="absolute top-0 right-0 w-[500px] h-[300px] bg-blue-500/[0.02] blur-[120px] pointer-events-none" />
+                <div className="absolute top-0 right-0 w-[500px] h-[300px] bg-white/10/[0.02] blur-[120px] pointer-events-none" />
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
                     <div className="text-center md:text-left">
                         <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10">
                                 <Bell size={24} />
                             </div>
                             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase leading-none">Signal Intelligence</h1>
@@ -93,7 +93,7 @@ const Notifications: React.FC = () => {
 
                     <button
                         onClick={loadData}
-                        className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#050508] border border-white/[0.04] text-[10px] font-black text-white/40 uppercase tracking-widest hover:text-blue-400 hover:border-blue-500/20 transition-all group"
+                        className="flex items-center gap-2 px-6 py-3 rounded-2xl glass-panel border border-white/[0.04] text-[10px] font-black text-white/40 uppercase tracking-widest hover:text-white hover:border-white/10 transition-all group"
                     >
                         <RefreshCw size={14} className={`group-hover:rotate-180 transition-transform duration-500 ${loading ? 'animate-spin' : ''}`} />
                         Sync Frequency
@@ -129,19 +129,19 @@ const Notifications: React.FC = () => {
                             >
                                 <div
                                     onClick={() => window.open(item.link, '_blank')}
-                                    className="group relative rounded-[2rem] border border-white/[0.04] bg-[#0a0a0a] p-5 md:p-6 cursor-pointer hover:bg-white/[0.02] hover:border-white/[0.1] transition-all overflow-hidden shadow-lg"
+                                    className="group relative rounded-[2rem] border border-white/[0.04] glass-panel p-5 md:p-6 cursor-pointer hover:bg-white/[0.02] hover:border-white/[0.1] transition-all overflow-hidden shadow-lg"
                                     style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}
                                 >
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/20 group-hover:bg-blue-500 transition-all opacity-0 group-hover:opacity-100" />
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-white/10 group-hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100" />
 
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-start gap-5">
-                                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/20 group-hover:text-blue-400 group-hover:bg-blue-500/10 transition-all border border-white/5">
+                                            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/20 group-hover:text-white group-hover:bg-white/5 transition-all border border-white/5">
                                                 <Info size={18} />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-3 mb-1.5">
-                                                    <span className="text-[9px] font-black text-blue-500/60 uppercase tracking-[0.2em] flex items-center gap-1.5">
+                                                    <span className="text-[9px] font-black text-white/60 uppercase tracking-[0.2em] flex items-center gap-1.5">
                                                         <ShieldCheck size={10} /> Official Release
                                                     </span>
                                                     <span className="h-1 w-1 rounded-full bg-white/10" />
@@ -156,17 +156,17 @@ const Notifications: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="hidden md:flex items-center justify-center w-10 h-10 rounded-full border border-white/5 opacity-0 group-hover:opacity-100 transition-all">
-                                            <ExternalLink size={14} className="text-blue-400" />
+                                            <ExternalLink size={14} className="text-white" />
                                         </div>
                                     </div>
 
                                     {/* Ambient Background Detail */}
-                                    <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-blue-500/[0.02] rounded-full blur-2xl group-hover:bg-blue-500/[0.05] transition-all" />
+                                    <div className="absolute -bottom-8 -right-8 w-24 h-24 bg-white/10/[0.02] rounded-full blur-2xl group-hover:bg-white/10/[0.05] transition-all" />
                                 </div>
                             </motion.div>
                         ))
                     ) : (
-                        <div className="text-center py-24 rounded-[3rem] border border-white/[0.04] bg-[#0a0a0a]/40 shadow-inner">
+                        <div className="text-center py-24 rounded-[3rem] border border-white/[0.04] glass-panel/40 shadow-inner">
                             <Zap className="w-12 h-12 mx-auto mb-4 text-white/5" />
                             <p className="text-[10px] font-black text-white/10 uppercase tracking-[0.4em]">No signals detected in this sector</p>
                         </div>

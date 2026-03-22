@@ -28,7 +28,7 @@ const SubjectCard: React.FC<SubjectCardProps> = ({ subject, onClick }) => {
                 <div className="p-2 bg-secondary/10 text-secondary rounded-xl">
                     <BookOpen className="w-5 h-5" />
                 </div>
-                <div className={`px-2 py-1 rounded-lg text-sm font-bold ${isLow ? 'bg-error/10 text-error' : 'bg-green-500/10 text-green-500'
+                <div className={`px-2 py-1 rounded-lg text-sm font-bold ${isLow ? 'bg-error/10 text-error' : 'bg-green-500/10 text-white'
                     }`}>
                     {subject.percentage}%
                 </div>

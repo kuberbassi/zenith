@@ -106,7 +106,7 @@ const Modal: React.FC<ModalProps> = ({
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.15 }}
                         onClick={onClose}
-                        className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-md will-change-[opacity]"
+                        className="absolute inset-0 glass-panel/80 backdrop-blur-md will-change-[opacity]"
                     />
 
                     {/* Modal - Theme-aware colors */}
@@ -115,7 +115,7 @@ const Modal: React.FC<ModalProps> = ({
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0.95, opacity: 0, y: 10 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-                        className={`relative w-full ${sizeClasses[size]} ${className} rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.5),_0_0_80px_rgba(59,130,246,0.05)] overflow-hidden will-change-transform max-h-[90vh] flex flex-col bg-[#111] border border-white/[0.08]`}
+                        className={`relative w-full ${sizeClasses[size]} ${className} rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.5),_0_0_80px_rgba(255,255,255,0.05)] overflow-hidden will-change-transform max-h-[90vh] flex flex-col glass-panel border border-white/[0.08]`}
                     >
                         {/* Header */}
                         {title && (

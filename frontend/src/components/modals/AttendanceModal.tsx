@@ -358,8 +358,8 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
         >
             <div className="space-y-6">
                 {/* Date Picker */}
-                <div className="flex items-center gap-4 p-3 bg-[#111] rounded-2xl border border-white/[0.08]">
-                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
+                <div className="flex items-center gap-4 p-3 glass-panel rounded-2xl border border-white/[0.08]">
+                    <div className="p-2 rounded-xl bg-white/5 text-white">
                         <CalendarIcon size={20} />
                     </div>
                     <div className="flex-1">
@@ -466,11 +466,11 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                         });
 
                                         const statusColors: any = {
-                                            'present': 'text-green-400 bg-green-500/10',
+                                            'present': 'text-white bg-green-500/10',
                                             'absent': 'text-red-400 bg-red-500/10',
                                             'late': 'text-orange-400 bg-orange-500/10',
-                                            'medical': 'text-blue-400 bg-blue-500/10',
-                                            'approved_medical': 'text-blue-400 bg-blue-500/10',
+                                            'medical': 'text-white bg-white/5',
+                                            'approved_medical': 'text-white bg-white/5',
                                             'cancelled': 'text-white/60 bg-white/5',
                                             'substituted': 'text-purple-400 bg-purple-500/10'
                                         };
@@ -534,7 +534,7 @@ const SubjectRow = ({
 
     if (expanded) {
         return (
-            <div className="bg-[#111] rounded-2xl p-4 border border-white/[0.08] shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+            <div className="glass-panel rounded-2xl p-4 border border-white/[0.08] shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
                 <div className="flex justify-between items-center mb-4 border-b border-white/[0.08] pb-3">
                     <h4 className="font-bold text-white/90">{subject.name}</h4>
                     <button onClick={onCloseDetails} className="text-white/40 hover:text-white/80 p-1 rounded-xl hover:bg-white/[0.06] transition-colors">
@@ -546,9 +546,9 @@ const SubjectRow = ({
                     {/* Status Grid */}
                     <div className="grid grid-cols-2 gap-2">
                         {[
-                            { id: 'present', label: 'Present', color: 'bg-green-500/15 text-green-400 border border-green-500/30' },
+                            { id: 'present', label: 'Present', color: 'bg-green-500/15 text-white border border-green-500/30' },
                             { id: 'absent', label: 'Absent', color: 'bg-red-500/15 text-red-400 border border-red-500/30' },
-                            { id: 'medical', label: 'Medical Leave', color: 'bg-blue-500/15 text-blue-400 border border-blue-500/30' }, // Map to approved_medical
+                            { id: 'medical', label: 'Medical Leave', color: 'bg-white/7 text-white border border-white/15' }, // Map to approved_medical
                             { id: 'cancelled', label: 'Cancelled', color: 'bg-white/10 text-white/70 border border-white/20' },
                             { id: 'substituted', label: 'Substituted', color: 'bg-purple-500/15 text-purple-400 border border-purple-500/30' },
                         ].map(opt => (
@@ -597,7 +597,7 @@ const SubjectRow = ({
                             Notes (Optional)
                         </label>
                         <textarea
-                            className="w-full bg-white/[0.02] border border-white/[0.08] focus:border-blue-500/50 focus:bg-white/[0.06] rounded-xl p-3 text-sm resize-none text-white placeholder:text-white/30 focus:outline-none transition-all"
+                            className="w-full bg-white/[0.02] border border-white/[0.08] focus:border-white/25 focus:bg-white/[0.06] rounded-xl p-3 text-sm resize-none text-white placeholder:text-white/30 focus:outline-none transition-all"
                             placeholder="Add details..."
                             rows={2}
                             value={detailNotes}
@@ -622,7 +622,7 @@ const SubjectRow = ({
 
     // Collapsed View
     return (
-        <div className="flex items-center justify-between p-3 rounded-2xl bg-[#111] hover:bg-white/[0.04] transition-colors border border-white/[0.08] hover:border-white/[0.15] group">
+        <div className="flex items-center justify-between p-3 rounded-2xl glass-panel hover:bg-white/[0.04] transition-colors border border-white/[0.08] hover:border-white/[0.15] group">
             <span className="font-bold text-white/90">{subject.name}</span>
             <div className="flex gap-2">
                 {!isMarked ? (
@@ -631,7 +631,7 @@ const SubjectRow = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => onSimpleMark(subject, 'present')}
-                            className="h-8 w-8 p-0 rounded-full text-green-400 hover:bg-green-500/10"
+                            className="h-8 w-8 p-0 rounded-full text-white hover:bg-green-500/10"
                             title="Mark Present"
                         >
                             <Check size={16} />
@@ -648,7 +648,7 @@ const SubjectRow = ({
                     </>
                 ) : (
                     <div className="flex items-center gap-2 mr-2">
-                        <span className={`text-[10px] uppercase px-2 py-0.5 rounded-md font-bold ${status === 'present' ? 'bg-green-500/15 text-green-400 border border-green-500/30' :
+                        <span className={`text-[10px] uppercase px-2 py-0.5 rounded-md font-bold ${status === 'present' ? 'bg-green-500/15 text-white border border-green-500/30' :
                             status === 'absent' ? 'bg-red-500/15 text-red-400 border border-red-500/30' :
                                 'bg-white/[0.05] text-white/50 border border-white/10'
                             }`}>
@@ -774,13 +774,13 @@ const SubstitutionDropdown = ({ subjects, value, selectedName, onChange }: {
             <button
                 type="button"
                 onClick={() => setOpen(!open)}
-                className="w-full bg-[#111] border border-white/[0.08] text-white rounded-xl px-4 py-2.5 text-sm text-left flex items-center justify-between hover:border-purple-500/30 transition-all"
+                className="w-full glass-panel border border-white/[0.08] text-white rounded-xl px-4 py-2.5 text-sm text-left flex items-center justify-between hover:border-purple-500/30 transition-all"
             >
                 <span className={value ? 'text-white' : 'text-white/30'}>{selectedName || 'Select Subject...'}</span>
                 <svg className={`w-4 h-4 text-white/30 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
             {open && (
-                <div className="absolute left-0 right-0 z-[60] mt-1 rounded-xl border border-white/[0.1] bg-[#111] shadow-2xl overflow-hidden max-h-[180px] overflow-y-auto custom-scrollbar" style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}>
+                <div className="absolute left-0 right-0 z-[60] mt-1 rounded-xl border border-white/[0.1] glass-panel shadow-2xl overflow-hidden max-h-[180px] overflow-y-auto custom-scrollbar" style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}>
                     <button
                         type="button"
                         onClick={() => { onChange(''); setOpen(false); }}

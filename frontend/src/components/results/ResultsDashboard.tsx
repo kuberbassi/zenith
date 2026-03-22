@@ -81,18 +81,18 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
         <div className="space-y-6">
             <motion.section
                 initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
-                className="relative rounded-3xl border border-white/[0.06] bg-[#050508] p-8 md:p-12 overflow-hidden"
-                style={{ boxShadow: '0 0 80px rgba(59,130,246,0.04), inset 0 1px 0 rgba(255,255,255,0.04)' }}
+                className="relative rounded-3xl border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden"
+                style={{ boxShadow: '0 0 80px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.04)' }}
             >
-                <div className="absolute top-0 right-0 w-[500px] h-[300px] bg-blue-500/[0.03] blur-[100px] pointer-events-none" />
+                <div className="absolute top-0 right-0 w-[500px] h-[300px] bg-white/10/[0.03] blur-[100px] pointer-events-none" />
                 <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-10">
                     <div className="flex-1">
                         <div className="flex items-center gap-2 mb-4">
-                            <ShieldCheck size={18} className="text-blue-400" />
+                            <ShieldCheck size={18} className="text-white" />
                             <span className="text-[11px] font-black text-white/20 uppercase tracking-[0.2em]">Verified Academic Record</span>
                         </div>
                         <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-2">{profileInfo?.name || user?.name}</h1>
-                        <p className="text-blue-400/60 font-medium tracking-wide mb-8">{profileInfo?.programme || 'Programme unavailable'} • Batch {displayBatch}</p>
+                        <p className="text-white/60 font-medium tracking-wide mb-8">{profileInfo?.programme || 'Programme unavailable'} • Batch {displayBatch}</p>
 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-5">
                             <div><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1.5">Enrollment</p><p className="text-sm font-bold text-white/70">{results.enrollment_number}</p></div>
@@ -108,14 +108,14 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         <div className="flex flex-wrap items-center justify-between gap-4 mt-6 pt-5 border-t border-white/5">
                             <div>
                                 <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-1 flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse inline-block" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white/10 animate-pulse inline-block" />
                                     Last Synced
                                 </p>
                                 <p className="text-xs font-bold text-white/40">{formatDate(lastUpdated)}</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                <button onClick={handleSyncClick} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-black text-blue-400 hover:bg-blue-500/20 transition-all"><RefreshCw size={12} /> Sync Results</button>
-                                <button onClick={onOpenPdf} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-black text-emerald-400 hover:bg-emerald-500/20 transition-all"><Download size={12} /> Download PDF</button>
+                                <button onClick={handleSyncClick} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-black text-white hover:bg-white/10 transition-all"><RefreshCw size={12} /> Sync Results</button>
+                                <button onClick={onOpenPdf} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-black text-white hover:bg-emerald-500/20 transition-all"><Download size={12} /> Download PDF</button>
                             </div>
                         </div>
                     </div>
@@ -140,9 +140,9 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             </motion.section>
 
             <div className="flex flex-wrap gap-2">
-                <button onClick={() => setSelectedSem('overall')} className={`px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${selectedSem === 'overall' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}>Overview</button>
+                <button onClick={() => setSelectedSem('overall')} className={`px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${selectedSem === 'overall' ? 'bg-white/10 text-white shadow-lg shadow-white/10' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}>Overview</button>
                 {results.semesters.map((s: any) => (
-                    <button key={s.semester} onClick={() => setSelectedSem(s.semester)} className={`px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${selectedSem === s.semester ? 'bg-blue-500 text-white' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}>
+                    <button key={s.semester} onClick={() => setSelectedSem(s.semester)} className={`px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${selectedSem === s.semester ? 'bg-white/10 text-white' : 'bg-white/5 text-white/30 hover:bg-white/10'}`}>
                         Sem {s.semester}
                     </button>
                 ))}
@@ -152,11 +152,11 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {[
                         { label: 'Scored', val: `${currentMetrics.totalMarks}/${currentMetrics.totalMaxMarks}`, icon: <BarChart3 size={15} />, color: accentColor },
-                        { label: 'Pass Rate', val: `${currentMetrics.passRate}%`, icon: <TrendingUp size={15} />, color: '#3b82f6' },
+                        { label: 'Pass Rate', val: `${currentMetrics.passRate}%`, icon: <TrendingUp size={15} />, color: '#ffffff' },
                         { label: selectedSem === 'overall' ? 'CGPA' : 'SGPA', val: (selectedSem === 'overall' ? metrics?.cgpa : semMetrics?.sgpa)?.toFixed(2) ?? '---', icon: <Activity size={15} />, color: '#8b5cf6' },
                         { label: 'Credits', val: currentMetrics.totalCredits ? String(Math.round(currentMetrics.totalCredits)) : '---', icon: <BookOpen size={15} />, color: 'rgba(255,255,255,0.8)' },
                     ].map(k => (
-                        <div key={k.label} className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5 md:p-6 flex flex-col justify-between min-h-[148px] group transition-all duration-500 hover:border-blue-500/20" style={{ boxShadow: '0 0 20px rgba(59,130,246,0.01), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                        <div key={k.label} className="rounded-2xl border border-white/[0.08] glass-panel p-5 md:p-6 flex flex-col justify-between min-h-[148px] group transition-all duration-500 hover:border-white/10" style={{ boxShadow: '0 0 20px rgba(255,255,255,0.01), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                             <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-bold text-white/25 uppercase tracking-[0.18em]">{k.label}</span>
                                 <div style={{ color: `${k.color}80` }} className="group-hover:scale-110 transition-transform">{k.icon}</div>
@@ -169,21 +169,21 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
 
             {currentMetrics && performanceSummary && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                    <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5"><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Academic Power</p><p className="text-3xl font-black tracking-tighter text-emerald-400">{Math.round(academicStrength)}%</p><p className="text-xs text-white/35 mt-2">Single score that compresses marks strength into one quick read.</p></div>
-                    <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5"><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Strongest Subject</p><p className="text-2xl font-black tracking-tighter text-blue-400">{performanceSummary.strongest?.code || performanceSummary.strongest?.name || '---'}</p><p className="text-xs text-white/35 mt-2">{performanceSummary.strongest ? `${getSubjectPercentage(performanceSummary.strongest)}% with ${performanceSummary.strongest.grade || 'no grade'}` : 'No completed subjects yet.'}</p></div>
-                    <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5"><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Attention Needed</p><p className="text-2xl font-black tracking-tighter text-amber-400">{performanceSummary.weakest?.code || performanceSummary.weakest?.name || '---'}</p><p className="text-xs text-white/35 mt-2">{performanceSummary.weakest ? `${getSubjectPercentage(performanceSummary.weakest)}% and grade ${performanceSummary.weakest.grade || 'pending'}` : 'No weak subject detected.'}</p></div>
-                    <div className="rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-5"><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Distinction Count</p><p className="text-3xl font-black tracking-tighter text-fuchsia-400">{performanceSummary.distinctionCount}</p><p className="text-xs text-white/35 mt-2">{performanceSummary.pendingCount > 0 ? `${performanceSummary.pendingCount} pending subjects excluded from this count.` : 'Subjects currently scoring 75% or above.'}</p></div>
+                    <div className="rounded-2xl border border-white/[0.08] glass-panel p-5"><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Academic Power</p><p className="text-3xl font-black tracking-tighter text-white">{Math.round(academicStrength)}%</p><p className="text-xs text-white/35 mt-2">Single score that compresses marks strength into one quick read.</p></div>
+                    <div className="rounded-2xl border border-white/[0.08] glass-panel p-5"><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Strongest Subject</p><p className="text-2xl font-black tracking-tighter text-white">{performanceSummary.strongest?.code || performanceSummary.strongest?.name || '---'}</p><p className="text-xs text-white/35 mt-2">{performanceSummary.strongest ? `${getSubjectPercentage(performanceSummary.strongest)}% with ${performanceSummary.strongest.grade || 'no grade'}` : 'No completed subjects yet.'}</p></div>
+                    <div className="rounded-2xl border border-white/[0.08] glass-panel p-5"><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Attention Needed</p><p className="text-2xl font-black tracking-tighter text-amber-400">{performanceSummary.weakest?.code || performanceSummary.weakest?.name || '---'}</p><p className="text-xs text-white/35 mt-2">{performanceSummary.weakest ? `${getSubjectPercentage(performanceSummary.weakest)}% and grade ${performanceSummary.weakest.grade || 'pending'}` : 'No weak subject detected.'}</p></div>
+                    <div className="rounded-2xl border border-white/[0.08] glass-panel p-5"><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2">Distinction Count</p><p className="text-3xl font-black tracking-tighter text-fuchsia-400">{performanceSummary.distinctionCount}</p><p className="text-xs text-white/35 mt-2">{performanceSummary.pendingCount > 0 ? `${performanceSummary.pendingCount} pending subjects excluded from this count.` : 'Subjects currently scoring 75% or above.'}</p></div>
                 </motion.div>
             )}
 
             {chartSubjects.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <motion.div className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] p-6 min-h-[350px] flex flex-col hover:border-blue-500/20 transition-all duration-500">
+                    <motion.div className="rounded-3xl border border-white/[0.08] glass-panel p-6 min-h-[350px] flex flex-col hover:border-white/10 transition-all duration-500">
                         <h3 className="text-xs font-bold text-white/20 uppercase tracking-widest mb-2">Score Distribution</h3>
                         <p className="text-xs text-white/30 mb-6">Clear ranking of subject-wise percentages so weak areas are obvious.</p>
                         <div className="flex-1"><Bar data={barChartData} options={barChartOptions} /></div>
                     </motion.div>
-                    <motion.div className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] p-6 min-h-[350px] flex flex-col hover:border-blue-500/20 transition-all duration-500">
+                    <motion.div className="rounded-3xl border border-white/[0.08] glass-panel p-6 min-h-[350px] flex flex-col hover:border-white/10 transition-all duration-500">
                         <h3 className="text-xs font-bold text-white/20 uppercase tracking-widest mb-2">Marks Composition</h3>
                         <p className="text-xs text-white/30 mb-6">Internal and external contributions per subject, useful for spotting missing or weak components.</p>
                         <div className="flex-1 pb-4"><Bar data={marksBreakdownData} options={marksBreakdownOptions} /></div>
@@ -192,7 +192,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
             )}
 
             {selectedSem !== 'overall' && currentSubjects.length > 0 && (
-                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] overflow-hidden">
+                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="rounded-3xl border border-white/[0.08] glass-panel overflow-hidden">
                     <div className="p-6 border-b border-white/[0.05] flex items-center justify-between gap-4">
                         <div>
                             <h3 className="text-sm font-black text-white/70 uppercase tracking-widest">{results.semesters.find((s: any) => s.semester === selectedSem)?.semester_label || 'Semester'} — Subjects</h3>
@@ -205,7 +205,7 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             )}
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase">{currentSubjects.length} Subjects</span>
+                            <span className="px-3 py-1 rounded-full bg-white/5 text-white text-[10px] font-bold uppercase">{currentSubjects.length} Subjects</span>
                             {semMetrics && <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-[10px] font-bold uppercase">SGPA {semMetrics.sgpa.toFixed(2)}</span>}
                         </div>
                     </div>
@@ -253,14 +253,14 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             const semCredits = (sem.subjects || []).reduce((a: number, s: any) => a + (parseFloat(s.credits || '0') || 0), 0);
                             const passRate = sem.subjects?.length ? Math.round((sem.subjects.filter((s: any) => (s.grade ? true : false) && ((s.grade && ['O', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'P'].includes(s.grade))).length / sem.subjects.length) * 100)) : 0;
                             return (
-                                <div key={sem.semester} onClick={() => setSelectedSem(sem.semester)} className="cursor-pointer group rounded-2xl border border-white/[0.08] bg-[#0a0a0a] p-6 hover:border-blue-500/30 transition-all" style={{ boxShadow: '0 0 20px rgba(59,130,246,0.01), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                                <div key={sem.semester} onClick={() => setSelectedSem(sem.semester)} className="cursor-pointer group rounded-2xl border border-white/[0.08] glass-panel p-6 hover:border-white/15 transition-all" style={{ boxShadow: '0 0 20px rgba(255,255,255,0.01), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                                     <div className="flex justify-between items-start mb-4">
                                         <div>
                                             <p className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">{sem.semester_label || `Semester ${sem.semester}`}</p>
                                             <p className="text-sm font-bold text-white/60 group-hover:text-white transition-colors">{sem.subjects?.length || 0} Subjects</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-2xl font-black text-blue-400 tracking-tighter group-hover:scale-105 transition-transform">{sgpa.toFixed(2)}</p>
+                                            <p className="text-2xl font-black text-white tracking-tighter group-hover:scale-105 transition-transform">{sgpa.toFixed(2)}</p>
                                             <p className="text-[10px] font-bold text-white/10 uppercase tracking-widest mt-0.5">SGPA</p>
                                         </div>
                                     </div>
@@ -269,16 +269,16 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                         <span>{passRate}% Pass</span>
                                     </div>
                                     <div className="h-1 rounded-full bg-white/[0.03] overflow-hidden">
-                                        <div className="h-full bg-blue-500/40 rounded-full" style={{ width: `${(sgpa / 10) * 100}%` }} />
+                                        <div className="h-full bg-white/20 rounded-full" style={{ width: `${(sgpa / 10) * 100}%` }} />
                                     </div>
                                 </div>
                             );
                         })}
                     </motion.div>
 
-                    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] overflow-hidden">
+                    <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-3xl border border-white/[0.08] glass-panel overflow-hidden">
                         <div className="p-6 border-b border-white/[0.05] flex items-center gap-3">
-                            <PieChart size={16} className="text-blue-400" />
+                            <PieChart size={16} className="text-white" />
                             <h3 className="text-sm font-black text-white/70 uppercase tracking-widest">Grade Distribution</h3>
                             <span className="ml-auto text-[10px] font-bold text-white/20 uppercase tracking-widest">Analytics</span>
                         </div>
@@ -317,9 +317,9 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                                     <div key={sem.semester} className="flex items-center gap-4">
                                         <span className="text-[10px] font-black text-white/20 uppercase w-24 shrink-0 truncate">{sem.semester_label || `Sem ${sem.semester}`}</span>
                                         <div className="flex-1 h-2 rounded-full bg-white/[0.03] overflow-hidden">
-                                            <div className="h-full bg-blue-500/50 rounded-full" style={{ width: `${(sgpa / 10) * 100}%` }} />
+                                            <div className="h-full bg-white/25 rounded-full" style={{ width: `${(sgpa / 10) * 100}%` }} />
                                         </div>
-                                        <span className="text-sm font-black text-blue-400 w-12 text-right tabular-nums">{sgpa.toFixed(2)}</span>
+                                        <span className="text-sm font-black text-white w-12 text-right tabular-nums">{sgpa.toFixed(2)}</span>
                                     </div>
                                 );
                             })}

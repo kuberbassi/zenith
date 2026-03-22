@@ -40,7 +40,7 @@ function getCourseId(course: Course): string {
 }
 
 const PLATFORMS = [
-    { value: 'coursera', label: 'Coursera', icon: Globe, color: 'bg-blue-600' },
+    { value: 'coursera', label: 'Coursera', icon: Globe, color: 'bg-white/20' },
     { value: 'udemy', label: 'Udemy', icon: Video, color: 'bg-purple-600' },
     { value: 'youtube', label: 'YouTube', icon: Video, color: 'bg-red-600' },
     { value: 'custom', label: 'Custom', icon: Globe, color: 'bg-zinc-600' },
@@ -130,32 +130,32 @@ const Courses: React.FC = () => {
     const activeCourses = courses.filter(c => c.progress < 100);
     const completedCourses = courses.filter(c => c.progress === 100);
 
-    const inputCls = "w-full px-5 py-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] text-white text-sm placeholder-white/20 focus:outline-none focus:border-blue-500/40 focus:ring-4 focus:ring-blue-500/5 transition-all";
+    const inputCls = "w-full px-5 py-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/20 focus:ring-4 focus:ring-white/10 transition-all";
 
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto pb-32">
 
             {/* ── Cinematic Hero ────────────────────────────────────────── */}
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-12 relative rounded-[2rem] border border-white/[0.06] bg-[#050508] p-8 md:p-12 overflow-hidden shadow-2xl">
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-500/[0.03] blur-[150px] pointer-events-none" />
+            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-12 relative rounded-[2rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden shadow-2xl">
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/10/[0.03] blur-[150px] pointer-events-none" />
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
                     <div className="flex-1">
                         <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/10"><BookOpen size={24} /></div>
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shadow-lg shadow-white/5"><BookOpen size={24} /></div>
                             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Intelligence Archive</h1>
                         </div>
                         <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-6">
                             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                <TrendingUp size={14} className="text-blue-400" />
+                                <TrendingUp size={14} className="text-white" />
                                 <span className="text-[11px] font-black text-white/40 uppercase tracking-widest">{activeCourses.length} Active Tracks</span>
                             </div>
                             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                <Award size={14} className="text-blue-400" />
+                                <Award size={14} className="text-white" />
                                 <span className="text-[11px] font-black text-white/40 uppercase tracking-widest">{completedCourses.length} Completed Tracks</span>
                             </div>
                         </div>
                     </div>
-                    <Button onClick={handleAddCourse} className="h-14 px-8 rounded-2xl bg-blue-500 text-white font-black uppercase tracking-widest shadow-2xl shadow-blue-500/20 hover:scale-105 active:scale-95 transition-all">Initialize Track</Button>
+                    <Button onClick={handleAddCourse} className="h-14 px-8 rounded-2xl bg-white/10 text-white font-black uppercase tracking-widest shadow-2xl shadow-white/10 hover:scale-105 active:scale-95 transition-all">Initialize Track</Button>
                 </div>
             </motion.div>
 
@@ -174,7 +174,7 @@ const Courses: React.FC = () => {
                                 const P_Icon = plat.icon;
                                 return (
                                     <motion.div key={getCourseId(course)} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="group">
-                                        <div className="h-full rounded-3xl border border-white/[0.06] bg-[#0a0a0a] p-6 relative overflow-hidden transition-all hover:bg-[#0c0c0c] hover:border-white/[0.1] shadow-xl flex flex-col" style={{ boxShadow: '0 20px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                                        <div className="h-full rounded-3xl border border-white/[0.06] glass-panel p-6 relative overflow-hidden transition-all hover:bg-[#0c0c0c] hover:border-white/[0.1] shadow-xl flex flex-col" style={{ boxShadow: '0 20px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                                             <div className="flex items-center justify-between mb-6">
                                                 <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${plat.color} text-white text-[9px] font-black uppercase tracking-widest`}><P_Icon size={12} /> {plat.label}</div>
                                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -185,8 +185,8 @@ const Courses: React.FC = () => {
                                             <h3 className="text-xl font-black text-white/90 mb-2 truncate group-hover:text-white transition-colors uppercase tracking-tight">{course.title}</h3>
                                             <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-6 flex items-center gap-2"><GraduationCap size={12} />{course.instructor || 'Lead Architect'}</p>
                                             <div className="mb-8">
-                                                <div className="flex justify-between items-center mb-2"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Synchronization</span><span className="text-[10px] font-black text-blue-400 font-mono tracking-widest">{course.progress}%</span></div>
-                                                <div className="h-1.5 w-full bg-white/[0.02] rounded-full overflow-hidden border border-white/[0.04]"><motion.div initial={{ width: 0 }} animate={{ width: `${course.progress}%` }} className="h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]" /></div>
+                                                <div className="flex justify-between items-center mb-2"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Synchronization</span><span className="text-[10px] font-black text-white font-mono tracking-widest">{course.progress}%</span></div>
+                                                <div className="h-1.5 w-full bg-white/[0.02] rounded-full overflow-hidden border border-white/[0.04]"><motion.div initial={{ width: 0 }} animate={{ width: `${course.progress}%` }} className="h-full bg-white/10 shadow-[0_0_10px_rgba(255,255,255,0.3)]" /></div>
                                             </div>
                                             {course.targetCompletionDate && <div className="flex items-center gap-2 text-[10px] font-bold text-white/20 uppercase tracking-widest mb-6"><Clock size={12} /> Est. Completion: {new Date(course.targetCompletionDate).toLocaleDateString()}</div>}
                                             <div className="mt-auto flex gap-3">
@@ -199,7 +199,7 @@ const Courses: React.FC = () => {
                                                         setCourses(previous);
                                                         showToast('error', 'Save Failed');
                                                     });
-                                                }} className="flex-1 h-11 rounded-xl shadow-lg shadow-blue-500/20 text-[10px] font-black uppercase tracking-widest">+10% Sync</Button>
+                                                }} className="flex-1 h-11 rounded-xl shadow-lg shadow-white/10 text-[10px] font-black uppercase tracking-widest">+10% Sync</Button>
                                             </div>
                                         </div>
                                     </motion.div>
@@ -215,21 +215,21 @@ const Courses: React.FC = () => {
                 <section>
                     <div className="flex items-center gap-3 mb-8 px-2">
                         <div className="h-px flex-1 bg-white/[0.04]" />
-                        <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-blue-400/40">Completed Tracks</h2>
+                        <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40">Completed Tracks</h2>
                         <div className="h-px flex-1 bg-white/[0.04]" />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {completedCourses.map(course => (
-                            <div key={getCourseId(course)} className="group p-5 rounded-3xl border border-white/[0.04] bg-[#050508] transition-all hover:bg-[#080808] opacity-60 hover:opacity-100">
+                            <div key={getCourseId(course)} className="group p-5 rounded-3xl border border-white/[0.04] glass-panel transition-all hover:glass-panel opacity-60 hover:opacity-100">
                                 <div className="flex justify-between items-start mb-4">
-                                    <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20"><Award size={16} /></div>
+                                    <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white border border-white/10"><Award size={16} /></div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100">
                                         <button onClick={() => handleEditCourse(course)} className="p-1.5 text-white/20 hover:text-white transition-colors"><Edit2 size={12} /></button>
                                         <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-1.5 text-white/20 hover:text-red-500 transition-colors"><Trash2 size={12} /></button>
                                     </div>
                                 </div>
                                 <h4 className="text-xs font-black text-white/80 line-clamp-2 uppercase tracking-tight mb-4">{course.title}</h4>
-                                <button onClick={() => window.open(course.url, '_blank')} className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-blue-400 hover:text-blue-300 transition-all text-left flex items-center gap-2">Open Course <ExternalLink size={10} /></button>
+                                <button onClick={() => window.open(course.url, '_blank')} className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-white hover:text-white transition-all text-left flex items-center gap-2">Open Course <ExternalLink size={10} /></button>
                             </div>
                         ))}
                     </div>
@@ -242,7 +242,7 @@ const Courses: React.FC = () => {
                     <div className="w-20 h-20 rounded-[2rem] bg-white/[0.02] border border-white/[0.04] flex items-center justify-center text-white/10 mx-auto mb-8"><Book size={40} /></div>
                     <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Archive Vacant</h3>
                     <p className="text-white/20 font-medium mb-12 max-w-sm mx-auto">No intelligence tracks have been initialized. Commencing primary tracking protocols recommended.</p>
-                    <Button onClick={handleAddCourse} className="h-14 px-10 rounded-2xl bg-blue-500 text-white font-black uppercase tracking-widest shadow-2xl shadow-blue-500/20">Begin Archive</Button>
+                    <Button onClick={handleAddCourse} className="h-14 px-10 rounded-2xl bg-white/10 text-white font-black uppercase tracking-widest shadow-2xl shadow-white/10">Begin Archive</Button>
                 </div>
             )}
 
@@ -255,13 +255,13 @@ const Courses: React.FC = () => {
                         <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Archive URL</label><input type="url" value={formData.url || ''} onChange={e => setFormData({ ...formData, url: e.target.value })} className={inputCls} placeholder="https://..." required /></div>
                     </div>
                     <div className="grid grid-cols-2 gap-6">
-                        <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Sync Progress (%)</label><input type="range" min="0" max="100" value={formData.progress || 0} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) || 0 })} className="w-full accent-blue-500 h-2 bg-white/5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-blue-500/30" /><div className="text-right text-xs font-bold text-blue-400 mt-1">{formData.progress || 0}%</div></div>
+                        <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Sync Progress (%)</label><input type="range" min="0" max="100" value={formData.progress || 0} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) || 0 })} className="w-full accent-blue-500 h-2 bg-white/5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white/10 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-white/15" /><div className="text-right text-xs font-bold text-white mt-1">{formData.progress || 0}%</div></div>
                         <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Target Milestone</label><input type="date" value={formData.targetCompletionDate || ''} onChange={e => setFormData({ ...formData, targetCompletionDate: e.target.value })} className={`${inputCls} dark-date-input`} /></div>
                     </div>
                     <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Lead Instructor</label><input type="text" value={formData.instructor || ''} onChange={e => setFormData({ ...formData, instructor: e.target.value })} className={inputCls} placeholder="e.g., Prof. H. Stark" /></div>
                     <div className="flex gap-4 pt-4">
                         <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1 rounded-xl h-12 border-white/[0.04]">Abort</Button>
-                        <Button type="submit" className="flex-1 rounded-xl h-12 bg-blue-500 shadow-xl shadow-blue-500/20">{editingCourse ? 'Save Changes' : 'Initialize Track'}</Button>
+                        <Button type="submit" className="flex-1 rounded-xl h-12 bg-white/10 shadow-xl shadow-white/10">{editingCourse ? 'Save Changes' : 'Initialize Track'}</Button>
                     </div>
                 </form>
             </Modal>

@@ -52,14 +52,14 @@ const GlowRing: React.FC<{ pct: number; size?: number }> = ({ pct, size = 220 })
         <div className="relative" style={{ width: size, height: size }}>
             {/* Outer ambient glow */}
             <div className="absolute inset-0 rounded-full" style={{
-                boxShadow: `0 0 60px rgba(16,185,129,${0.08 + pct * 0.002}), 0 0 120px rgba(16,185,129,0.03)`
+                boxShadow: `0 0 60px rgba(16,185,129,${0.08 + pct * 0.002}), 0 0 120px rgba(255,255,255,0.03)`
             }} />
             <svg width={size} height={size} className="transform -rotate-90">
                 <defs>
                     <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#3b82f6" />
-                        <stop offset="50%" stopColor="#60a5fa" />
-                        <stop offset="100%" stopColor="#2563eb" />
+                        <stop offset="0%" stopColor="#ffffff" />
+                        <stop offset="50%" stopColor="#f5f5f5" />
+                        <stop offset="100%" stopColor="#e5e5e5" />
                     </linearGradient>
                     <filter id="ringGlow">
                         <feGaussianBlur stdDeviation="3" result="blur" />
@@ -181,7 +181,7 @@ const Dashboard: React.FC = () => {
         datasets: [{
             label: 'Attendance %',
             data: weakestSubjects.map(subject => Math.round(subject.attendance_percentage || 0)),
-            backgroundColor: weakestSubjects.map(subject => (subject.attendance_percentage || 0) < targetThreshold ? 'rgba(239,68,68,0.75)' : 'rgba(59,130,246,0.75)'),
+            backgroundColor: weakestSubjects.map(subject => (subject.attendance_percentage || 0) < targetThreshold ? 'rgba(239,68,68,0.75)' : 'rgba(255,255,255,0.75)'),
             borderRadius: 10,
         }],
     }), [weakestSubjects, targetThreshold]);
@@ -211,8 +211,8 @@ const Dashboard: React.FC = () => {
                     const entry = grouped[date];
                     return entry.total > 0 ? Math.round((entry.attended / entry.total) * 100) : 0;
                 }),
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59,130,246,0.12)',
+                borderColor: '#ffffff',
+                backgroundColor: 'rgba(255,255,255,0.12)',
                 fill: true,
                 tension: 0.35,
                 pointRadius: 3,
@@ -250,11 +250,11 @@ const Dashboard: React.FC = () => {
             {/* ── Beacon Section ── */}
             <motion.section
                 variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
-                className="relative rounded-[2.5rem] border border-white/[0.06] bg-[#050508] p-8 md:p-12 overflow-hidden mb-6 group transition-all duration-700"
-                style={{ boxShadow: '0 0 100px -20px rgba(16,185,129,0.06), inset 0 1px 0 rgba(255,255,255,0.04)' }}
+                className="relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden mb-6 group transition-all duration-700"
+                style={{ boxShadow: '0 0 100px -20px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.04)' }}
             >
-                <div className="absolute inset-0 bg-blue-500/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-500/[0.05] blur-[100px] pointer-events-none group-hover:bg-blue-500/[0.08] transition-all duration-700" />
+                <div className="absolute inset-0 bg-white/10/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+                <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10/[0.05] blur-[100px] pointer-events-none group-hover:bg-white/10/[0.08] transition-all duration-700" />
 
                 <div className="relative z-10">
                     <div className="flex items-center justify-between mb-10">
@@ -274,7 +274,7 @@ const Dashboard: React.FC = () => {
                             <div className="transition-transform hover:scale-105 duration-300">
                                 <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 leading-none">Subject Payload</p>
                                 <p className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none">{subjectCount}</p>
-                                <div className="flex items-center gap-1.5 mt-3 text-blue-400/40">
+                                <div className="flex items-center gap-1.5 mt-3 text-white/40">
                                     <Target size={12} className="opacity-50" /> <span className="text-[9px] font-black uppercase tracking-[0.15em]">Active Channels</span>
                                 </div>
                             </div>
@@ -289,11 +289,11 @@ const Dashboard: React.FC = () => {
 
                         {/* Central Hub */}
                         <div className="relative group/ring cursor-default py-4">
-                            <div className="absolute inset-0 bg-blue-500/5 blur-3xl rounded-full opacity-0 group-hover/ring:opacity-100 transition-opacity duration-700" />
+                            <div className="absolute inset-0 bg-white/2 blur-3xl rounded-full opacity-0 group-hover/ring:opacity-100 transition-opacity duration-700" />
                             <GlowRing pct={att} />
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
                                 <AnimNum value={att} decimals={1} className="text-6xl md:text-7xl font-black text-white tracking-tighter leading-none" />
-                                <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.4em] mt-3 opacity-60">Stability</span>
+                                <span className="text-[10px] font-black text-white uppercase tracking-[0.4em] mt-3 opacity-60">Stability</span>
                             </div>
                         </div>
 
@@ -301,8 +301,8 @@ const Dashboard: React.FC = () => {
                         <div className="w-full flex-1 grid grid-cols-2 gap-8 md:gap-10 lg:text-right">
                             <div className="lg:order-2 transition-transform hover:scale-105 duration-300">
                                 <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 leading-none">Safe Zones</p>
-                                <p className="text-5xl md:text-6xl font-black text-blue-400 tracking-tighter leading-none">{safeCount}</p>
-                                <div className="flex items-center lg:justify-end gap-1.5 mt-3 text-blue-400/40">
+                                <p className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none">{safeCount}</p>
+                                <div className="flex items-center lg:justify-end gap-1.5 mt-3 text-white/40">
                                     <ShieldCheck size={12} className="opacity-50" /> <span className="text-[9px] font-black uppercase tracking-[0.15em]">Optimal</span>
                                 </div>
                             </div>
@@ -325,7 +325,7 @@ const Dashboard: React.FC = () => {
                         label: 'Overall Attendance',
                         value: `${att.toFixed(1)}%`,
                         detail: `${totalAttended}/${totalClasses} classes attended`,
-                        tone: 'text-blue-400',
+                        tone: 'text-white',
                         icon: <Activity size={15} />
                     },
                     {
@@ -339,18 +339,18 @@ const Dashboard: React.FC = () => {
                         label: 'Safe Bunks',
                         value: String(safeBunks),
                         detail: 'Miss only these without falling under target',
-                        tone: 'text-emerald-400',
+                        tone: 'text-white',
                         icon: <CheckCircle2 size={15} />
                     },
                     {
                         label: 'On-Track Subjects',
                         value: `${safeCount}/${subjectCount}`,
                         detail: `${Math.round(subjectCount > 0 ? (safeCount / subjectCount) * 100 : 0)}% above threshold`,
-                        tone: 'text-blue-300',
+                        tone: 'text-white',
                         icon: <ShieldCheck size={15} />
                     },
                 ].map((card) => (
-                    <motion.div key={card.label} variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="rounded-[2rem] bg-[#0a0a0a] border border-white/[0.06] p-6">
+                    <motion.div key={card.label} variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="rounded-[2rem] glass-panel border border-white/[0.06] p-6">
                         <div className="flex items-center justify-between mb-5">
                             <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{card.label}</span>
                             <span className={`${card.tone} opacity-80`}>{card.icon}</span>
@@ -362,7 +362,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-6">
-                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-2 rounded-[2rem] bg-[#0a0a0a] border border-white/[0.06] p-6 min-h-[340px] flex flex-col">
+                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-2 rounded-[2rem] glass-panel border border-white/[0.06] p-6 min-h-[340px] flex flex-col">
                     <div className="flex items-center gap-2 mb-3">
                         <Sparkles size={14} className="text-red-400/50" />
                         <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Attention Required</span>
@@ -373,9 +373,9 @@ const Dashboard: React.FC = () => {
                     </div>
                 </motion.div>
 
-                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-3 rounded-[2rem] bg-[#0a0a0a] border border-white/[0.06] p-6 min-h-[340px] flex flex-col">
+                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-3 rounded-[2rem] glass-panel border border-white/[0.06] p-6 min-h-[340px] flex flex-col">
                     <div className="flex items-center gap-2 mb-3">
-                        <TrendingUp size={14} className="text-blue-500/40" />
+                        <TrendingUp size={14} className="text-white/40" />
                         <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Stability Trend</span>
                     </div>
                     <p className="text-sm text-white/45 mb-4">Last 10 attendance days. Use this to spot drift early, not to admire charts.</p>
@@ -389,14 +389,14 @@ const Dashboard: React.FC = () => {
             <section>
                 <div className="flex items-center justify-between mb-6 px-2">
                     <h2 className="text-sm font-black text-white/40 uppercase tracking-[0.2em]">Module Inventory</h2>
-                    <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-400 uppercase tracking-widest hover:bg-blue-500/20 transition-all">
+                    <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 transition-all">
                         <Plus size={14} /> Register Module
                     </button>
                 </div>
 
                 {subjects.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-24 rounded-[3rem] border-2 border-dashed border-white/[0.04] bg-white/[0.01]">
-                        <Zap size={32} className="text-blue-500/20 mb-4" />
+                        <Zap size={32} className="text-white/20 mb-4" />
                         <p className="text-xs font-black text-white/20 uppercase tracking-widest">No Active Modules Found</p>
                     </div>
                 ) : (
@@ -405,7 +405,7 @@ const Dashboard: React.FC = () => {
                             {sortSubs(subjects).map((subject, idx) => {
                                 const pct = subject.attendance_percentage || 0;
                                 const isCritical = pct < targetThreshold;
-                                const accent = isCritical ? '#ef4444' : '#3b82f6';
+                                const accent = isCritical ? '#ef4444' : '#ffffff';
                                 const needed = classesNeeded(subject.attended || 0, subject.total || 0);
                                 const canSkip = classesCanSkip(subject.attended || 0, subject.total || 0);
 
@@ -415,10 +415,10 @@ const Dashboard: React.FC = () => {
                                         initial={{ opacity: 0, scale: 0.95 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
-                                        className="group relative rounded-[2rem] border border-white/[0.06] bg-[#0a0a0a] p-6 hover:border-blue-500/20 transition-all duration-500"
+                                        className="group relative rounded-[2rem] border border-white/[0.06] glass-panel p-6 hover:border-white/10 transition-all duration-500"
                                         style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 40px -20px rgba(0,0,0,0.5)' }}
                                     >
-                                        <div className="absolute inset-0 rounded-[2rem] bg-blue-500/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                                        <div className="absolute inset-0 rounded-[2rem] bg-white/10/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                                         <div className="flex items-start justify-between mb-5">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-2">
@@ -440,10 +440,10 @@ const Dashboard: React.FC = () => {
                                                 <p className="text-sm font-bold text-white/85">{subject.attended || 0} / {subject.total || 0}</p>
                                             </div>
                                             <div className="text-center">
-                                                <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${isCritical ? 'text-red-500/60' : 'text-blue-500/60'}`}>
+                                                <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${isCritical ? 'text-red-500/60' : 'text-white/60'}`}>
                                                     {isCritical ? 'Need' : 'Can Skip'}
                                                 </p>
-                                                <p className={`text-sm font-bold ${isCritical ? 'text-red-400' : 'text-blue-400'}`}>
+                                                <p className={`text-sm font-bold ${isCritical ? 'text-red-400' : 'text-white'}`}>
                                                     {isCritical ? needed : canSkip}
                                                 </p>
                                             </div>

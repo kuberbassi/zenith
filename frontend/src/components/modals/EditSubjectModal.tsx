@@ -121,7 +121,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                             name="name"
                             value={formData.name}
                             onChange={handleChange}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-blue-500/50 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-white/25 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30"
                             placeholder="e.g. Data Structures"
                             required
                         />
@@ -148,7 +148,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                     }}
                                     className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all
                                         ${((formData as any).categories || []).includes(cat)
-                                            ? 'bg-blue-500/15 border-blue-500/30 text-blue-400'
+                                            ? 'bg-white/7 border-white/15 text-white'
                                             : 'bg-white/[0.02] border-transparent text-white/40 hover:bg-white/[0.06] hover:text-white/70'
                                         }
                                     `}
@@ -169,7 +169,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                 name="code"
                                 value={formData.code}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-blue-500/50 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-white/25 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30"
                                 placeholder="e.g. CS-101"
                             />
                         </div>
@@ -187,7 +187,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                 name="professor"
                                 value={formData.professor}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-blue-500/50 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-white/25 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30"
                                 placeholder="Prof. Name"
                             />
                         </div>
@@ -203,7 +203,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                 name="classroom"
                                 value={formData.classroom}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-blue-500/50 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-white/25 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30"
                                 placeholder="Room 301"
                             />
                         </div>
@@ -220,7 +220,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                             value={formData.syllabus}
                             onChange={handleChange}
                             rows={3}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-blue-500/50 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30 resize-none"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white/[0.02] border border-white/[0.08] focus:border-white/25 focus:bg-white/[0.06] focus:outline-none transition-all text-white placeholder:text-white/30 resize-none"
                             placeholder="Enter syllabus topics or important notes..."
                         />
                     </div>
@@ -267,7 +267,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                             value={(formData as any).practical_total || 10}
                                             onChange={handleChange}
                                             min="1"
-                                            className="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-white/[0.08] focus:border-blue-500/50 focus:outline-none transition-all text-white text-center font-bold text-lg"
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-white/[0.08] focus:border-white/25 focus:outline-none transition-all text-white text-center font-bold text-lg"
                                         />
                                     </div>
                                 )}
@@ -280,7 +280,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                             value={(formData as any).assignment_total || 4}
                                             onChange={handleChange}
                                             min="1"
-                                            className="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-white/[0.08] focus:border-blue-500/50 focus:outline-none transition-all text-white text-center font-bold text-lg"
+                                            className="w-full px-4 py-2.5 rounded-2xl bg-black/40 border border-white/[0.08] focus:border-white/25 focus:outline-none transition-all text-white text-center font-bold text-lg"
                                         />
                                     </div>
                                 )}

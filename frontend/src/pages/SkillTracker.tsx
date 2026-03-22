@@ -20,8 +20,8 @@ const SKILL_CATEGORIES = [
 const SKILL_LEVELS: Skill['level'][] = ['beginner', 'intermediate', 'advanced', 'expert'];
 
 const LEVEL_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
-    beginner: { color: '#3b82f6', bg: 'rgba(59,130,246,0.1)', border: 'rgba(59,130,246,0.2)' },
-    intermediate: { color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)', border: 'rgba(139,92,246,0.2)' },
+    beginner: { color: '#ffffff', bg: 'rgba(255,255,255,0.1)', border: 'rgba(255,255,255,0.2)' },
+    intermediate: { color: '#8b5cf6', bg: 'rgba(255,255,255,0.1)', border: 'rgba(255,255,255,0.2)' },
     advanced: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
     expert: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' },
 };
@@ -116,17 +116,17 @@ const SkillTracker: React.FC = () => {
 
     return (
         <div className="pb-32 max-w-7xl mx-auto px-4">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12 relative rounded-[2.5rem] border border-white/[0.06] bg-[#0a0a0a] p-8 md:p-12 overflow-hidden shadow-2xl" style={{ boxShadow: '0 0 80px rgba(59,130,246,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-blue-500/[0.02] blur-[150px] pointer-events-none" />
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12 relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden shadow-2xl" style={{ boxShadow: '0 0 80px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-white/10/[0.02] blur-[150px] pointer-events-none" />
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
                     <div className="text-center md:text-left">
                         <div className="flex items-center justify-center md:justify-start gap-5 mb-5">
-                            <div className="w-14 h-14 rounded-3xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20 shadow-lg shadow-blue-500/10">
+                            <div className="w-14 h-14 rounded-3xl bg-white/5 flex items-center justify-center text-white border border-white/10 shadow-lg shadow-white/5">
                                 <Rocket size={28} />
                             </div>
                             <div>
                                 <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none mb-1">Capability Matrix</h1>
-                                <div className="flex items-center justify-center md:justify-start gap-2 text-blue-400/60 font-mono text-[10px] uppercase tracking-[0.2em] font-black">
+                                <div className="flex items-center justify-center md:justify-start gap-2 text-white/60 font-mono text-[10px] uppercase tracking-[0.2em] font-black">
                                     <ShieldCheck size={12} className="animate-pulse" />
                                     Active Evolution: Node {skills.length}
                                 </div>
@@ -135,13 +135,13 @@ const SkillTracker: React.FC = () => {
                         <p className="text-white/30 font-bold text-xs md:text-sm tracking-[0.15em] uppercase max-w-lg leading-relaxed">Mapping professional aptitude and cognitive skill sets for mission-critical objectives.</p>
                     </div>
 
-                    <Button icon={<Plus size={16} />} onClick={() => { setEditingSkill(null); setFormData({ name: '', category: 'Technical', level: 'beginner', progress: 0, notes: '' }); setIsModalOpen(true); }} className="h-14 px-8 rounded-2xl bg-blue-500 text-white font-black tracking-widest uppercase text-xs hover:bg-blue-600 shadow-xl shadow-blue-500/20">New Capability</Button>
+                    <Button icon={<Plus size={16} />} onClick={() => { setEditingSkill(null); setFormData({ name: '', category: 'Technical', level: 'beginner', progress: 0, notes: '' }); setIsModalOpen(true); }} className="h-14 px-8 rounded-2xl bg-white/10 text-white font-black tracking-widest uppercase text-xs hover:bg-white/20 shadow-xl shadow-white/10">New Capability</Button>
                 </div>
             </motion.div>
 
             <div className="mb-10 flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 {['all', ...SKILL_CATEGORIES].map(cat => (
-                    <button key={cat} onClick={() => { setFilter(cat); localStorage.setItem('acadhub_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
+                    <button key={cat} onClick={() => { setFilter(cat); localStorage.setItem('acadhub_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-white/10 border-blue-500 text-white shadow-lg shadow-white/10' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
                         {cat}
                     </button>
                 ))}
@@ -154,7 +154,7 @@ const SkillTracker: React.FC = () => {
                             const cfg = LEVEL_CONFIG[skill.level] || LEVEL_CONFIG.beginner;
                             return (
                                 <motion.div key={skill._id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
-                                    <div className="group relative rounded-[2.5rem] border border-white/[0.06] bg-[#0a0a0a] p-8 h-full flex flex-col transition-all hover:bg-white/[0.01] hover:border-white/[0.12] shadow-xl overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}>
+                                    <div className="group relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 h-full flex flex-col transition-all hover:bg-white/[0.01] hover:border-white/[0.12] shadow-xl overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}>
                                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
                                         <div className="flex justify-between items-start mb-6">
@@ -163,7 +163,7 @@ const SkillTracker: React.FC = () => {
                                                     <span className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest" style={{ color: cfg.color, backgroundColor: cfg.bg, border: `1px solid ${cfg.border}` }}>{skill.level}</span>
                                                     <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">{skill.category}</span>
                                                 </div>
-                                                <h3 className="text-xl font-black text-white tracking-tight uppercase group-hover:text-blue-400 transition-colors uppercase">{skill.name}</h3>
+                                                <h3 className="text-xl font-black text-white tracking-tight uppercase group-hover:text-white transition-colors uppercase">{skill.name}</h3>
                                             </div>
                                             <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
                                                 <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/20 hover:text-white hover:bg-white/10 transition-all border border-white/5"><Edit2 size={14} /></button>
@@ -179,7 +179,7 @@ const SkillTracker: React.FC = () => {
                                                     <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-0.5">Integration</p>
                                                     <p className="text-xs font-black text-white tracking-widest">{skill.progress}%</p>
                                                 </div>
-                                                <Sparkles size={14} className="text-blue-500/20 group-hover:text-blue-400 transition-colors" />
+                                                <Sparkles size={14} className="text-white/20 group-hover:text-white transition-colors" />
                                             </div>
                                             <div className="h-1.5 rounded-full bg-white/5 overflow-hidden border border-white/[0.04]">
                                                 <motion.div initial={{ width: 0 }} animate={{ width: `${skill.progress}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400" />
@@ -202,12 +202,12 @@ const SkillTracker: React.FC = () => {
                     </div>
                     <Input label="Description" value={formData.notes || ''} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Enter capability details..." />
                     <div>
-                        <div className="flex justify-between mb-3"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Efficiency</span><span className="text-xs font-black text-blue-400">{formData.progress}%</span></div>
+                        <div className="flex justify-between mb-3"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Efficiency</span><span className="text-xs font-black text-white">{formData.progress}%</span></div>
                         <input type="range" min="0" max="100" step="5" value={formData.progress} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) })} className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-blue-500" />
                     </div>
                     <div className="flex gap-3 pt-4">
                         <Button variant="outlined" onClick={() => setIsModalOpen(false)} className="flex-1 uppercase tracking-widest text-[10px] font-black h-12">Abort</Button>
-                        <Button onClick={handleSave} isLoading={isSaving} className="flex-1 uppercase tracking-widest text-[10px] font-black h-12 bg-blue-500 text-white shadow-xl shadow-blue-500/20">{editingSkill ? 'Commit' : 'Start'}</Button>
+                        <Button onClick={handleSave} isLoading={isSaving} className="flex-1 uppercase tracking-widest text-[10px] font-black h-12 bg-white/10 text-white shadow-xl shadow-white/10">{editingSkill ? 'Commit' : 'Start'}</Button>
                     </div>
                 </div>
             </Modal>

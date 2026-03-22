@@ -169,25 +169,25 @@ const Settings: React.FC = () => {
         { key: 'data', label: 'Storage', icon: <Shield size={14} /> },
     ];
 
-    const inputCls = "w-full px-5 py-3.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] text-white text-sm placeholder-white/20 focus:outline-none focus:border-blue-500/40 focus:ring-4 focus:ring-blue-500/5 transition-all";
+    const inputCls = "w-full px-5 py-3.5 rounded-2xl border border-white/[0.06] bg-white/[0.02] text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/20 focus:ring-4 focus:ring-white/10 transition-all";
 
     return (
         <motion.div initial="hidden" animate="visible" variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } }} className="max-w-4xl mx-auto pb-32 pt-20 px-4">
 
             {/* ── Cinematic Hero ────────────────────────────────────────── */}
-            <motion.section variants={{ hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0 } }} className="relative mb-8 rounded-3xl border border-white/[0.06] bg-[#050508] p-8 md:p-12 overflow-hidden shadow-2xl" style={{ boxShadow: '0 40px 100px -20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-blue-500/[0.04] blur-[120px] pointer-events-none" />
+            <motion.section variants={{ hidden: { opacity: 0, y: 15 }, visible: { opacity: 1, y: 0 } }} className="relative mb-8 rounded-3xl border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden shadow-2xl" style={{ boxShadow: '0 40px 100px -20px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/10/[0.04] blur-[120px] pointer-events-none" />
                 <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 md:gap-12">
                     <div className="relative group">
-                        <div className="w-28 h-28 md:w-32 md:h-32 rounded-[2.5rem] bg-[#0a0a0a] border-4 border-[#050508] overflow-hidden shadow-2xl relative">
+                        <div className="w-28 h-28 md:w-32 md:h-32 rounded-[2.5rem] glass-panel border-4 border-[#050508] overflow-hidden shadow-2xl relative">
                             {user?.picture ? (
                                 <img src={user.picture} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                             ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-blue-500/20 to-blue-500/5 flex items-center justify-center text-4xl font-black text-blue-400">{(user?.name || 'P').charAt(0)}</div>
+                                <div className="w-full h-full bg-gradient-to-br from-blue-500/20 to-blue-500/5 flex items-center justify-center text-4xl font-black text-white">{(user?.name || 'P').charAt(0)}</div>
                             )}
                             {isEditingProfile && (
                                 <label className={`absolute inset-0 bg-black/60 flex items-center justify-center cursor-pointer transition-opacity ${isUploadingPfp ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                    {isUploadingPfp ? <RefreshCw size={24} className="text-blue-400 animate-spin" /> : <Camera size={24} className="text-white" />}
+                                    {isUploadingPfp ? <RefreshCw size={24} className="text-white animate-spin" /> : <Camera size={24} className="text-white" />}
                                     <input type="file" accept="image/*" className="hidden" disabled={isUploadingPfp} onChange={async (e) => {
                                         const file = e.target.files?.[0];
                                         if (!file) return;
@@ -226,12 +226,12 @@ const Settings: React.FC = () => {
                                 </label>
                             )}
                         </div>
-                        <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-blue-500 flex items-center justify-center text-white border-4 border-[#050508] shadow-lg shadow-blue-500/40"><ShieldCheck size={14} /></div>
+                        <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white border-4 border-[#050508] shadow-lg shadow-white/20"><ShieldCheck size={14} /></div>
                     </div>
                     <div className="flex-1 text-center md:text-left">
                         <div className="flex items-center justify-center md:justify-start gap-4 mb-2">
                             <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">{user?.name || 'Strategic Pilot'}</h1>
-                            <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-black text-blue-400 uppercase tracking-widest">Authenticated</span>
+                            <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black text-white uppercase tracking-widest">Authenticated</span>
                         </div>
                         <p className="text-white/30 font-medium mb-6 flex flex-wrap justify-center md:justify-start items-center gap-x-4">
                             <span className="flex items-center gap-2"><Mail size={14} /> {user?.email}</span>
@@ -240,11 +240,11 @@ const Settings: React.FC = () => {
                         </p>
                         <div className="flex flex-wrap justify-center md:justify-start gap-3">
                             <div className="px-4 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center gap-2">
-                                <Activity size={14} className="text-blue-400" />
+                                <Activity size={14} className="text-white" />
                                 <span className="text-[11px] font-bold text-white/50 tracking-tight">{dashboardStats?.attendance.toFixed(1)}% Operational</span>
                             </div>
                             <div className="px-4 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center gap-2">
-                                <GraduationCap size={14} className="text-blue-400" />
+                                <GraduationCap size={14} className="text-white" />
                                 <span className="text-[11px] font-bold text-white/50 tracking-tight">Sem {user?.semester || currentSemester}</span>
                             </div>
                         </div>
@@ -255,7 +255,7 @@ const Settings: React.FC = () => {
             {/* ── Navigation ────────────────────────────────────────────── */}
             <div className="flex gap-2 mb-8 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.04] overflow-x-auto no-scrollbar">
                 {tabs.map(t => (
-                    <button key={t.key} onClick={() => setActiveTab(t.key)} className={`flex-1 flex gap-2 items-center justify-center px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${activeTab === t.key ? 'bg-blue-500 text-white shadow-xl shadow-blue-500/20' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{t.icon} {t.label}</button>
+                    <button key={t.key} onClick={() => setActiveTab(t.key)} className={`flex-1 flex gap-2 items-center justify-center px-6 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${activeTab === t.key ? 'bg-white/10 text-white shadow-xl shadow-white/10' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{t.icon} {t.label}</button>
                 ))}
             </div>
 
@@ -267,13 +267,13 @@ const Settings: React.FC = () => {
                     {activeTab === 'profile' && (
                         <div className="space-y-6">
                             {/* Core Identity */}
-                            <div className="rounded-[2.5rem] border border-white/[0.06] bg-[#0a0a0a] p-8" style={{ boxShadow: '0 0 40px rgba(16,185,129,0.01), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                            <div className="rounded-[2.5rem] border border-white/[0.06] glass-panel p-8" style={{ boxShadow: '0 0 40px rgba(255,255,255,0.01), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                                 <div className="flex items-center justify-between mb-8">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400"><User size={20} /></div>
+                                        <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-white"><User size={20} /></div>
                                         <div><h3 className="text-base font-black text-white tracking-tight">Core Protocol</h3><p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">Primary Identity Details</p></div>
                                     </div>
-                                    <button onClick={() => isEditingProfile ? handleProfileSave() : setIsEditingProfile(true)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>{isEditingProfile ? 'Update Station' : 'Edit Protocol'}</button>
+                                    <button onClick={() => isEditingProfile ? handleProfileSave() : setIsEditingProfile(true)} className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isEditingProfile ? 'bg-white/10 text-white shadow-lg shadow-white/10' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}>{isEditingProfile ? 'Update Station' : 'Edit Protocol'}</button>
                                 </div>
                                 <div className="space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -302,7 +302,7 @@ const Settings: React.FC = () => {
                                         <div>
                                             <div className="flex justify-between mb-2.5 ml-1">
                                                 <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest">Global Target</label>
-                                                <span className="text-[10px] font-black text-blue-400">{profileForm.attendance_threshold}%</span>
+                                                <span className="text-[10px] font-black text-white">{profileForm.attendance_threshold}%</span>
                                             </div>
                                             <input type="range" min="50" max="100" value={profileForm.attendance_threshold} onChange={e => setProfileForm({ ...profileForm, attendance_threshold: parseInt(e.target.value) })} disabled={!isEditingProfile} className="w-full accent-blue-500 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer" />
                                         </div>

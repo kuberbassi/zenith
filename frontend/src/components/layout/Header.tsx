@@ -74,7 +74,7 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
         <>
             {/* ── Floating Pill Header — fixed to viewport (all screen sizes) ── */}
             <div className="flex fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-24px)]">
-                <div className="flex items-center h-11 md:h-14 px-2 md:px-3 rounded-full bg-[#111]/90 backdrop-blur-2xl border border-white/[0.1]" style={{ boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 4px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center h-11 md:h-14 px-2 md:px-3 rounded-full glass-panel/90 backdrop-blur-2xl border border-white/[0.1]" style={{ boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 4px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
                     {/* Page icon + title */}
                     <div className="flex items-center gap-1.5 md:gap-3 px-2 md:px-4">
                         <PageIcon size={16} className="text-white/40 shrink-0" />
@@ -100,14 +100,14 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -4 }}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-[#111] border border-white/[0.08] rounded-2xl p-1.5 shadow-xl shadow-black/50 min-w-[130px]"
+                                    className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel border border-white/[0.08] rounded-2xl p-1.5 shadow-xl shadow-black/50 min-w-[130px]"
                                 >
                                     {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                                         <button
                                             key={s}
                                             onClick={() => { setCurrentSemester(s); setSemDropOpen(false); }}
                                             className={`w-full text-left px-3 py-2 rounded-lg text-[12px] font-medium transition-colors ${s === currentSemester
-                                                ? 'bg-blue-500/15 text-blue-400'
+                                                ? 'bg-white/7 text-white'
                                                 : 'text-white/50 hover:bg-white/[0.05] hover:text-white/70'
                                                 }`}
                                         >
@@ -142,7 +142,7 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
                         >
                             <Bell size={16} />
                             {notificationCount > 0 && (
-                                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-white/10 rounded-full" />
                             )}
                         </Link>
 
@@ -170,10 +170,10 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
                             initial={{ opacity: 0, y: -8, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                            className="fixed top-24 left-1/2 -translate-x-1/2 w-full max-w-md bg-[#0a0a0a] rounded-[2rem] border border-white/[0.06] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.04)] z-50 overflow-hidden"
+                            className="fixed top-24 left-1/2 -translate-x-1/2 w-full max-w-md glass-panel rounded-[2rem] border border-white/[0.06] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.04)] z-50 overflow-hidden"
                         >
                             <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06]">
-                                <Search size={18} className="text-blue-500/50" />
+                                <Search size={18} className="text-white/50" />
                                 <input
                                     type="text"
                                     placeholder="Search pages..."
@@ -196,8 +196,8 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
                                             onClick={() => setSearchOpen(false)}
                                             className="flex items-center gap-4 px-4 py-3 rounded-2xl hover:bg-white/[0.04] text-white/50 hover:text-white transition-colors group"
                                         >
-                                            <div className="p-2 rounded-xl bg-white/[0.02] group-hover:bg-blue-500/10 transition-colors">
-                                                <item.icon size={18} className="text-white/40 group-hover:text-blue-400 transition-colors" />
+                                            <div className="p-2 rounded-xl bg-white/[0.02] group-hover:bg-white/5 transition-colors">
+                                                <item.icon size={18} className="text-white/40 group-hover:text-white transition-colors" />
                                             </div>
                                             <span className="text-sm font-bold tracking-wide">{item.name}</span>
                                         </Link>

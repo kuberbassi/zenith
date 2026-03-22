@@ -32,15 +32,15 @@ const SystemLogsSection: React.FC = () => {
 
     const getLogIcon = (action: string) => {
         const value = action.toLowerCase();
-        if (value.includes('profile')) return <User size={14} className="text-blue-500" />;
-        if (value.includes('attendance') || value.includes('subject')) return <Activity size={14} className="text-blue-500" />;
+        if (value.includes('profile')) return <User size={14} className="text-white" />;
+        if (value.includes('attendance') || value.includes('subject')) return <Activity size={14} className="text-white" />;
         if (value.includes('delete') || value.includes('reset') || value.includes('wipe')) return <Trash2 size={14} className="text-red-500" />;
-        if (value.includes('setting') || value.includes('preference')) return <SettingsIcon size={14} className="text-blue-400" />;
+        if (value.includes('setting') || value.includes('preference')) return <SettingsIcon size={14} className="text-white" />;
         return <FileText size={14} className="text-white/40" />;
     };
 
     if (loading) {
-        return <div className="h-48 flex items-center justify-center"><RefreshCw className="animate-spin text-blue-500/40" /></div>;
+        return <div className="h-48 flex items-center justify-center"><RefreshCw className="animate-spin text-white/40" /></div>;
     }
 
     const dates = Object.keys(groupedLogs);
@@ -48,7 +48,7 @@ const SystemLogsSection: React.FC = () => {
     return (
         <div className="space-y-6">
             {dates.length === 0 ? (
-                <div className="rounded-3xl border border-white/[0.06] bg-[#0a0a0a] p-12 flex flex-col items-center justify-center text-center">
+                <div className="rounded-3xl border border-white/[0.06] glass-panel p-12 flex flex-col items-center justify-center text-center">
                     <Clock size={32} className="text-white/10 mb-4" />
                     <h3 className="text-sm font-bold text-white tracking-widest uppercase mb-1">Station Clean</h3>
                     <p className="text-xs text-white/30 max-w-xs">No activity has been logged in your terminal yet.</p>
@@ -61,10 +61,10 @@ const SystemLogsSection: React.FC = () => {
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">{date}</h3>
                             <div className="h-px flex-1 bg-white/[0.04]" />
                         </div>
-                        <div className="rounded-3xl border border-white/[0.06] bg-[#0a0a0a] overflow-hidden divide-y divide-white/[0.03]">
+                        <div className="rounded-3xl border border-white/[0.06] glass-panel overflow-hidden divide-y divide-white/[0.03]">
                             {groupedLogs[date].map((log, index) => (
                                 <div key={index} className="flex gap-4 p-5 hover:bg-white/[0.01] transition-colors group">
-                                    <div className="w-10 h-10 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center shrink-0 group-hover:border-blue-500/30 transition-all">
+                                    <div className="w-10 h-10 rounded-2xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center shrink-0 group-hover:border-white/15 transition-all">
                                         {getLogIcon(log.action)}
                                     </div>
                                     <div className="flex-1 min-w-0">

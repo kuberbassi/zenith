@@ -89,7 +89,7 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSucc
             {isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-                    <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-2xl bg-[#0a0a0a] rounded-[2.5rem] border border-white/[0.06] p-8 md:p-12 shadow-2xl overflow-hidden">
+                    <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-2xl glass-panel rounded-[2.5rem] border border-white/[0.06] p-8 md:p-12 shadow-2xl overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
 
                         <div className="flex items-center justify-between mb-10">
@@ -102,14 +102,14 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSucc
                                     <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Institutional Calibration // Sector {semester}</p>
                                 </div>
                             </div>
-                            <Button onClick={handleAddPeriod} variant="outlined" className="h-12 px-6 rounded-xl border-white/[0.08] text-blue-400 font-black tracking-widest uppercase text-[10px] hover:bg-blue-500/10">
+                            <Button onClick={handleAddPeriod} variant="outlined" className="h-12 px-6 rounded-xl border-white/[0.08] text-white font-black tracking-widest uppercase text-[10px] hover:bg-white/5">
                                 Add Interval
                             </Button>
                         </div>
 
                         <div className="max-h-[400px] overflow-y-auto pr-4 no-scrollbar space-y-4">
                             {periods.map((period, idx) => (
-                                <motion.div key={period.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }} className="flex items-center gap-4 p-5 rounded-2xl bg-[#050508] border border-white/[0.04] group hover:border-white/[0.1] transition-all">
+                                <motion.div key={period.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }} className="flex items-center gap-4 p-5 rounded-2xl glass-panel border border-white/[0.04] group hover:border-white/[0.1] transition-all">
                                     <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-[10px] font-black text-white/20 border border-white/5">{idx + 1}</div>
                                     <div className="flex-1 grid grid-cols-3 gap-4">
                                         <Input value={period.name} onChange={e => handleUpdatePeriod(period.id, 'name', e.target.value)} placeholder="Interval ID" className="bg-transparent border-none p-0 h-8" />
@@ -128,7 +128,7 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSucc
 
                         <div className="flex gap-4 mt-10">
                             <Button variant="outlined" onClick={onClose} className="flex-1 h-14 rounded-2xl border-white/10 text-white font-black uppercase tracking-widest text-[10px]">Abort</Button>
-                            <Button onClick={handleSave} isLoading={loading} className="flex-[2] h-14 rounded-2xl bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-blue-500/20">Commit Calibration</Button>
+                            <Button onClick={handleSave} isLoading={loading} className="flex-[2] h-14 rounded-2xl bg-white/10 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-white/10">Commit Calibration</Button>
                         </div>
                     </motion.div>
                 </div>

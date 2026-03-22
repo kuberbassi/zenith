@@ -41,8 +41,8 @@ function calcCGPA(semesters: any[]): number {
 function gradeBgClass(grade: string): string {
     const pt = GRADE_POINTS[grade];
     if (pt === undefined || pt === 0) return 'bg-red-500/10 text-red-400 border border-red-500/20';
-    if (pt >= 9) return 'bg-blue-500/15 text-blue-300 border border-blue-500/30';
-    if (pt >= 7) return 'bg-green-500/10 text-green-400 border border-green-500/20';
+    if (pt >= 9) return 'bg-white/7 text-white border border-white/15';
+    if (pt >= 7) return 'bg-green-500/10 text-white border border-green-500/20';
     if (pt >= 5) return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
     return 'bg-orange-500/10 text-orange-400 border border-orange-500/20';
 }
@@ -163,7 +163,7 @@ const Results: React.FC = () => {
     const [pdfSem, setPdfSem] = useState<string>('overall');
     const [pdfLoading, setPdfLoading] = useState(false);
 
-    const accentColor = '#3b82f6';
+    const accentColor = '#ffffff';
     const gridColor = 'rgba(255,255,255,0.04)';
 
     useEffect(() => {
@@ -290,7 +290,7 @@ const Results: React.FC = () => {
         } finally { setFetching(false); }
     }
 
-    const inputCls = 'w-full px-4 py-3 rounded-xl border border-white/10 bg-white/[0.02] text-white text-sm placeholder-white/20 focus:outline-none focus:border-blue-500/50 transition-all';
+    const inputCls = 'w-full px-4 py-3 rounded-xl border border-white/10 bg-white/[0.02] text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-all';
 
     /*  Computed metrics  */
     const metrics = useMemo(() => {
@@ -383,7 +383,7 @@ const Results: React.FC = () => {
                 data: chartSubjects.map((s: any) => getSubjectPercentage(s)),
                 backgroundColor: chartSubjects.map((s: any) => {
                     const pct = getSubjectPercentage(s);
-                    if (pct >= 75) return '#3b82f6';
+                    if (pct >= 75) return '#ffffff';
                     if (pct >= 60) return '#22c55e';
                     if (pct >= 50) return '#f59e0b';
                     return '#ef4444';
@@ -442,9 +442,9 @@ const Results: React.FC = () => {
         const labels = Object.keys(dist).filter(k => dist[k] > 0);
         const data = labels.map(k => dist[k]);
         const colors = labels.map(g => {
-            if (g === 'O') return '#3b82f6'; // Blue
+            if (g === 'O') return '#ffffff'; // Blue
             if (g === 'A+') return '#8b5cf6'; // Purple
-            if (g === 'A') return '#10b981'; // Green
+            if (g === 'A') return '#ffffff'; // Green
             if (g === 'B+') return '#f59e0b'; // Amber
             if (g === 'B') return '#f97316'; // Orange
             if (g === 'C+' || g === 'C') return '#ef4444'; // Red
@@ -466,7 +466,7 @@ const Results: React.FC = () => {
     };
 
     if (step === 'loading') {
-        return <div className="flex items-center justify-center h-screen"><RefreshCw className="animate-spin text-blue-500/40" /></div>;
+        return <div className="flex items-center justify-center h-screen"><RefreshCw className="animate-spin text-white/40" /></div>;
     }
 
     return (
@@ -502,9 +502,9 @@ const Results: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] p-8 shadow-2xl" style={{ boxShadow: '0 0 40px rgba(59,130,246,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                    <div className="rounded-3xl border border-white/[0.08] glass-panel p-8 shadow-2xl" style={{ boxShadow: '0 0 40px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
                         <div className="flex items-center gap-4 mb-8">
-                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10">
                                 <GraduationCap size={24} />
                             </div>
                             <div>
@@ -540,7 +540,7 @@ const Results: React.FC = () => {
                             </div>
                             <Button
                                 type="submit" isLoading={fetching}
-                                className="w-full h-12 justify-center rounded-xl bg-blue-500 text-white font-black tracking-widest uppercase text-xs hover:bg-blue-600 transition-all shadow-lg shadow-blue-500/20"
+                                className="w-full h-12 justify-center rounded-xl bg-white/10 text-white font-black tracking-widest uppercase text-xs hover:bg-white/20 transition-all shadow-lg shadow-white/10"
                                 icon={<Zap size={14} />}
                             >
                                 {results ? 'Sync Now' : 'Initialize Link'}
@@ -556,7 +556,7 @@ const Results: React.FC = () => {
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                     className="max-w-md mx-auto mt-10"
                 >
-                    <div className="rounded-3xl border border-white/[0.08] bg-[#0a0a0a] p-8">
+                    <div className="rounded-3xl border border-white/[0.08] glass-panel p-8">
                         <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-5">
                             <div>
                                 <h2 className="text-xl font-black text-white tracking-tight">Security Check</h2>
@@ -577,7 +577,7 @@ const Results: React.FC = () => {
                             <p className="mb-4 text-[11px] text-amber-400/70">CAPTCHA is case-sensitive and single-use. Refresh before every retry.</p>
                             <div className="flex gap-2">
                                 <Button type="button" onClick={() => setStep('form')} variant="secondary" className="flex-1 justify-center rounded-xl bg-white/5 border border-white/5 text-white/40 text-[10px] font-black uppercase tracking-widest">Back</Button>
-                                <Button type="submit" isLoading={fetching} className="flex-1 justify-center rounded-xl bg-blue-500 text-white font-black tracking-widest uppercase text-[10px] shadow-lg shadow-blue-500/20">Verify</Button>
+                                <Button type="submit" isLoading={fetching} className="flex-1 justify-center rounded-xl bg-white/10 text-white font-black tracking-widest uppercase text-[10px] shadow-lg shadow-white/10">Verify</Button>
                             </div>
                         </form>
                     </div>
@@ -624,12 +624,12 @@ const Results: React.FC = () => {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="w-full max-w-sm rounded-3xl border border-white/[0.08] bg-[#080808] p-8"
+                        className="w-full max-w-sm rounded-3xl border border-white/[0.08] glass-panel p-8"
                     >
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                                    <Download size={14} className="text-emerald-400" />
+                                    <Download size={14} className="text-white" />
                                 </div>
                                 <h3 className="text-base font-black text-white">Download Results PDF</h3>
                             </div>
@@ -655,7 +655,7 @@ const Results: React.FC = () => {
                                     onClick={() => setPdfSem(opt.val)}
                                     className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-xs font-bold text-left transition-all ${
                                         pdfSem === opt.val
-                                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                                            ? 'border-emerald-500/40 bg-emerald-500/10 text-white'
                                             : 'border-white/[0.06] bg-white/[0.02] text-white/40 hover:bg-white/[0.05]'
                                     }`}
                                 >
@@ -673,7 +673,7 @@ const Results: React.FC = () => {
                             <button
                                 onClick={handleDownloadPdf}
                                 disabled={pdfLoading}
-                                className="flex-1 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-xs font-black text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-xs font-black text-white hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                             >
                                 {pdfLoading
                                     ? <><RefreshCw size={12} className="animate-spin" /> Generating…</>

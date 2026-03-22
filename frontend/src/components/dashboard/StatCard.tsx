@@ -28,7 +28,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, color = 
                     {icon}
                 </div>
                 {trend && (
-                    <div className={`flex items-center text-xs font-bold ${trend === 'up' ? 'text-green-500' : 'text-error'}`}>
+                    <div className={`flex items-center text-xs font-bold ${trend === 'up' ? 'text-white' : 'text-error'}`}>
                         {trend === 'up' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
                     </div>
                 )}

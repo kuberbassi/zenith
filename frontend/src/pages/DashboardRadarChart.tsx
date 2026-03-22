@@ -36,10 +36,10 @@ const DashboardRadarChart: React.FC<Props> = ({ subjects }) => {
             {
                 label: 'Attendance',
                 data: values,
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59,130,246,0.12)',
+                borderColor: '#ffffff',
+                backgroundColor: 'rgba(255,255,255,0.12)',
                 borderWidth: 2,
-                pointBackgroundColor: '#3b82f6',
+                pointBackgroundColor: '#ffffff',
                 pointBorderWidth: 0,
             },
         ],

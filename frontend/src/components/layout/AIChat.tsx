@@ -17,7 +17,7 @@ const renderMarkdown = (text: string) => {
         // Bullet points
         const trimmed = line.trim();
         if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
-            return <div key={i} className="flex gap-1.5 ml-1"><span className="text-blue-400/60 shrink-0">•</span><span>{parts.slice(0)}</span></div>;
+            return <div key={i} className="flex gap-1.5 ml-1"><span className="text-white/60 shrink-0">•</span><span>{parts.slice(0)}</span></div>;
         }
 
         // Empty lines become spacing
@@ -144,7 +144,7 @@ const AIChat: React.FC = () => {
                         onClick={() => setIsOpen(true)}
                         className="fixed bottom-6 right-6 lg:right-8 z-50 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center overflow-hidden group"
                         style={{
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #6366f1 100%)',
+                            background: 'linear-gradient(135deg, #ffffff 0%, #8b5cf6 50%, #6366f1 100%)',
                             boxShadow: '0 4px 24px rgba(99, 102, 241, 0.4), 0 2px 8px rgba(0,0,0,0.3)',
                         }}
                     >
@@ -172,7 +172,7 @@ const AIChat: React.FC = () => {
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%)' }}>
                             <div className="flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)' }}>
+                                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ffffff, #8b5cf6)' }}>
                                     <Sparkles className="w-3.5 h-3.5 text-white" />
                                 </div>
                                 <div>
@@ -201,8 +201,8 @@ const AIChat: React.FC = () => {
                             {/* Empty State */}
                             {messages.length === 0 && !isTyping && (
                                 <div className="h-full flex flex-col items-center justify-center gap-5 py-6">
-                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.15))', border: '1px solid rgba(99,102,241,0.2)' }}>
-                                        <Sparkles className="w-5 h-5 text-blue-400" />
+                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.15))', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                        <Sparkles className="w-5 h-5 text-white" />
                                     </div>
                                     <div className="text-center">
                                         <p className="text-white/60 text-sm font-medium mb-1">Ask me anything</p>
@@ -236,8 +236,8 @@ const AIChat: React.FC = () => {
                                     className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     {msg.role === 'assistant' && (
-                                        <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: msg.error ? 'rgba(239,68,68,0.15)' : 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))', border: `1px solid ${msg.error ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.15)'}` }}>
-                                            <Sparkles className={`w-3 h-3 ${msg.error ? 'text-red-400' : 'text-blue-400'}`} />
+                                        <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: msg.error ? 'rgba(239,68,68,0.15)' : 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.2))', border: `1px solid ${msg.error ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.15)'}` }}>
+                                            <Sparkles className={`w-3 h-3 ${msg.error ? 'text-red-400' : 'text-white'}`} />
                                         </div>
                                     )}
                                     <div
@@ -249,7 +249,7 @@ const AIChat: React.FC = () => {
                                             }`}
                                         style={{
                                             background: msg.role === 'user'
-                                                ? 'linear-gradient(135deg, #3b82f6, #6366f1)'
+                                                ? 'linear-gradient(135deg, #ffffff, #6366f1)'
                                                 : msg.error
                                                     ? 'rgba(239,68,68,0.08)'
                                                     : 'rgba(255,255,255,0.04)',
@@ -269,8 +269,8 @@ const AIChat: React.FC = () => {
                             {/* Typing Indicator */}
                             {isTyping && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2 items-start">
-                                    <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))', border: '1px solid rgba(99,102,241,0.15)' }}>
-                                        <Sparkles className="w-3 h-3 text-blue-400" />
+                                    <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.2))', border: '1px solid rgba(99,102,241,0.15)' }}>
+                                        <Sparkles className="w-3 h-3 text-white" />
                                     </div>
                                     <div className="px-3 py-2.5 rounded-2xl rounded-bl-md flex items-center gap-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.04)' }}>
                                         {[0, 0.15, 0.3].map((delay, i) => (
@@ -299,14 +299,14 @@ const AIChat: React.FC = () => {
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                                     placeholder="Ask about your academics..."
-                                    className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-xl py-2.5 px-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/30 transition-all"
+                                    className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-xl py-2.5 px-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-white/15 transition-all"
                                 />
                                 <button
                                     onClick={() => handleSend()}
                                     disabled={!input.trim() || isTyping}
                                     className="w-9 h-9 rounded-xl flex items-center justify-center transition-all disabled:opacity-20"
                                     style={{
-                                        background: input.trim() && !isTyping ? 'linear-gradient(135deg, #3b82f6, #6366f1)' : 'rgba(255,255,255,0.04)',
+                                        background: input.trim() && !isTyping ? 'linear-gradient(135deg, #ffffff, #6366f1)' : 'rgba(255,255,255,0.04)',
                                         border: '1px solid rgba(255,255,255,0.06)',
                                     }}
                                 >
