@@ -6,6 +6,7 @@ import { GradeCalculator } from '../lib/calculations.js'
 import { fetchIpuResults } from '../services/ipuClient.js'
 import { ok, created, fail } from '../utils/response.js'
 import { mergePreferredRecord } from '../utils/recordMerge.js'
+import { buildResultsPayload } from '../utils/resultsPayload.js'
 import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
 
 const router = Router()
@@ -281,80 +282,7 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
         const cacheId = buildViewCacheId('results_analytics', {})
         const cached = await readViewCache<any>(userId, cacheId)
         if (cached) { ok(res, cached, 200, 0); return }
-        const results = await prisma.semesterResult.findMany({
-            where: { user_id: userId },
-            orderBy: { semester: 'asc' },
-        })
-        if (!results.length) {
-            ok(res, { cgpa: 0, semesters: [], gradeDistribution: {}, overallPercentage: 0, academicStrength: 0 })
-            return
-        }
-
-        const userDoc = await prisma.user.findUnique({ where: { id: userId } })
-        const rawStudentInfo = results.reduce((acc: any, row: any) => {
-            const current = (row.student_info ?? {}) as Record<string, unknown>
-            return mergePreferredRecord(current, acc)
-        }, {} as Record<string, unknown>)
-        const enrichedStudentInfo = {
-            ...(userDoc?.name ? { name: userDoc.name } : {}),
-            ...(userDoc?.enrollment_number ? { roll_no: userDoc.enrollment_number } : {}),
-            ...(userDoc?.mother_name ? { mother: userDoc.mother_name } : {}),
-            ...(userDoc?.phone_number ? { phone: userDoc.phone_number } : {}),
-            ...(userDoc?.email ? { email: userDoc.email } : {}),
-            ...(userDoc?.gender ? { gender: userDoc.gender } : {}),
-            ...(userDoc?.batch ? { batch: userDoc.batch } : {}),
-            ...(userDoc?.course ? { programme: userDoc.course } : {}),
-            ...(userDoc?.college ? { institution: userDoc.college } : {}),
-            ...(userDoc?.admission_year ? { admission_year: userDoc.admission_year } : {}),
-            ...rawStudentInfo,
-        }
-
-        const mappedSemesters = results.map((r: any) => ({
-            semester: String(r.semester),
-            semester_num: r.semester,
-            semester_label: r.semester_label || `Semester ${r.semester}`,
-            subjects: r.subjects || [],
-            sgpa: r.sgpa ? String(r.sgpa) : null,
-            total_marks: r.total_marks || null,
-            max_marks: r.max_marks || null,
-        }))
-
-        const semSubjects = results.map((r: any) => r.subjects as Array<Record<string, unknown>>)
-        const cgpaCalc = GradeCalculator.calculateCGPA(semSubjects)
-
-        const gradeDist: Record<string, number> = {}
-        let totalMarks = 0
-        let totalMaxMarks = 0
-        results.forEach((r: any) => {
-            if (Array.isArray(r.subjects)) {
-                (r.subjects as any[]).forEach((s: any) => {
-                    if (s.is_pending || s.grade === '-' || s.total_marks === null) return
-                    totalMarks += Number(s.total_marks ?? 0)
-                    totalMaxMarks += Number(s.max_marks ?? 100)
-                    const g = (s.grade || 'F').toString().toUpperCase()
-                    gradeDist[g] = (gradeDist[g] || 0) + 1
-                })
-            }
-        })
-
-        const overallPercentage = totalMaxMarks > 0
-            ? Number(((totalMarks / totalMaxMarks) * 100).toFixed(1))
-            : 0
-        const academicStrength = totalMaxMarks > 0 ? Math.round((totalMarks / totalMaxMarks) * 100) : 0
-
-        const payload = {
-            enrollment_number: results.find((r: any) => r.enrollment_number)?.enrollment_number || userDoc?.enrollment_number || '',
-            student_info: enrichedStudentInfo,
-            last_updated: results.reduce((latest: Date, r: any) => {
-                const d = new Date(r.updated_at)
-                return d > latest ? d : latest
-            }, new Date(0)).toISOString(),
-            cgpa: cgpaCalc.cgpa,
-            semesters: mappedSemesters,
-            gradeDistribution: gradeDist,
-            overallPercentage,
-            academicStrength: academicStrength,
-        }
+        const payload = await buildResultsPayload(userId)
         ok(res, payload, 200, 0)
         void writeViewCache(userId, cacheId, payload, 5 * 60 * 1000).catch(() => {})
     } catch (err) {

@@ -9,6 +9,7 @@ import { ok, fail } from '../utils/response.js'
 import { fetchIpuResults, fetchAllIpuResults, fetchAllIpuResultsWithClient, parseIpuResultsPayload, type ProcessedSubject } from '../services/ipuResultsFetcher.service.js'
 import { destroyIpuSessionEverywhere, getHydratedIpuSession, isIpuSessionAuthenticated, persistIpuSessionState, type IpuSession } from '../services/ipuSession.service.js'
 import { isMeaningfulValue, mergePreferredRecord } from '../utils/recordMerge.js'
+import { buildResultsPayload } from '../utils/resultsPayload.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -899,87 +900,16 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
 /* ── GET /api/ipu/saved-results ────────────────────────────────────────── */
 router.get('/saved-results', async (req: AuthRequest, res) => {
   try {
-    const userId = req.userId!
-    const results = await prisma.semesterResult.findMany({
-      where: { user_id: userId, source: 'ipu_scraper' },
-      orderBy: { semester: 'asc' },
-    })
-
-    if (!results.length) {
+    const payload = await buildResultsPayload(req.userId!, { source: 'ipu_scraper' })
+    if (!payload.semesters.length) {
       return ok(res, null)
     }
+    const totalSubjects = payload.semesters
+      .flatMap((semester: any) => semester.subjects || [])
+      .filter((subject: any) => !subject.is_pending && subject.grade !== '-')
+      .length
 
-      // Build response matching the scraped format
-      const studentInfo = results.reduce((acc: any, row: any) => {
-        const current = (row.student_info ?? {}) as Record<string, unknown>
-        return mergePreferredRecord(current, acc)
-      }, {} as Record<string, unknown>)
-      const enrollmentNumber = results[0]?.enrollment_number || ''
-
-      // Enrich student_info with User document
-      const userDoc = await prisma.user.findUnique({ where: { id: userId } })
-      const enrichedStudentInfo = {
-        ...(userDoc?.name ? { name: userDoc.name } : {}),
-        ...(userDoc?.enrollment_number ? { roll_no: userDoc.enrollment_number } : {}),
-        ...(userDoc?.mother_name ? { mother: userDoc.mother_name } : {}),
-        ...(userDoc?.phone_number ? { phone: userDoc.phone_number } : {}),
-        ...(userDoc?.email ? { email: userDoc.email } : {}),
-        ...(userDoc?.gender ? { gender: userDoc.gender } : {}),
-        ...(userDoc?.batch ? { batch: userDoc.batch } : {}),
-        ...(userDoc?.course ? { programme: userDoc.course } : {}),
-        ...(userDoc?.college ? { institution: userDoc.college } : {}),
-        ...(userDoc?.admission_year ? { admission_year: userDoc.admission_year } : {}),
-        ...normalizeStudentInfo(studentInfo),
-      }
-
-    // Calculate CGPA
-    const validSgpas = results.filter((r: any) => r.sgpa > 0)
-    const cgpa = validSgpas.length
-      ? parseFloat((validSgpas.reduce((a: number, r: any) => a + r.sgpa, 0) / validSgpas.length).toFixed(2))
-      : 0
-
-    const semesters = results.map((r: any) => ({
-      semester: String(r.semester),
-      semester_num: r.semester,
-      semester_label: r.semester_label || `Semester ${r.semester}`,
-      subjects: r.subjects || [],
-      sgpa: r.sgpa ? String(r.sgpa) : null,
-      total_marks: r.total_marks || null,
-      max_marks: r.max_marks || null,
-    }))
-
-    // Compute grade distribution and overall percentage — exclude pending subjects
-    const gradeDistSaved: Record<string, number> = {}
-    const allSubjsSaved = results.flatMap((r: any) => ((r.subjects ?? []) as any[]))
-    const completedSaved = allSubjsSaved.filter((s: any) => !s.is_pending && s.grade !== '-')
-    for (const sub of completedSaved) {
-      const g = sub.grade || 'F'
-      gradeDistSaved[g] = (gradeDistSaved[g] || 0) + 1
-    }
-    let totalMarksSaved = 0
-    let totalMaxSaved = 0
-    for (const sub of completedSaved) {
-      totalMarksSaved += Number(sub.total_marks ?? 0)
-      totalMaxSaved += Number(sub.max_marks ?? 100)
-    }
-    const overallPctSaved = totalMaxSaved > 0
-      ? parseFloat(((totalMarksSaved / totalMaxSaved) * 100).toFixed(1))
-      : 0
-
-    ok(res, {
-      enrollment_number: enrollmentNumber,
-      student_info: enrichedStudentInfo,
-      semesters,
-      cgpa,
-      gradeDistribution: gradeDistSaved,
-      overallPercentage: overallPctSaved,
-      totalSubjects: completedSaved.length,
-      saved: true,
-      last_updated: results.reduce((latest: any, r: any) => {
-        const d = new Date(r.updated_at)
-        return d > latest ? d : latest
-      }, new Date(0)).toISOString(),
-    })
+    ok(res, { ...payload, totalSubjects, saved: true })
   } catch (err) {
     console.error('[IPU saved-results]', err)
     fail(res, 'Failed to fetch saved results', 'FETCH_FAILED', 500)
