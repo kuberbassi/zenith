@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import type { ChartOptions } from 'chart.js';
 import {
     Eye, EyeOff, RefreshCw, Zap, GraduationCap,
-    ShieldCheck, KeyRound, X, Download
+    ShieldCheck, X, Download
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
@@ -163,14 +163,6 @@ const Results: React.FC = () => {
     const [pdfSem, setPdfSem] = useState<string>('overall');
     const [pdfLoading, setPdfLoading] = useState(false);
 
-    // Change portal password modal
-    const [showCPwModal, setShowCPwModal] = useState(false);
-    const [cpwCurrent, setCpwCurrent] = useState('');
-    const [cpwNew, setCpwNew] = useState('');
-    const [cpwConfirm, setCpwConfirm] = useState('');
-    const [cpwLoading, setCpwLoading] = useState(false);
-    const [cpwError, setCpwError] = useState<string | null>(null);
-
     const accentColor = '#3b82f6';
     const gridColor = 'rgba(255,255,255,0.04)';
 
@@ -214,30 +206,6 @@ const Results: React.FC = () => {
             setPdfLoading(false);
             setShowPdfModal(false);
         }
-    }
-
-    async function handleChangePw() {
-        if (!cpwCurrent.trim() || !cpwNew.trim() || !cpwConfirm.trim()) {
-            setCpwError('All fields are required.'); return;
-        }
-        if (cpwNew !== cpwConfirm) { setCpwError('Passwords do not match.'); return; }
-        if (cpwNew === cpwCurrent) { setCpwError('New password must be different from the current password.'); return; }
-        if (cpwNew.length < 8) { setCpwError('New password must be at least 8 characters.'); return; }
-        if (!/[A-Z]/.test(cpwNew) || !/[a-z]/.test(cpwNew) || !/[0-9]/.test(cpwNew) || !/[!@#$%^&*]/.test(cpwNew)) {
-            setCpwError('Use uppercase, lowercase, number, and one special character from !@#$%^&*.');
-            return;
-        }
-        setCpwError(null); setCpwLoading(true);
-        try {
-            const res: any = await attendanceService.changeIPUPassword({
-                current_password: cpwCurrent, new_password: cpwNew, confirm_password: cpwConfirm,
-            });
-            showToast('success', res?.message || 'Password changed successfully!');
-            setShowCPwModal(false);
-            setCpwCurrent(''); setCpwNew(''); setCpwConfirm('');
-        } catch (e: any) {
-            setCpwError(e?.response?.data?.error || 'Failed to change password. Sync results first, then change it within 10 minutes.');
-        } finally { setCpwLoading(false); }
     }
 
     async function handleAutoFetch() {
@@ -627,7 +595,6 @@ const Results: React.FC = () => {
                     formatDate={formatDate}
                     handleSyncClick={handleSyncClick}
                     onOpenPdf={() => setShowPdfModal(true)}
-                    onOpenChangePassword={() => setShowCPwModal(true)}
                     selectedSem={selectedSem}
                     setSelectedSem={(value) => setSelectedSem(String(value))}
                     currentMetrics={currentMetrics}
@@ -718,72 +685,6 @@ const Results: React.FC = () => {
                 </div>
             )}
 
-            {/* ── Change Portal Password Modal ─────────────────────────────── */}
-            {showCPwModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#080808] p-8"
-                    >
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
-                                    <KeyRound size={14} className="text-white/40" />
-                                </div>
-                                <h3 className="text-base font-black text-white">Change Portal Password</h3>
-                            </div>
-                            <button onClick={() => { setShowCPwModal(false); setCpwError(null); }} className="text-white/20 hover:text-white/60 transition-colors">
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <p className="text-[11px] text-amber-400/60 mb-6 ml-11">Sync results first if this fails — active session required (expires in 30 min)</p>
-
-                        {cpwError && (
-                            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400">{cpwError}</div>
-                        )}
-
-                        <div className="mb-6 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
-                            <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.16em] mb-3">Portal Password Rules</p>
-                            <ul className="space-y-2 text-xs leading-5 text-white/55">
-                                <li>Use your current portal password in the first field.</li>
-                                <li>New password must include uppercase, lowercase, number, and one special character from !@#$%^&amp;*.</li>
-                                <li>The portal requires minimum 8 characters.</li>
-                                <li>Do not reuse the current password.</li>
-                                <li className="text-amber-300/80">After 3 unsuccessful attempts, the account can be locked and the session logged out.</li>
-                            </ul>
-                        </div>
-
-                        <div className="space-y-3 mb-6">
-                            <input
-                                type="password" value={cpwCurrent} onChange={e => setCpwCurrent(e.target.value)}
-                                placeholder="Current Portal Password" className={inputCls}
-                            />
-                            <input
-                                type="password" value={cpwNew} onChange={e => setCpwNew(e.target.value)}
-                                placeholder="New Portal Password" className={inputCls}
-                            />
-                            <input
-                                type="password" value={cpwConfirm} onChange={e => setCpwConfirm(e.target.value)}
-                                placeholder="Retype New Password" className={inputCls}
-                            />
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => { setShowCPwModal(false); setCpwError(null); setCpwCurrent(''); setCpwNew(''); setCpwConfirm(''); }}
-                                className="flex-1 py-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-xs font-black text-white/40 hover:bg-white/[0.06] transition-all"
-                            >Cancel</button>
-                            <button
-                                onClick={handleChangePw} disabled={cpwLoading}
-                                className="flex-1 py-3 rounded-2xl bg-white/10 border border-white/10 text-xs font-black text-white/70 hover:bg-white/15 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-                            >
-                                {cpwLoading ? <><RefreshCw size={12} className="animate-spin" /> Changing…</> : 'Change Password'}
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
         </motion.div>
     );
 };

@@ -20,7 +20,6 @@ const IPU_LOGIN_URL = `${IPU_BASE}/web/login.jsp`
 const IPU_LOGIN_ACTION = `${IPU_BASE}/web/Login`
 const IPU_HOME_URL = `${IPU_BASE}/web/student/studenthome.jsp`
 const IPU_PROFILE_URL = `${IPU_BASE}/web/student/profile.jsp`
-const IPU_CHANGE_PW_URL = `${IPU_BASE}/web/changepasswd.jsp`
 const IPU_RESULTS_URL = `${IPU_BASE}/web/StudentSearchProcess`
 
 const HEADERS = {
@@ -35,6 +34,11 @@ const HEADERS = {
 /* ── Per-user axios session store (keeps cookies across requests) ────── */
 
 type ResultStudentInfo = Record<string, unknown>
+type LoginFieldNames = {
+  username?: string
+  password?: string
+  captcha?: string
+}
 type PersistableSemester = {
   semester: string
   semester_num: number
@@ -185,6 +189,50 @@ function detectLoginAction($: cheerio.CheerioAPI): string {
   if (!action) return IPU_LOGIN_ACTION
   const resolved = resolveIpuUrl(action)
   if (/\/web\/login\.jsp$/i.test(resolved)) return IPU_LOGIN_ACTION
+  return resolved
+}
+
+function normalizeEnrollmentNumber(value: string): string {
+  return String(value || '').trim()
+}
+
+function preserveSecret(value: string): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function sanitizeFieldName(value: unknown, fallback: string): string {
+  const normalized = String(value ?? '').trim()
+  if (!normalized) return fallback
+  return /^[A-Za-z0-9_.-]{1,64}$/.test(normalized) ? normalized : fallback
+}
+
+function sanitizeHiddenFields(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const result: Record<string, string> = {}
+  for (const [rawKey, rawValue] of Object.entries(value as Record<string, unknown>)) {
+    const key = sanitizeFieldName(rawKey, '')
+    if (!key) continue
+    result[key] = String(rawValue ?? '')
+  }
+  return result
+}
+
+function sanitizeFieldNames(value: unknown): Required<LoginFieldNames> {
+  const source = (value && typeof value === 'object' && !Array.isArray(value))
+    ? (value as LoginFieldNames)
+    : {}
+  return {
+    username: sanitizeFieldName(source.username, 'username'),
+    password: sanitizeFieldName(source.password, 'passwd'),
+    captcha: sanitizeFieldName(source.captcha, 'captcha'),
+  }
+}
+
+function sanitizeLoginAction(value: unknown): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return IPU_LOGIN_ACTION
+  const resolved = resolveIpuUrl(raw)
+  if (!resolved.startsWith(`${IPU_BASE}/`)) return IPU_LOGIN_ACTION
   return resolved
 }
 
@@ -579,9 +627,12 @@ router.get('/captcha', async (req: AuthRequest, res) => {
 
 /* ── POST /api/ipu/auto-fetch ─────────────────────────────────────────── */
 router.post('/auto-fetch', async (req: AuthRequest, res) => {
-  const { enrollment_number = '', password = '' } = req.body || {}
-  const enrollment = enrollment_number.trim()
-  const pwd = password.trim()
+  const parsed = AutoFetchSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return fail(res, parsed.error.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400)
+  }
+  const enrollment = normalizeEnrollmentNumber(parsed.data.enrollment_number)
+  const pwd = preserveSecret(parsed.data.password)
 
   if (!enrollment || !pwd) return fail(res, 'Enrollment number and password are required.', 'MISSING_FIELDS', 400)
 
@@ -621,10 +672,16 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
 /* ── POST /api/ipu/fetch-results ──────────────────────────────────────── */
 router.post('/fetch-results', async (req: AuthRequest, res) => {
   const userId = req.userId!
-  const { enrollment_number = '', password = '', captcha = '', hidden_fields = {}, field_names = {}, login_action = '' } = req.body || {}
-  const enrollment = enrollment_number.trim()
-  const pwd = password.trim()
-  const cap = captcha.trim()
+  const parsed = FetchResultsSchema.safeParse(req.body)
+  if (!parsed.success) {
+    return fail(res, parsed.error.errors[0]?.message || 'Validation failed', 'VALIDATION_ERROR', 400)
+  }
+  const enrollment = normalizeEnrollmentNumber(parsed.data.enrollment_number)
+  const pwd = preserveSecret(parsed.data.password)
+  const cap = String(parsed.data.captcha || '').trim()
+  const hidden_fields = sanitizeHiddenFields(parsed.data.hidden_fields)
+  const field_names = sanitizeFieldNames(parsed.data.field_names)
+  const login_action = sanitizeLoginAction(parsed.data.login_action)
 
   if (!enrollment || !pwd || !cap) {
     return fail(res, 'Enrollment number, password and CAPTCHA are required.', 'MISSING_FIELDS', 400)
@@ -637,10 +694,10 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     if (!loginSafety.ok) {
       return fail(res, loginSafety.reason || 'Portal login blocked for safety.', 'LOGIN_BLOCKED', 429)
     }
-    const usernameField = field_names.username || 'username'
-    const passwordField = field_names.password || 'passwd'
-    const captchaField = field_names.captcha || 'captcha'
-    const loginUrl = login_action || IPU_LOGIN_ACTION
+    const usernameField = field_names.username
+    const passwordField = field_names.password
+    const captchaField = field_names.captcha
+    const loginUrl = login_action
     browserSession.markLoginAttempt()
     console.log('[IPU] Posting login to:', loginUrl)
 
@@ -929,108 +986,29 @@ router.get('/saved-results', async (req: AuthRequest, res) => {
   }
 })
 
-/* ── POST /api/ipu/change-password ─────────────────────────────────────── */
-router.post('/change-password', async (req: AuthRequest, res) => {
-  const { current_password = '', new_password = '', confirm_password = '' } = req.body || {}
-  if (!current_password || !new_password || !confirm_password) {
-    return fail(res, 'All three password fields are required.', 'MISSING_FIELDS', 400)
-  }
-  if (new_password !== confirm_password) {
-    return fail(res, 'New password and confirm password do not match.', 'VALIDATION_ERROR', 400)
-  }
-  if (new_password === current_password) {
-    return fail(res, 'New password must be different from the current password.', 'VALIDATION_ERROR', 400)
-  }
-  if (new_password.length < 8) {
-    return fail(res, 'New password must be at least 8 characters.', 'VALIDATION_ERROR', 400)
-  }
-  if (!/[A-Z]/.test(new_password) || !/[a-z]/.test(new_password) || !/[0-9]/.test(new_password) || !/[!@#$%^&*]/.test(new_password)) {
-    return fail(res, 'New password must include uppercase, lowercase, number, and special character (!@#$%^&*).', 'VALIDATION_ERROR', 400)
-  }
-
-  const browserSession = await getHydratedIpuSession(req.userId!, HEADERS)
-  if (!isIpuSessionAuthenticated(browserSession)) {
-    return fail(res, 'Active IPU session expired. Sync results once, then change password within 10 minutes.', 'SESSION_EXPIRED', 401)
-  }
-
-  try {
-    const cpResp = await browserSession.client.get(IPU_CHANGE_PW_URL, { timeout: 15_000 })
-    const html = String(cpResp.data)
-
-    if (html.toLowerCase().includes('j_username') || html.toLowerCase().includes('captchaservlet')) {
-      browserSession!.authenticatedAt = undefined
-      await persistIpuSessionState(req.userId!, browserSession)
-      return fail(res, 'Active IPU session expired. Sync results again before changing password.', 'SESSION_EXPIRED', 401)
-    }
-
-    const $cp = cheerio.load(html)
-    const form = $cp('form').first()
-    if (!form.length) {
-      return fail(res, 'Could not find the change-password form on the IPU portal.', 'FORM_NOT_FOUND', 422)
-    }
-
-    // Collect hidden fields
-    const payload = new URLSearchParams()
-    form.find('input[type="hidden"]').each((_i, el) => {
-      const name = $cp(el).attr('name')
-      if (name) payload.append(name, $cp(el).attr('value') || '')
-    })
-
-    // Detect input field names for old / new / confirm passwords
-    const findField = (...candidates: string[]): string | null => {
-      for (const c of candidates) {
-        const el = form.find(`input[name*="${c}" i]`).first()
-        if (el.length) return el.attr('name') || null
-      }
-      return null
-    }
-    payload.append(findField('old', 'current', 'existing', 'prev') || 'oldPassword', current_password)
-    payload.append(findField('new_pass', 'newpass', 'newpwd', 'new') || 'newPassword', new_password)
-    payload.append(findField('confirm', 'retype', 'verify', 'cnf') || 'confirmPassword', confirm_password)
-
-    const formAction = form.attr('action')?.trim() || ''
-    const actionUrl = formAction ? resolveIpuUrl(formAction) : `${IPU_BASE}/web/ChangePassword`
-
-    const submitResp = await browserSession.client.post(actionUrl, payload.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Referer: IPU_CHANGE_PW_URL,
-      },
-      timeout: 15_000,
-    })
-
-    const respText = String(submitResp.data)
-    const respLow = respText.toLowerCase()
-
-    if (respLow.includes('j_username') || respLow.includes('captchaservlet')) {
-      browserSession!.authenticatedAt = undefined
-      await persistIpuSessionState(req.userId!, browserSession)
-      return fail(res, 'IPU session expired during password change. Sync results again.', 'SESSION_EXPIRED', 401)
-    }
-    if (respLow.includes('incorrect') || respLow.includes('wrong') || respLow.includes('mismatch') || respLow.includes('invalid') || respLow.includes('does not match')) {
-      return fail(res, 'Current password is incorrect.', 'WRONG_PASSWORD', 401)
-    }
-    if (respLow.includes('success') || respLow.includes('changed') || respLow.includes('updated') || (submitResp.status >= 200 && submitResp.status < 300 && !respLow.includes('error'))) {
-      browserSession!.authenticatedAt = undefined
-      await destroyIpuSessionEverywhere(req.userId!)
-      return ok(res, { message: 'Password changed successfully on the IPU portal.' })
-    }
-    // Ambiguous — likely worked if no error message
-    return ok(res, { message: 'Password change submitted. Please verify by logging in with your new password.' })
-  } catch (e: any) {
-    console.error('[IPU change-password]', e.message)
-    if (e.code === 'ECONNREFUSED' || e.code === 'ENOTFOUND' || e.code === 'ETIMEDOUT') {
-      return fail(res, `Network error: ${e.message}`, 'NETWORK_ERROR', 502)
-    }
-    fail(res, `Failed to change password: ${e.message}`, 'INTERNAL_ERROR', 500)
-  }
-})
-
 /* ── POST /api/ipu/sync-results ── Direct JSON API sync ────────────────── */
 
 const SyncResultsSchema = z.object({
   sessionCookie: z.string().min(1, 'Session cookie is required'),
   semester: z.number().int().min(1).max(12).optional(),
+})
+
+const AutoFetchSchema = z.object({
+  enrollment_number: z.string().min(1, 'Enrollment number is required'),
+  password: z.string().min(1, 'Password is required'),
+})
+
+const FetchResultsSchema = z.object({
+  enrollment_number: z.string().min(1, 'Enrollment number is required'),
+  password: z.string().min(1, 'Password is required'),
+  captcha: z.string().min(1, 'CAPTCHA is required'),
+  hidden_fields: z.record(z.string(), z.unknown()).optional(),
+  field_names: z.object({
+    username: z.string().optional(),
+    password: z.string().optional(),
+    captcha: z.string().optional(),
+  }).optional(),
+  login_action: z.string().optional(),
 })
 
 router.post('/sync-results', async (req: AuthRequest, res) => {

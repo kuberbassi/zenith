@@ -5,7 +5,7 @@ import {
     ArcElement, BarElement, CategoryScale, Chart as ChartJS, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip as ChartTooltip,
 } from 'chart.js';
 import {
-    Activity, BarChart3, BookOpen, Download, KeyRound, PieChart, RefreshCw, ShieldCheck, TrendingUp
+    Activity, BarChart3, BookOpen, Download, PieChart, RefreshCw, ShieldCheck, TrendingUp
 } from 'lucide-react';
 import CircularProgress from '@/components/ui/CircularProgress';
 
@@ -23,7 +23,6 @@ type ResultsDashboardProps = {
     formatDate: (value: string | null) => string;
     handleSyncClick: () => void;
     onOpenPdf: () => void;
-    onOpenChangePassword: () => void;
     selectedSem: string;
     setSelectedSem: (value: string) => void;
     currentMetrics: any;
@@ -56,7 +55,6 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
     formatDate,
     handleSyncClick,
     onOpenPdf,
-    onOpenChangePassword,
     selectedSem,
     setSelectedSem,
     currentMetrics,
@@ -118,7 +116,6 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             <div className="flex flex-wrap gap-2">
                                 <button onClick={handleSyncClick} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-black text-blue-400 hover:bg-blue-500/20 transition-all"><RefreshCw size={12} /> Sync Results</button>
                                 <button onClick={onOpenPdf} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-black text-emerald-400 hover:bg-emerald-500/20 transition-all"><Download size={12} /> Download PDF</button>
-                                <button onClick={onOpenChangePassword} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/[0.08] text-xs font-black text-white/40 hover:bg-white/10 hover:text-white/60 transition-all"><KeyRound size={12} /> Change Password</button>
                             </div>
                         </div>
                     </div>

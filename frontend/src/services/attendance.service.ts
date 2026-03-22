@@ -648,15 +648,6 @@ export const attendanceService = {
         return response.data.data;
     },
 
-    changeIPUPassword: async (payload: {
-        current_password: string;
-        new_password: string;
-        confirm_password: string;
-    }) => {
-        const response = await api.post('/api/ipu/change-password', payload);
-        return response.data.data;
-    },
-
     // Get previously saved IPU results from DB (no login needed)
     getSavedIPUResults: async () => {
         const response = await api.get('/api/academic/results/analytics');

@@ -271,19 +271,11 @@ export async function fetchIpuResultsWithClient(client: AxiosInstance, semester:
 }
 
 export async function fetchAllIpuResults(sessionCookie: string, maxSemesters = 8): Promise<FetchedSemesterResult[]> {
-  const promises = []
-  for (let sem = 1; sem <= maxSemesters; sem++) {
-    promises.push(fetchIpuResults(sessionCookie, sem))
-  }
-
-  const settlements = await Promise.allSettled(promises)
   const results: FetchedSemesterResult[] = []
-
-  for (const settlement of settlements) {
-    if (settlement.status === 'fulfilled') {
-      results.push(settlement.value)
-    } else {
-      const err = settlement.reason
+  for (let sem = 1; sem <= maxSemesters; sem++) {
+    try {
+      results.push(await fetchIpuResults(sessionCookie, sem))
+    } catch (err: any) {
       if (err.code === 'SESSION_EXPIRED' || err.code === 'BAD_RESULTS_RESPONSE') throw err
       console.log('[IPU Direct] Semester fetch failed:', err?.meta || err?.message || err)
     }
@@ -293,20 +285,11 @@ export async function fetchAllIpuResults(sessionCookie: string, maxSemesters = 8
 }
 
 export async function fetchAllIpuResultsWithClient(client: AxiosInstance, maxSemesters = 8): Promise<FetchedSemesterResult[]> {
-  const promises = []
-  for (let sem = 1; sem <= maxSemesters; sem++) {
-    promises.push(fetchIpuResultsWithClient(client, sem))
-  }
-
-  const settlements = await Promise.allSettled(promises)
   const results: FetchedSemesterResult[] = []
-
-  for (const settlement of settlements) {
-    if (settlement.status === 'fulfilled') {
-      results.push(settlement.value)
-    } else {
-      const err = settlement.reason
-      // Propagate session-level or fatal errors
+  for (let sem = 1; sem <= maxSemesters; sem++) {
+    try {
+      results.push(await fetchIpuResultsWithClient(client, sem))
+    } catch (err: any) {
       if (err.code === 'SESSION_EXPIRED' || err.code === 'BAD_RESULTS_RESPONSE') throw err
       console.log('[IPU Direct] Semester fetch failed:', err?.meta || err?.message || err)
     }

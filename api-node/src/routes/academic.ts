@@ -286,7 +286,7 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
             orderBy: { semester: 'asc' },
         })
         if (!results.length) {
-            ok(res, { cgpa: 0, semesters: [], gradeDistribution: {}, overallPercentage: 0 })
+            ok(res, { cgpa: 0, semesters: [], gradeDistribution: {}, overallPercentage: 0, academicStrength: 0 })
             return
         }
 
@@ -337,6 +337,9 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
             }
         })
 
+        const overallPercentage = totalMaxMarks > 0
+            ? Number(((totalMarks / totalMaxMarks) * 100).toFixed(1))
+            : 0
         const academicStrength = totalMaxMarks > 0 ? Math.round((totalMarks / totalMaxMarks) * 100) : 0
 
         const payload = {
@@ -349,6 +352,7 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
             cgpa: cgpaCalc.cgpa,
             semesters: mappedSemesters,
             gradeDistribution: gradeDist,
+            overallPercentage,
             academicStrength: academicStrength,
         }
         ok(res, payload, 200, 0)

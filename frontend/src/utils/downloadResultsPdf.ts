@@ -55,6 +55,18 @@ function formatDeclaredDate(value: unknown): string | null {
     return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function getLatestDeclaredDate(subjects: any[]): string | null {
+    let latest: Date | null = null;
+    for (const subject of subjects) {
+        if (!subject?.declared_date) continue;
+        const parsed = new Date(String(subject.declared_date));
+        if (Number.isNaN(parsed.getTime())) continue;
+        if (!latest || parsed > latest) latest = parsed;
+    }
+    if (!latest) return null;
+    return latest.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 function getSemestersToRender(results: any, selectedSem: string) {
     const allSems = results?.semesters || [];
     return selectedSem === 'overall'
@@ -209,14 +221,14 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
                 isPending ? 'Pending' : (sub.total_marks ?? '-'),
                 isPending ? '---' : (sub.max_marks ?? 100),
                 sub.grade || '-',
-                sub.credits || sub.status || '-', // Show credits if available
+                sub.credits || sub.status || '-',
             ];
         });
 
         autoTable(doc, {
             startY: y,
             margin: { left: margin, right: margin },
-            head: [['#', 'Paper Code', 'Subject Name', 'Int', 'Ext', 'Total', 'Max', 'Grade', 'Credits']],
+            head: [['#', 'Paper Code', 'Subject Name', 'Int', 'Ext', 'Total', 'Max', 'Grade', 'Status/Credits']],
             body: tableBody,
             theme: 'grid',
             headStyles: {
@@ -299,11 +311,7 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         const allSubjects = (results?.semesters || []).flatMap((sem: any) => sem.subjects || []);
         const completedSubjects = allSubjects.filter((sub: any) => !sub.is_pending && sub.grade !== '-');
         const distinctionCount = completedSubjects.filter((sub: any) => Number(sub.percentage || 0) >= 75).length;
-        const latestDeclared = completedSubjects
-            .map((sub: any) => formatDeclaredDate(sub.declared_date))
-            .filter(Boolean)
-            .sort()
-            .slice(-1)[0];
+        const latestDeclared = getLatestDeclaredDate(completedSubjects);
 
         doc.setFillColor(...BLUE_LIGHT);
         doc.setDrawColor(...BLUE_MID);
