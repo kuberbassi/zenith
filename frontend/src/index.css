@@ -8,16 +8,16 @@
 
 @layer base {
   :root {
-    /* Forced Stealth (Sea Green) */
-    --md-sys-color-primary: #10b981;
-    --md-sys-color-on-primary: #FFFFFF;
-    --md-sys-color-primary-container: #064e3b;
-    --md-sys-color-on-primary-container: #d1fae5;
+    /* Pure monochrome — no color tint */
+    --md-sys-color-primary: #ffffff;
+    --md-sys-color-on-primary: #000000;
+    --md-sys-color-primary-container: #1a1a1a;
+    --md-sys-color-on-primary-container: #f0f0f0;
 
-    --md-sys-color-secondary: #059669;
-    --md-sys-color-on-secondary: #FFFFFF;
-    --md-sys-color-secondary-container: #064e3b;
-    --md-sys-color-on-secondary-container: #d1fae5;
+    --md-sys-color-secondary: #e0e0e0;
+    --md-sys-color-on-secondary: #000000;
+    --md-sys-color-secondary-container: #1a1a1a;
+    --md-sys-color-on-secondary-container: #f0f0f0;
   }
 }
 
@@ -39,10 +39,10 @@ img {
 }
 
 :root {
-  --md-sys-color-tertiary: #34d399;
+  --md-sys-color-tertiary: #ffffff;
   --md-sys-color-on-tertiary: #000000;
-  --md-sys-color-tertiary-container: #065f46;
-  --md-sys-color-on-tertiary-container: #a7f3d0;
+  --md-sys-color-tertiary-container: #141414;
+  --md-sys-color-on-tertiary-container: #f0f0f0;
 
   --md-sys-color-error: #ef4444;
   --md-sys-color-on-error: #ffffff;
@@ -50,20 +50,20 @@ img {
   --md-sys-color-on-error-container: #fee2e2;
 
   --md-sys-color-background: #000000;
-  --md-sys-color-on-background: #ededed;
+  --md-sys-color-on-background: #f5f5f5;
 
   --md-sys-color-surface: #000000;
-  --md-sys-color-on-surface: #ededed;
-  --md-sys-color-surface-variant: #0a0a0a;
-  --md-sys-color-on-surface-variant: #888888;
+  --md-sys-color-on-surface: #f5f5f5;
+  --md-sys-color-surface-variant: #080808;
+  --md-sys-color-on-surface-variant: #999999;
 
-  --md-sys-color-outline: rgba(255, 255, 255, 0.12);
-  --md-sys-color-outline-variant: rgba(255, 255, 255, 0.06);
+  --md-sys-color-outline: rgba(255, 255, 255, 0.10);
+  --md-sys-color-outline-variant: rgba(255, 255, 255, 0.05);
 
-  --md-sys-color-surface-container: #0a0a0a;
-  --md-sys-color-surface-container-low: #050505;
-  --md-sys-color-surface-container-high: #111111;
-  --md-sys-color-surface-container-highest: #171717;
+  --md-sys-color-surface-container: #080808;
+  --md-sys-color-surface-container-low: #030303;
+  --md-sys-color-surface-container-high: #0e0e0e;
+  --md-sys-color-surface-container-highest: #141414;
   --md-sys-color-surface-dim: #000000;
 
   --md-sys-elevation-level-0: 0px 0px 0px 0px;
@@ -82,10 +82,10 @@ img {
 }
 
 .dark {
-  --md-sys-color-primary: #10b981;
-  --md-sys-color-on-primary: #FFFFFF;
-  --md-sys-color-primary-container: #064e3b;
-  --md-sys-color-on-primary-container: #d1fae5;
+  --md-sys-color-primary: #ffffff;
+  --md-sys-color-on-primary: #000000;
+  --md-sys-color-primary-container: #1a1a1a;
+  --md-sys-color-on-primary-container: #f0f0f0;
 }
 
 html {
@@ -117,25 +117,25 @@ html {
 }
 
 *.glass-panel {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
+  backdrop-filter: blur(32px) saturate(1.1);
+  -webkit-backdrop-filter: blur(32px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow:
-    0 0 20px rgba(255, 255, 255, 0.015),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   border-radius: 24px;
 }
 
 *.glass-glow {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px) saturate(1.3);
-  -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(40px) saturate(1.15);
+  -webkit-backdrop-filter: blur(40px) saturate(1.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    0 0 30px rgba(255, 255, 255, 0.025),
-    0 0 60px rgba(255, 255, 255, 0.01),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 0 1px rgba(255, 255, 255, 0.12),
+    0 0 40px rgba(255, 255, 255, 0.008),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   border-radius: 24px;
 }
 

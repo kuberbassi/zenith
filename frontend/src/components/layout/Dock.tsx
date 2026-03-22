@@ -52,7 +52,7 @@ function DockItem({ item, mouseX, isHoveredGlobal }: {
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
                 className={`flex items-center justify-center rounded-2xl transition-colors duration-200 cursor-pointer ${
-                    isActive ? 'bg-emerald-500/15 text-emerald-400' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
+                    isActive ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
                 }`}
             >
                 <item.icon className="w-[44%] h-[44%]" />
@@ -451,12 +451,12 @@ function MobileBubble() {
                                 <div
                                     className={`w-[52px] h-[52px] rounded-[18px] flex items-center justify-center border transition-all ${
                                         isActive
-                                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                                            ? 'bg-white/10 border-white/20 text-white'
                                             : 'bg-[#111]/95 border-white/[0.09] text-white/55'
                                     }`}
                                     style={{
                                         boxShadow: isActive
-                                            ? '0 4px 20px rgba(16,185,129,0.2), 0 0 0 1px rgba(16,185,129,0.08)'
+                                            ? '0 4px 20px rgba(255,255,255,0.08), 0 0 0 1px rgba(255,255,255,0.06)'
                                             : '0 4px 20px rgba(0,0,0,0.55)',
                                         backdropFilter: 'blur(20px)',
                                     }}
@@ -464,7 +464,7 @@ function MobileBubble() {
                                     <item.icon size={20} strokeWidth={1.75} />
                                 </div>
                                 <span className={`text-[8.5px] font-semibold tracking-wide leading-none ${
-                                    isActive ? 'text-emerald-400' : 'text-white/40'
+                                    isActive ? 'text-white' : 'text-white/40'
                                 }`}>{item.name}</span>
                             </Link>
                         </motion.div>
