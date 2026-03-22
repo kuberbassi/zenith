@@ -1,129 +1,195 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
+const STAR_COUNT = 1400;
+const TWINKLE_COUNT = 60;
+
 const AmbientBackground: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!mountRef.current) return;
 
-        // Scene setup
         const scene = new THREE.Scene();
-        // Use pure black void
-        scene.fog = new THREE.FogExp2('#000000', 0.001);
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 30;
+        const camera = new THREE.PerspectiveCamera(
+            60,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000,
+        );
+        camera.position.z = 40;
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false });
+        renderer.setClearColor(0x000000, 1);
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // optimize performance
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         mountRef.current.appendChild(renderer.domElement);
 
-        // Particles
-        const particlesGeometry = new THREE.BufferGeometry();
-        const particlesCount = 700;
+        /* ── Static star-field ─────────────────────────────── */
+        const starsGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(STAR_COUNT * 3);
+        const sizes = new Float32Array(STAR_COUNT);
+        const opacities = new Float32Array(STAR_COUNT);
 
-        const posArray = new Float32Array(particlesCount * 3);
-        const colorsArray = new Float32Array(particlesCount * 3);
+        for (let i = 0; i < STAR_COUNT; i++) {
+            positions[i * 3]     = (Math.random() - 0.5) * 200;
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 120;
 
-        const color1 = new THREE.Color('#3b82f6'); // Primary Neon Blue
-        const color2 = new THREE.Color('#8b5cf6'); // Neon Purple
-        const color3 = new THREE.Color('#3b82f6'); // Success Green
-
-        for (let i = 0; i < particlesCount * 3; i += 3) {
-            // Position
-            posArray[i] = (Math.random() - 0.5) * 100;
-            posArray[i + 1] = (Math.random() - 0.5) * 100;
-            posArray[i + 2] = (Math.random() - 0.5) * 50;
-
-            // Colors mapping
-            const mix = Math.random();
-            const mixedColor = mix < 0.33 ? color1 : mix < 0.66 ? color2 : color3;
-
-            colorsArray[i] = mixedColor.r;
-            colorsArray[i + 1] = mixedColor.g;
-            colorsArray[i + 2] = mixedColor.b;
+            // Most stars are tiny; a handful are brighter
+            const r = Math.random();
+            sizes[i] = r < 0.92 ? 0.08 + Math.random() * 0.12 : 0.25 + Math.random() * 0.2;
+            opacities[i] = r < 0.92 ? 0.25 + Math.random() * 0.35 : 0.6 + Math.random() * 0.4;
         }
 
-        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colorsArray, 3));
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        starsGeo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+        starsGeo.setAttribute('aOpacity', new THREE.BufferAttribute(opacities, 1));
 
-        // Ultra premium glowing circular particle material
-        // We render points instead of heavy geometry
-        const particlesMaterial = new THREE.PointsMaterial({
-            size: 0.15,
-            vertexColors: true,
+        const starsMat = new THREE.ShaderMaterial({
+            uniforms: {
+                uPixelRatio: { value: renderer.getPixelRatio() },
+            },
+            vertexShader: `
+                attribute float aSize;
+                attribute float aOpacity;
+                varying float vOpacity;
+                uniform float uPixelRatio;
+                void main() {
+                    vOpacity = aOpacity;
+                    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = aSize * uPixelRatio * (120.0 / -mvPos.z);
+                    gl_Position = projectionMatrix * mvPos;
+                }
+            `,
+            fragmentShader: `
+                varying float vOpacity;
+                void main() {
+                    float d = length(gl_PointCoord - 0.5);
+                    if (d > 0.5) discard;
+                    float alpha = smoothstep(0.5, 0.15, d) * vOpacity;
+                    gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+                }
+            `,
             transparent: true,
-            opacity: 0.8,
-            blending: THREE.AdditiveBlending // creates that glowing overlapping effect
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
         });
 
-        const particleMesh = new THREE.Points(particlesGeometry, particlesMaterial);
-        scene.add(particleMesh);
+        const starsMesh = new THREE.Points(starsGeo, starsMat);
+        scene.add(starsMesh);
 
-        // Slow rotation variables
+        /* ── Twinkle stars (subtle brightness pulse) ────── */
+        const twinkleGeo = new THREE.BufferGeometry();
+        const twinklePos = new Float32Array(TWINKLE_COUNT * 3);
+        const twinklePhase = new Float32Array(TWINKLE_COUNT);
+        const twinkleSpeed = new Float32Array(TWINKLE_COUNT);
+
+        for (let i = 0; i < TWINKLE_COUNT; i++) {
+            twinklePos[i * 3]     = (Math.random() - 0.5) * 180;
+            twinklePos[i * 3 + 1] = (Math.random() - 0.5) * 180;
+            twinklePos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+            twinklePhase[i] = Math.random() * Math.PI * 2;
+            twinkleSpeed[i] = 0.3 + Math.random() * 0.8;
+        }
+
+        twinkleGeo.setAttribute('position', new THREE.BufferAttribute(twinklePos, 3));
+        twinkleGeo.setAttribute('aPhase', new THREE.BufferAttribute(twinklePhase, 1));
+        twinkleGeo.setAttribute('aSpeed', new THREE.BufferAttribute(twinkleSpeed, 1));
+
+        const twinkleMat = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uPixelRatio: { value: renderer.getPixelRatio() },
+            },
+            vertexShader: `
+                attribute float aPhase;
+                attribute float aSpeed;
+                uniform float uTime;
+                uniform float uPixelRatio;
+                varying float vBrightness;
+                void main() {
+                    vBrightness = 0.3 + 0.7 * (0.5 + 0.5 * sin(uTime * aSpeed + aPhase));
+                    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = (0.3 + 0.15 * vBrightness) * uPixelRatio * (120.0 / -mvPos.z);
+                    gl_Position = projectionMatrix * mvPos;
+                }
+            `,
+            fragmentShader: `
+                varying float vBrightness;
+                void main() {
+                    float d = length(gl_PointCoord - 0.5);
+                    if (d > 0.5) discard;
+                    float glow = smoothstep(0.5, 0.0, d);
+                    float alpha = glow * vBrightness;
+                    gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+                }
+            `,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+
+        const twinkleMesh = new THREE.Points(twinkleGeo, twinkleMat);
+        scene.add(twinkleMesh);
+
+        /* ── Interaction ───────────────────────────────────── */
         let mouseX = 0;
         let mouseY = 0;
-        let targetX = 0;
-        let targetY = 0;
 
-        const windowHalfX = window.innerWidth / 2;
-        const windowHalfY = window.innerHeight / 2;
-
-        const onDocumentMouseMove = (event: MouseEvent) => {
-            mouseX = (event.clientX - windowHalfX) * 0.0005;
-            mouseY = (event.clientY - windowHalfY) * 0.0005;
+        const onMouseMove = (e: MouseEvent) => {
+            mouseX = (e.clientX / window.innerWidth - 0.5) * 0.4;
+            mouseY = (e.clientY / window.innerHeight - 0.5) * 0.4;
         };
+        document.addEventListener('mousemove', onMouseMove, { passive: true });
 
-        document.addEventListener('mousemove', onDocumentMouseMove);
-
-        const handleResize = () => {
+        const onResize = () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            const pr = Math.min(window.devicePixelRatio, 1.5);
+            renderer.setPixelRatio(pr);
+            starsMat.uniforms.uPixelRatio.value = pr;
+            twinkleMat.uniforms.uPixelRatio.value = pr;
         };
+        window.addEventListener('resize', onResize);
 
-        window.addEventListener('resize', handleResize);
-
-        // Animation Loop
-        let lastTime = 0;
-        let rotationTime = 0;
+        /* ── Render loop ───────────────────────────────────── */
+        let clock = 0;
+        let animId = 0;
 
         const animate = (time: number) => {
-            requestAnimationFrame(animate);
+            animId = requestAnimationFrame(animate);
+            clock = time * 0.001;
 
-            // Calculate delta time
-            const deltaTime = time - lastTime;
-            lastTime = time;
-            rotationTime += deltaTime * 0.001;
+            // Very slow constant drift
+            starsMesh.rotation.y += 0.00008;
+            starsMesh.rotation.x += 0.00003;
 
-            targetX = mouseX * 0.5;
-            targetY = mouseY * 0.5;
+            // Parallax from mouse
+            starsMesh.rotation.y += (mouseX * 0.15 - starsMesh.rotation.y) * 0.02;
+            starsMesh.rotation.x += (mouseY * 0.15 - starsMesh.rotation.x) * 0.02;
 
-            // Ease rotation
-            particleMesh.rotation.y += 0.05 * (targetX - particleMesh.rotation.y);
-            particleMesh.rotation.x += 0.05 * (targetY - particleMesh.rotation.x);
-
-            // Constant drift
-            particleMesh.position.y = Math.sin(rotationTime * 0.5) * 0.5;
+            twinkleMesh.rotation.copy(starsMesh.rotation);
+            twinkleMat.uniforms.uTime.value = clock;
 
             renderer.render(scene, camera);
         };
 
-        requestAnimationFrame(animate);
+        animId = requestAnimationFrame(animate);
 
         return () => {
-            // Cleanup
-            window.removeEventListener('resize', handleResize);
-            document.removeEventListener('mousemove', onDocumentMouseMove);
-
-            if (mountRef.current && renderer.domElement) {
+            cancelAnimationFrame(animId);
+            window.removeEventListener('resize', onResize);
+            document.removeEventListener('mousemove', onMouseMove);
+            if (mountRef.current && renderer.domElement.parentNode === mountRef.current) {
                 mountRef.current.removeChild(renderer.domElement);
             }
-
-            particlesGeometry.dispose();
-            particlesMaterial.dispose();
+            starsGeo.dispose();
+            starsMat.dispose();
+            twinkleGeo.dispose();
+            twinkleMat.dispose();
             renderer.dispose();
         };
     }, []);
@@ -131,10 +197,7 @@ const AmbientBackground: React.FC = () => {
     return (
         <div
             ref={mountRef}
-            className="fixed inset-0 z-0 pointer-events-none opacity-50 mix-blend-screen"
-            style={{
-                background: 'radial-gradient(circle at center, transparent 0%, #000000 80%)'
-            }}
+            className="fixed inset-0 z-0 pointer-events-none"
         />
     );
 };

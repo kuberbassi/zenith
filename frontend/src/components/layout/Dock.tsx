@@ -1,4 +1,4 @@
-﻿import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -52,7 +52,7 @@ function DockItem({ item, mouseX, isHoveredGlobal }: {
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
                 className={`flex items-center justify-center rounded-2xl transition-colors duration-200 cursor-pointer ${
-                    isActive ? 'bg-blue-500/15 text-blue-400' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
+                    isActive ? 'bg-emerald-500/15 text-emerald-400' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
                 }`}
             >
                 <item.icon className="w-[44%] h-[44%]" />
@@ -165,8 +165,8 @@ function DesktopDock() {
                     onMouseMove={(e) => mouseX.set(e.clientX)}
                     onMouseEnter={() => setIsHoveredGlobal(true)}
                     onMouseLeave={() => { mouseX.set(Infinity); setIsHoveredGlobal(false); }}
-                    className="flex items-center gap-3 px-5 py-3 rounded-3xl bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/[0.1] shadow-2xl"
-                    style={{ boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 -4px 20px rgba(59,130,246,0.04), inset 0 1px 0 rgba(255,255,255,0.06)' }}
+                    className="flex items-center gap-3 px-5 py-3 rounded-3xl bg-[#080808]/92 backdrop-blur-2xl border border-white/[0.1] shadow-2xl"
+                    style={{ boxShadow: '0 0 30px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.06)' }}
                 >
                     <div ref={pfpRef} className="relative mr-2">
                         <button
@@ -174,7 +174,7 @@ function DesktopDock() {
                             onClick={handlePfpClick}
                             className={`w-14 h-14 rounded-full overflow-hidden transition-all cursor-pointer ${
                                 pfpMenuOpen
-                                    ? 'ring-2 ring-blue-500/50 ring-offset-2 ring-offset-[#0a0a0a]'
+                                    ? 'ring-2 ring-white/30 ring-offset-2 ring-offset-[#080808]'
                                     : 'opacity-70 hover:opacity-100 border border-white/[0.1]'
                             }`}
                         >
@@ -208,7 +208,7 @@ function DesktopDock() {
                                 left: dropdownPos.left,
                                 zIndex: 9999,
                                 width: 224,
-                                boxShadow: '0 -16px 48px rgba(0,0,0,0.8), 0 0 20px rgba(59,130,246,0.06), inset 0 1px 0 rgba(255,255,255,0.05)',
+                                boxShadow: '0 -16px 48px rgba(0,0,0,0.8), 0 0 20px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.05)',
                             }}
                             className="rounded-2xl border border-white/[0.08] bg-[#0d0d0d] backdrop-blur-2xl overflow-hidden"
                         >
@@ -451,12 +451,12 @@ function MobileBubble() {
                                 <div
                                     className={`w-[52px] h-[52px] rounded-[18px] flex items-center justify-center border transition-all ${
                                         isActive
-                                            ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                                             : 'bg-[#111]/95 border-white/[0.09] text-white/55'
                                     }`}
                                     style={{
                                         boxShadow: isActive
-                                            ? '0 4px 20px rgba(59,130,246,0.3), 0 0 0 1px rgba(59,130,246,0.1)'
+                                            ? '0 4px 20px rgba(16,185,129,0.2), 0 0 0 1px rgba(16,185,129,0.08)'
                                             : '0 4px 20px rgba(0,0,0,0.55)',
                                         backdropFilter: 'blur(20px)',
                                     }}
@@ -464,7 +464,7 @@ function MobileBubble() {
                                     <item.icon size={20} strokeWidth={1.75} />
                                 </div>
                                 <span className={`text-[8.5px] font-semibold tracking-wide leading-none ${
-                                    isActive ? 'text-blue-400' : 'text-white/40'
+                                    isActive ? 'text-emerald-400' : 'text-white/40'
                                 }`}>{item.name}</span>
                             </Link>
                         </motion.div>
@@ -489,14 +489,14 @@ function MobileBubble() {
                     className="w-14 h-14 rounded-full overflow-hidden relative select-none outline-none"
                     style={{
                         boxShadow: isOpen
-                            ? '0 0 32px rgba(59,130,246,0.45), 0 4px 20px rgba(0,0,0,0.6)'
+                            ? '0 0 32px rgba(255,255,255,0.15), 0 4px 20px rgba(0,0,0,0.6)'
                             : pfpMenuOpen
-                            ? '0 0 28px rgba(139,92,246,0.45), 0 4px 20px rgba(0,0,0,0.6)'
+                            ? '0 0 28px rgba(255,255,255,0.12), 0 4px 20px rgba(0,0,0,0.6)'
                             : '0 4px 24px rgba(0,0,0,0.5)',
                         border: isOpen
-                            ? '2px solid rgba(59,130,246,0.5)'
+                            ? '2px solid rgba(255,255,255,0.25)'
                             : pfpMenuOpen
-                            ? '2px solid rgba(139,92,246,0.5)'
+                            ? '2px solid rgba(255,255,255,0.2)'
                             : '2px solid rgba(255,255,255,0.12)',
                     }}
                 >
