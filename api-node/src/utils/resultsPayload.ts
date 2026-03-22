@@ -23,24 +23,83 @@ type ResultRow = {
   updated_at: Date
 }
 
+function buildHistoricalCreditIndex(results: ResultRow[]) {
+  const bySemester = new Map<number, Map<string, number>>()
+  const globalIndex = new Map<string, number>()
+
+  for (const row of results) {
+    if (!Array.isArray(row.subjects)) continue
+    const semesterIndex = bySemester.get(row.semester) || new Map<string, number>()
+    for (const raw of row.subjects as Array<Record<string, unknown>>) {
+      const credits = Number(raw.credits ?? 0)
+      if (!credits) continue
+      const codeKey = normalizeLookup(raw.code)
+      const nameKey = normalizeLookup(raw.name)
+      if (codeKey) {
+        semesterIndex.set(`code:${codeKey}`, credits)
+        globalIndex.set(`code:${codeKey}`, credits)
+      }
+      if (nameKey) {
+        semesterIndex.set(`name:${nameKey}`, credits)
+        globalIndex.set(`name:${nameKey}`, credits)
+      }
+    }
+    bySemester.set(row.semester, semesterIndex)
+  }
+
+  return { bySemester, globalIndex }
+}
+
 function enrichSemesterSubjects(
   semester: number,
   subjects: unknown,
   subjectIndexBySemester: Map<number, Map<string, { credits: number | null }>>,
+  historicalCredits: { bySemester: Map<number, Map<string, number>>; globalIndex: Map<string, number> },
+  totalCreditsHint: number,
 ): Array<Record<string, unknown>> {
   if (!Array.isArray(subjects)) return []
   const semesterIndex = subjectIndexBySemester.get(semester) || new Map<string, { credits: number | null }>()
+  const historicalSemesterIndex = historicalCredits.bySemester.get(semester) || new Map<string, number>()
 
-  return subjects.map((raw) => {
+  const enriched = subjects.map((raw) => {
     const subject = ((raw && typeof raw === 'object') ? raw : {}) as Record<string, unknown>
     const codeKey = normalizeLookup(subject.code)
     const nameKey = normalizeLookup(subject.name)
-    const matched = (codeKey && semesterIndex.get(`code:${codeKey}`))
-      || (nameKey && semesterIndex.get(`name:${nameKey}`))
+    const matched = (
+      (codeKey ? semesterIndex.get(`code:${codeKey}`) : undefined)
+      || (nameKey ? semesterIndex.get(`name:${nameKey}`) : undefined)
+    )
+    const historical = (
+      (codeKey ? historicalSemesterIndex.get(`code:${codeKey}`) : undefined)
+      || (nameKey ? historicalSemesterIndex.get(`name:${nameKey}`) : undefined)
+      || (codeKey ? historicalCredits.globalIndex.get(`code:${codeKey}`) : undefined)
+      || (nameKey ? historicalCredits.globalIndex.get(`name:${nameKey}`) : undefined)
+    )
 
-    if (!matched || matched.credits == null || subject.credits != null) return subject
-    return { ...subject, credits: matched.credits }
+    if (subject.credits != null) return subject
+    if (matched?.credits != null) return { ...subject, credits: matched.credits }
+    if (historical != null) return { ...subject, credits: historical }
+    return subject
   })
+
+  if (totalCreditsHint > 0) {
+    const currentTotal = enriched.reduce((sum, subject) => sum + Number(subject.credits ?? 0), 0)
+    const missingIndexes = enriched
+      .map((subject, index) => ({ subject, index }))
+      .filter(({ subject }) => Number(subject.credits ?? 0) <= 0)
+
+    const remainingCredits = totalCreditsHint - currentTotal
+    if (missingIndexes.length > 0 && remainingCredits > 0 && remainingCredits % missingIndexes.length === 0) {
+      const inferredCredits = remainingCredits / missingIndexes.length
+      if (inferredCredits > 0 && inferredCredits <= 10) {
+        for (const { index } of missingIndexes) {
+          enriched[index] = { ...enriched[index], credits: inferredCredits }
+        }
+      }
+    }
+  }
+
+  return enriched
 }
 
 export async function buildResultsPayload(
@@ -64,6 +123,8 @@ export async function buildResultsPayload(
     return { cgpa: 0, semesters: [], gradeDistribution: {}, overallPercentage: 0, academicStrength: 0 }
   }
 
+  const resultRows = results as ResultRow[]
+
   const subjectIndexBySemester = new Map<number, Map<string, { credits: number | null }>>()
   for (const subject of subjects) {
     const semesterIndex = subjectIndexBySemester.get(subject.semester) || new Map<string, { credits: number | null }>()
@@ -74,7 +135,9 @@ export async function buildResultsPayload(
     subjectIndexBySemester.set(subject.semester, semesterIndex)
   }
 
-  const rawStudentInfo = results.reduce((acc, row) => {
+  const historicalCredits = buildHistoricalCreditIndex(resultRows)
+
+  const rawStudentInfo = resultRows.reduce((acc, row) => {
     const current = ((row.student_info ?? {}) as Record<string, unknown>)
     return mergePreferredRecord(current, acc)
   }, {} as Record<string, unknown>)
@@ -94,8 +157,14 @@ export async function buildResultsPayload(
     ...rawStudentInfo,
   }
 
-  const normalizedResults = (results as ResultRow[]).map((row) => {
-    const enrichedSubjects = enrichSemesterSubjects(row.semester, row.subjects, subjectIndexBySemester)
+  const normalizedResults = resultRows.map((row) => {
+    const enrichedSubjects = enrichSemesterSubjects(
+      row.semester,
+      row.subjects,
+      subjectIndexBySemester,
+      historicalCredits,
+      row.total_credits,
+    )
     const sgpaCalc = GradeCalculator.calculateSGPA(enrichedSubjects.map((subject) => ({
       credits: Number(subject.credits ?? 0),
       grade_point: Number(subject.grade_point ?? 0),
