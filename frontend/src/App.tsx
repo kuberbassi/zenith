@@ -237,11 +237,11 @@ const AppContent: React.FC = () => {
   );
 };
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'missing-client-id'
 
 const App: React.FC = () => {
-  if (!GOOGLE_CLIENT_ID) {
-    throw new Error('Missing VITE_GOOGLE_CLIENT_ID. Configure the frontend environment before starting the app.')
+  if (GOOGLE_CLIENT_ID === 'missing-client-id') {
+    console.warn('Missing VITE_GOOGLE_CLIENT_ID. Google Login will not work. Please configure the frontend environment before starting the app.')
   }
 
   return (
