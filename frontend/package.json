@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node generate-version.js && vite",
-    "build": "node generate-version.js && tsc -b && vite build",
+    "build": "node check-env.js && node generate-version.js && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
