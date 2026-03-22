@@ -3,10 +3,11 @@ import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     User,
-    Activity, Camera, Clock, RefreshCw,
+    Activity, Camera, Clock,
     GraduationCap,
     Mail, Hash, Shield, ShieldCheck
 } from 'lucide-react';
+import Loader from '@/components/ui/Loader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSemester } from '@/contexts/SemesterContext';
@@ -183,11 +184,14 @@ const Settings: React.FC = () => {
                             {user?.picture ? (
                                 <img src={user.picture} alt="Profile" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                             ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-blue-500/20 to-blue-500/5 flex items-center justify-center text-4xl font-black text-white">{(user?.name || 'P').charAt(0)}</div>
+                                <div className="w-full h-full bg-white/10 flex items-center justify-center text-4xl font-black text-white/40 tracking-tighter uppercase relative">
+                                    <div className="absolute inset-0 bg-white/[0.02] animate-pulse" />
+                                    <span className="relative z-10">{(user?.name || 'P').charAt(0)}</span>
+                                </div>
                             )}
                             {isEditingProfile && (
                                 <label className={`absolute inset-0 bg-black/60 flex items-center justify-center cursor-pointer transition-opacity ${isUploadingPfp ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                    {isUploadingPfp ? <RefreshCw size={24} className="text-white animate-spin" /> : <Camera size={24} className="text-white" />}
+                                    {isUploadingPfp ? <Loader size={20} /> : <Camera size={24} className="text-white" />}
                                     <input type="file" accept="image/*" className="hidden" disabled={isUploadingPfp} onChange={async (e) => {
                                         const file = e.target.files?.[0];
                                         if (!file) return;
@@ -304,7 +308,7 @@ const Settings: React.FC = () => {
                                                 <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest">Global Target</label>
                                                 <span className="text-[10px] font-black text-white">{profileForm.attendance_threshold}%</span>
                                             </div>
-                                            <input type="range" min="50" max="100" value={profileForm.attendance_threshold} onChange={e => setProfileForm({ ...profileForm, attendance_threshold: parseInt(e.target.value) })} disabled={!isEditingProfile} className="w-full accent-blue-500 h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer" />
+                                            <input type="range" min="50" max="100" value={profileForm.attendance_threshold} onChange={e => setProfileForm({ ...profileForm, attendance_threshold: parseInt(e.target.value) })} disabled={!isEditingProfile} className="w-full accent-white h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer" />
                                         </div>
                                         <div>
                                             <div className="flex justify-between mb-2.5 ml-1">

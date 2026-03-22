@@ -8,7 +8,7 @@ import {
 } from 'chart.js';
 import { motion } from 'framer-motion';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import Skeleton from '@/components/ui/Skeleton';
+import Loader from '@/components/ui/Loader';
 import { TrendingUp, Activity, Award, AlertTriangle, CalendarDays } from 'lucide-react';
 import Sparkles from '@/components/ui/Sparkles';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,19 +30,8 @@ const Analytics: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="p-8 space-y-8 max-w-7xl mx-auto">
-                <Skeleton className="h-40 w-full rounded-[3rem]" />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Skeleton className="h-32 rounded-3xl" />
-                    <Skeleton className="h-32 rounded-3xl" />
-                    <Skeleton className="h-32 rounded-3xl" />
-                    <Skeleton className="h-32 rounded-3xl" />
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <Skeleton className="h-80 rounded-[2.5rem]" />
-                    <Skeleton className="h-80 rounded-[2.5rem]" />
-                    <Skeleton className="h-80 rounded-[2.5rem]" />
-                </div>
+            <div className="flex items-center justify-center h-[80vh]">
+                <Loader size={40} />
             </div>
         );
     }

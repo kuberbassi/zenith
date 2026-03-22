@@ -1,5 +1,5 @@
 import React, { type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { Loader2 } from 'lucide-react';
+import Loader from './Loader';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'link' | 'filled' | 'tonal' | 'outlined' | 'text';
@@ -22,14 +22,14 @@ const Button: React.FC<ButtonProps> = ({
     const baseClasses = "inline-flex items-center justify-center font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden shrink-0 whitespace-nowrap flex-nowrap";
 
     const variantClasses: Record<string, string> = {
-        primary: "bg-primary text-on-primary hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",
-        filled: "bg-primary text-on-primary hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",
+        primary: "bg-primary !text-black hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",
+        filled: "bg-primary !text-black hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",
 
         secondary: "bg-secondary-container text-on-secondary-container hover:shadow-sm hover:bg-secondary-container/80 active:bg-secondary-container/70 border border-transparent",
         tonal: "bg-secondary-container text-on-secondary-container hover:bg-secondary-container/80 active:bg-secondary-container/70 border border-transparent shadow-none",
 
-        outline: "border border-outline text-primary hover:bg-primary/10 active:bg-primary/20",
         outlined: "border border-outline text-primary hover:bg-primary/10 active:bg-primary/20",
+        outline: "border border-outline text-primary hover:bg-primary/10 active:bg-primary/20",
 
         ghost: "text-primary hover:bg-primary/10 active:bg-primary/20 border-transparent",
         text: "text-primary hover:bg-primary/10 active:bg-primary/20 border-transparent",
@@ -54,10 +54,10 @@ const Button: React.FC<ButtonProps> = ({
             <span className="absolute inset-0 bg-current opacity-0 hover:opacity-[0.08] active:opacity-[0.12] transition-opacity duration-200" />
 
             {isLoading ? (
-                <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin relative z-10" />
+                <div className="flex items-center gap-2">
+                    <Loader size={16} />
                     <span className="relative z-10">Loading...</span>
-                </>
+                </div>
             ) : (
                 <>
                     {icon && <span className="relative z-10">{icon}</span>}

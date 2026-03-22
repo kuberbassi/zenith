@@ -80,13 +80,13 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const getColors = (type: ToastType) => {
         switch (type) {
             case 'success':
-                return 'bg-success-500/20 border-success-500/50 text-success-400';
+                return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
             case 'error':
-                return 'bg-danger-500/20 border-danger-500/50 text-danger-400';
+                return 'bg-red-500/10 border-red-500/20 text-red-400';
             case 'warning':
-                return 'bg-warning-500/20 border-warning-500/50 text-warning-400';
+                return 'bg-amber-500/10 border-amber-500/20 text-amber-400';
             case 'info':
-                return 'bg-primary-500/20 border-primary-500/50 text-primary-400';
+                return 'bg-white/5 border-white/10 text-white/90';
         }
     };
 

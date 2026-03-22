@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
-const STAR_COUNT = 1400;
-const TWINKLE_COUNT = 60;
+const STAR_COUNT = 1800;
+const TWINKLE_COUNT = 120;
 
 const AmbientBackground: React.FC = () => {
     const mountRef = useRef<HTMLDivElement>(null);
@@ -37,10 +37,10 @@ const AmbientBackground: React.FC = () => {
             positions[i * 3 + 1] = (Math.random() - 0.5) * 200;
             positions[i * 3 + 2] = (Math.random() - 0.5) * 120;
 
-            // Most stars are tiny; a handful are brighter
+            // Most stars are visible; some are bigger and brighter
             const r = Math.random();
-            sizes[i] = r < 0.92 ? 0.08 + Math.random() * 0.12 : 0.25 + Math.random() * 0.2;
-            opacities[i] = r < 0.92 ? 0.25 + Math.random() * 0.35 : 0.6 + Math.random() * 0.4;
+            sizes[i] = r < 0.9 ? 0.2 + Math.random() * 0.3 : 0.6 + Math.random() * 0.8;
+            opacities[i] = r < 0.9 ? 0.4 + Math.random() * 0.4 : 0.8 + Math.random() * 0.2;
         }
 
         starsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import Loader from './Loader';
 
 interface LoadingSpinnerProps {
     size?: 'sm' | 'md' | 'lg';
@@ -14,11 +14,6 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     variant = 'spinner',
     skeletonClassName = 'h-24 w-full',
 }) => {
-    const sizeClasses = {
-        sm: 'w-5 h-5',
-        md: 'w-8 h-8',
-        lg: 'w-12 h-12',
-    };
 
     // Skeleton variant
     if (variant === 'skeleton') {
@@ -28,10 +23,14 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     }
 
     // Spinner variant
+    const loaderSizes = {
+        sm: 20,
+        md: 32,
+        lg: 48,
+    };
+
     const spinner = (
-        <Loader2
-            className={`${sizeClasses[size]} text-primary animate-spin`}
-        />
+        <Loader size={loaderSizes[size]} />
     );
 
     if (fullScreen) {

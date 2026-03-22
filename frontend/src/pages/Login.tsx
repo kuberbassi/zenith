@@ -12,14 +12,14 @@ const ThreeBackground = () => {
             <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
                 <ambientLight intensity={0.5} />
                 <directionalLight position={[10, 10, 5]} intensity={1} color="#ffffff" />
-                <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#8b5cf6" />
+                <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#ffffff" />
 
                 <Suspense fallback={null}>
-                    <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+                    <Stars radius={100} depth={50} count={8000} factor={7} saturation={0} fade={false} speed={2.5} />
                     <Float speed={2} rotationIntensity={1.5} floatIntensity={2}>
                         <Sphere args={[1, 64, 64]} scale={1.2}>
                             <MeshDistortMaterial
-                                color="#0a192f"
+                                color="#000000"
                                 attach="material"
                                 distort={0.4}
                                 speed={1.5}
@@ -62,13 +62,13 @@ const Login: React.FC = () => {
                     style={{ boxShadow: '0 0 80px rgba(255,255,255,0.1), inset 0 1px 0 rgba(255,255,255,0.1)' }}>
 
                     {/* Glowing Accent */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-blue-500/50 to-transparent blur-sm" />
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent blur-sm" />
 
                     {/* Icon */}
                     <div className="mb-8 flex justify-center relative">
-                        <div className="absolute inset-0 bg-white/10 blur-2xl rounded-full" />
-                        <div className="w-20 h-20 rounded-3xl glass-panel border border-white/10 flex items-center justify-center shadow-2xl relative z-10 overflow-hidden">
-                            <img src="/icon-trans.png" alt="AcadHub" className="w-[70%] h-[70%] object-contain transition-transform duration-700 hover:scale-110" />
+                        <div className="absolute inset-0 bg-white/10 blur-3xl rounded-full" />
+                        <div className="w-32 h-32 rounded-[2.5rem] glass-panel border border-white/10 flex items-center justify-center shadow-2xl relative z-10 overflow-hidden group">
+                            <img src="/pwa-192x192.png" alt="AcadHub" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                         </div>
                     </div>
 

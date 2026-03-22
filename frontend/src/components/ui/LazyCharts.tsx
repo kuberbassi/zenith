@@ -7,7 +7,7 @@ import { Bar, Line, Doughnut } from 'react-chartjs-2';
 
 const ChartSkeleton: React.FC<{ height?: number | string }> = ({ height = 300 }) => (
     <div
-        className="animate-pulse bg-surface-container-high/50 rounded-xl flex items-center justify-center"
+        className="flex items-center justify-center"
         style={{ height }}
     >
         <LoadingSpinner size="md" />

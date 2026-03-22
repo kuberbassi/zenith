@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import {
-    Rocket, ShieldCheck, Sparkles, Edit2, Trash2, Plus
+    Rocket, ShieldCheck, Sparkles, Edit2, Trash, Plus
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Button from '@/components/ui/Button';
@@ -20,9 +20,9 @@ const SKILL_CATEGORIES = [
 const SKILL_LEVELS: Skill['level'][] = ['beginner', 'intermediate', 'advanced', 'expert'];
 
 const LEVEL_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
-    beginner: { color: '#ffffff', bg: 'rgba(255,255,255,0.1)', border: 'rgba(255,255,255,0.2)' },
-    intermediate: { color: '#8b5cf6', bg: 'rgba(255,255,255,0.1)', border: 'rgba(255,255,255,0.2)' },
-    advanced: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.2)' },
+    beginner: { color: '#ffffff', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)' },
+    intermediate: { color: '#10b981', bg: 'rgba(16,185,129,0.05)', border: 'rgba(16,185,129,0.1)' },
+    advanced: { color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)' },
     expert: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' },
 };
 
@@ -141,7 +141,7 @@ const SkillTracker: React.FC = () => {
 
             <div className="mb-10 flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 {['all', ...SKILL_CATEGORIES].map(cat => (
-                    <button key={cat} onClick={() => { setFilter(cat); localStorage.setItem('acadhub_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-white/10 border-blue-500 text-white shadow-lg shadow-white/10' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
+                    <button key={cat} onClick={() => { setFilter(cat); localStorage.setItem('acadhub_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-white/10 border-white/20 text-white shadow-lg shadow-white/10' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
                         {cat}
                     </button>
                 ))}
@@ -155,7 +155,7 @@ const SkillTracker: React.FC = () => {
                             return (
                                 <motion.div key={skill._id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
                                     <div className="group relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 h-full flex flex-col transition-all hover:bg-white/[0.01] hover:border-white/[0.12] shadow-xl overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}>
-                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
 
                                         <div className="flex justify-between items-start mb-6">
                                             <div className="flex flex-col gap-2">
@@ -167,7 +167,7 @@ const SkillTracker: React.FC = () => {
                                             </div>
                                             <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
                                                 <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/20 hover:text-white hover:bg-white/10 transition-all border border-white/5"><Edit2 size={14} /></button>
-                                                <button onClick={() => handleDelete(skill._id!)} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all border border-white/5"><Trash2 size={14} /></button>
+                                                <button onClick={() => handleDelete(skill._id!)} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all border border-white/5"><Trash size={14} /></button>
                                             </div>
                                         </div>
 
@@ -181,8 +181,8 @@ const SkillTracker: React.FC = () => {
                                                 </div>
                                                 <Sparkles size={14} className="text-white/20 group-hover:text-white transition-colors" />
                                             </div>
-                                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden border border-white/[0.04]">
-                                                <motion.div initial={{ width: 0 }} animate={{ width: `${skill.progress}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} className="h-full rounded-full bg-gradient-to-r from-blue-600 to-blue-400" />
+                                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden border border-white/[0.08]">
+                                                <motion.div initial={{ width: 0 }} animate={{ width: `${skill.progress}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} className="h-full rounded-full bg-gradient-to-r from-white via-white to-white/60 shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
                                             </div>
                                         </div>
                                     </div>
@@ -203,7 +203,7 @@ const SkillTracker: React.FC = () => {
                     <Input label="Description" value={formData.notes || ''} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Enter capability details..." />
                     <div>
                         <div className="flex justify-between mb-3"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Efficiency</span><span className="text-xs font-black text-white">{formData.progress}%</span></div>
-                        <input type="range" min="0" max="100" step="5" value={formData.progress} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) })} className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-blue-500" />
+                        <input type="range" min="0" max="100" step="5" value={formData.progress} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) })} className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-white" />
                     </div>
                     <div className="flex gap-3 pt-4">
                         <Button variant="outlined" onClick={() => setIsModalOpen(false)} className="flex-1 uppercase tracking-widest text-[10px] font-black h-12">Abort</Button>

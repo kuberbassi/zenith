@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import { Bell, Info, ExternalLink, Calendar, RefreshCw, AlertCircle, ShieldCheck, Zap } from 'lucide-react';
+import Loader from '@/components/ui/Loader';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { attendanceService } from '@/services/attendance.service';
 
@@ -95,7 +96,7 @@ const Notifications: React.FC = () => {
                         onClick={loadData}
                         className="flex items-center gap-2 px-6 py-3 rounded-2xl glass-panel border border-white/[0.04] text-[10px] font-black text-white/40 uppercase tracking-widest hover:text-white hover:border-white/10 transition-all group"
                     >
-                        <RefreshCw size={14} className={`group-hover:rotate-180 transition-transform duration-500 ${loading ? 'animate-spin' : ''}`} />
+                        <Loader size={20} />
                         Sync Frequency
                     </button>
                 </div>

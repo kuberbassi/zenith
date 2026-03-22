@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Clock, FileText, RefreshCw, Settings as SettingsIcon, Trash2, User } from 'lucide-react';
+import { Activity, Clock, FileText, Settings as SettingsIcon, Trash2, User } from 'lucide-react';
+import Loader from '@/components/ui/Loader';
 import type { SystemLog } from '@/types';
 import { attendanceService } from '@/services/attendance.service';
 
@@ -40,7 +41,7 @@ const SystemLogsSection: React.FC = () => {
     };
 
     if (loading) {
-        return <div className="h-48 flex items-center justify-center"><RefreshCw className="animate-spin text-white/40" /></div>;
+        return <div className="h-48 flex items-center justify-center"><Loader size={20} /></div>;
     }
 
     const dates = Object.keys(groupedLogs);

@@ -3,9 +3,10 @@ import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import type { ChartOptions } from 'chart.js';
 import {
-    Eye, EyeOff, RefreshCw, Zap, GraduationCap,
+    Eye, EyeOff, Zap, GraduationCap,
     ShieldCheck, X, Download
 } from 'lucide-react';
+import Loader from '@/components/ui/Loader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { attendanceService } from '@/services/attendance.service';
@@ -408,7 +409,7 @@ const Results: React.FC = () => {
             {
                 label: 'Internal',
                 data: chartSubjects.map((s: any) => getSubjectMarks(s).internal),
-                backgroundColor: 'rgba(59, 130, 246, 0.85)',
+                backgroundColor: 'rgba(255, 255, 255, 0.4)',
                 borderRadius: 6,
             },
             {
@@ -466,7 +467,7 @@ const Results: React.FC = () => {
     };
 
     if (step === 'loading') {
-        return <div className="flex items-center justify-center h-screen"><RefreshCw className="animate-spin text-white/40" /></div>;
+        return <div className="flex items-center justify-center h-screen"><Loader size={20} /></div>;
     }
 
     return (
@@ -563,7 +564,7 @@ const Results: React.FC = () => {
                                 <p className="text-xs text-white/30 font-medium">Verify human identity</p>
                             </div>
                             <button disabled={captchaLoading || fetching} onClick={refreshCaptcha} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed">
-                                <RefreshCw size={16} className={captchaLoading ? 'animate-spin' : ''} />
+                                <Loader size={20} />
                             </button>
                         </div>
                         <div className="p-4 bg-white rounded-2xl mb-6 flex justify-center shadow-inner overflow-hidden">
@@ -676,7 +677,7 @@ const Results: React.FC = () => {
                                 className="flex-1 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-xs font-black text-white hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                             >
                                 {pdfLoading
-                                    ? <><RefreshCw size={12} className="animate-spin" /> Generating…</>
+                                    ? <><Loader size={20} /> Generating…</>
                                     : <><Download size={12} /> Download PDF</>
                                 }
                             </button>

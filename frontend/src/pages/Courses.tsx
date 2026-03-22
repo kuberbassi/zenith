@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ExternalLink, Trash2, Edit2, Award,
+    ExternalLink, Trash, Edit2, Award,
     TrendingUp, Book, Globe, Video, BookOpen, GraduationCap, Clock
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
@@ -179,7 +179,7 @@ const Courses: React.FC = () => {
                                                 <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${plat.color} text-white text-[9px] font-black uppercase tracking-widest`}><P_Icon size={12} /> {plat.label}</div>
                                                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={() => handleEditCourse(course)} className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] text-white/20 hover:text-white hover:bg-white/5"><Edit2 size={12} /></button>
-                                                    <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] text-white/20 hover:text-red-500 hover:bg-red-500/5"><Trash2 size={12} /></button>
+                                                    <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] text-white/20 hover:text-red-500 hover:bg-red-500/5"><Trash size={12} /></button>
                                                 </div>
                                             </div>
                                             <h3 className="text-xl font-black text-white/90 mb-2 truncate group-hover:text-white transition-colors uppercase tracking-tight">{course.title}</h3>
@@ -225,7 +225,7 @@ const Courses: React.FC = () => {
                                     <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white border border-white/10"><Award size={16} /></div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100">
                                         <button onClick={() => handleEditCourse(course)} className="p-1.5 text-white/20 hover:text-white transition-colors"><Edit2 size={12} /></button>
-                                        <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-1.5 text-white/20 hover:text-red-500 transition-colors"><Trash2 size={12} /></button>
+                                        <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-1.5 text-white/20 hover:text-red-500 transition-colors"><Trash size={12} /></button>
                                     </div>
                                 </div>
                                 <h4 className="text-xs font-black text-white/80 line-clamp-2 uppercase tracking-tight mb-4">{course.title}</h4>

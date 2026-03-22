@@ -170,7 +170,7 @@ const Calendar: React.FC = () => {
 
                                 <div className="absolute bottom-2 md:bottom-4 flex flex-wrap justify-center gap-1 px-1">
                                     {present.slice(0, 4).map((_, idx) => (
-                                        <div key={`p-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(255,255,255,0.6)]" />
+                                        <div key={`p-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-white/60 shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
                                     ))}
                                     {absent.slice(0, 4).map((_, idx) => (
                                         <div key={`a-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-red-500/60 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
@@ -185,7 +185,7 @@ const Calendar: React.FC = () => {
                 {/* Legend */}
                 <div className="mt-12 pt-8 border-t border-white/[0.04] flex flex-wrap justify-center gap-10">
                     <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_10px_rgba(255,255,255,0.8)]" />
+                        <div className="w-2 h-2 rounded-full bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
                         <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Present Scan</span>
                     </div>
                     <div className="flex items-center gap-3">

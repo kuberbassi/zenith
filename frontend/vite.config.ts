@@ -12,9 +12,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-trans.png', 'acadhub-brand-v3.png', 'favicon-cropped.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
-        name: 'AcadHub v3.0.0',
+        name: 'AcadHub',
         short_name: 'AcadHub',
-        description: 'Smart Attendance Tracker v3.0.0',
+        description: 'Smart Attendance Tracker',
         theme_color: '#000000',
         background_color: '#000000',
         icons: [

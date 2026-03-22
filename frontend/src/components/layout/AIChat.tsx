@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Send, X, Sparkles, User, ChevronDown, Trash2 } from 'lucide-react';
 import api from '@/services/api';
+import Loader from '@/components/ui/Loader';
 
 // Lightweight markdown → JSX for AI messages
 const renderMarkdown = (text: string) => {
@@ -36,11 +37,11 @@ interface ChatMessage {
 }
 
 const SUGGESTIONS = [
-    'Which subjects can I skip?',
-    'How\'s my attendance overall?',
-    'What\'s my schedule today?',
-    'Explain my result analytics',
-    'Help me improve my grades',
+    'How is my attendance today?',
+    'Show my timetable',
+    'Which classes can I skip?',
+    'Analyze my results',
+    'Optimize my study plan',
 ];
 
 const AIChat: React.FC = () => {
@@ -99,7 +100,7 @@ const AIChat: React.FC = () => {
                 .slice(-10)
                 .map(m => ({ role: m.role, content: m.content }));
 
-            const response = await api.post('/api/ai/chat', {
+            const response = await api.post('/api/ai/chat_v2', {
                 message: msg,
                 history,
             });
@@ -139,16 +140,14 @@ const AIChat: React.FC = () => {
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         exit={{ scale: 0, opacity: 0 }}
-                        whileHover={{ scale: 1.08, y: -2 }}
-                        whileTap={{ scale: 0.92 }}
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setIsOpen(true)}
-                        className="fixed bottom-6 right-6 lg:right-8 z-50 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center overflow-hidden group"
-                        style={{
-                            background: 'linear-gradient(135deg, #ffffff 0%, #8b5cf6 50%, #6366f1 100%)',
-                            boxShadow: '0 4px 24px rgba(99, 102, 241, 0.4), 0 2px 8px rgba(0,0,0,0.3)',
-                        }}
+                        className="fixed bottom-6 right-6 lg:right-8 z-50 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center overflow-hidden glass-panel group shadow-2xl transition-all"
                     >
+                        <div className="absolute inset-0 bg-white/[0.05] group-hover:bg-white/[0.1] transition-colors" />
                         <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-white relative z-10" />
+                        <div className="absolute -inset-4 bg-white/5 blur-xl group-hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100" />
                     </motion.button>
                 )}
             </AnimatePresence>
@@ -162,31 +161,26 @@ const AIChat: React.FC = () => {
                         exit={{ opacity: 0, y: 20, scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
                         ref={panelRef}
-                        className="fixed bottom-[80px] right-6 lg:right-8 z-50 w-[calc(100vw-24px)] max-w-[380px] h-[520px] max-h-[calc(100vh-104px)] flex flex-col overflow-hidden rounded-2xl"
-                        style={{
-                            background: '#0c0c0f',
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            boxShadow: '0 24px 80px -12px rgba(0,0,0,0.8), 0 0 1px rgba(255,255,255,0.1)',
-                        }}
+                        className="fixed bottom-[80px] right-6 lg:right-8 z-50 w-[calc(100vw-24px)] max-w-[380px] h-[520px] max-h-[calc(100vh-104px)] flex flex-col overflow-hidden rounded-[2rem] glass-glow"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%)' }}>
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #ffffff, #8b5cf6)' }}>
-                                    <Sparkles className="w-3.5 h-3.5 text-white" />
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/10 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                                    <Sparkles className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-white text-[13px] leading-none">AcadHub AI</h3>
-                                    <span className="text-[10px] text-white/30 font-medium">Llama 3.3 · Your data</span>
+                                    <h3 className="font-black text-white text-[13px] uppercase tracking-widest leading-none">AcadHub AI</h3>
+                                    <span className="text-[10px] text-white/25 font-bold uppercase tracking-tighter">Llama 3.3 · Control Link</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-0.5">
+                            <div className="flex items-center gap-1">
                                 {messages.length > 0 && (
-                                    <button onClick={clearChat} className="p-1.5 text-white/20 hover:text-white/50 transition-colors rounded-lg hover:bg-white/[0.04]" title="Clear chat">
-                                        <Trash2 className="w-3.5 h-3.5" />
+                                    <button onClick={clearChat} className="p-2 text-white/20 hover:text-white/60 transition-all rounded-xl hover:bg-white/[0.05]" title="Wipe session">
+                                        <Trash2 className="w-4 h-4" />
                                     </button>
                                 )}
-                                <button onClick={() => setIsOpen(false)} className="p-1.5 text-white/20 hover:text-white/50 transition-colors rounded-lg hover:bg-white/[0.04]">
+                                <button onClick={() => setIsOpen(false)} className="p-2 text-white/20 hover:text-white/60 transition-all rounded-xl hover:bg-white/[0.05]">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
@@ -196,28 +190,24 @@ const AIChat: React.FC = () => {
                         <div
                             ref={scrollContainerRef}
                             onScroll={handleScroll}
-                            className="flex-1 overflow-y-auto px-4 py-3 space-y-3 no-scrollbar"
+                            className="flex-1 overflow-y-auto px-5 py-4 space-y-4 no-scrollbar"
                         >
                             {/* Empty State */}
                             {messages.length === 0 && !isTyping && (
-                                <div className="h-full flex flex-col items-center justify-center gap-5 py-6">
-                                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.15))', border: '1px solid rgba(99,102,241,0.2)' }}>
-                                        <Sparkles className="w-5 h-5 text-white" />
+                                <div className="h-full flex flex-col items-center justify-center gap-6 py-6" style={{ minHeight: '300px' }}>
+                                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/[0.03] border border-white/[0.08] shadow-2xl">
+                                        <Sparkles className="w-6 h-6 text-white/40" />
                                     </div>
-                                    <div className="text-center">
-                                        <p className="text-white/60 text-sm font-medium mb-1">Ask me anything</p>
-                                        <p className="text-white/25 text-xs max-w-[220px]">I can see your attendance, timetable, subjects, and more</p>
-                                        <p className="text-amber-300/60 text-[10px] max-w-[240px] mt-2 leading-relaxed">
-                                            AI replies are generated by Groq using the academic context needed to answer your question.
-                                        </p>
+                                    <div className="text-center space-y-2">
+                                        <p className="text-white/70 text-sm font-black uppercase tracking-widest leading-none">Awaiting Protocol</p>
+                                        <p className="text-white/30 text-xs font-medium max-w-[220px]">Synthetic intelligence connected to your academic mainframe</p>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2 w-full max-w-[280px]">
+                                    <div className="grid grid-cols-1 gap-2 w-full max-w-[280px]">
                                         {SUGGESTIONS.map((s, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => handleSend(s)}
-                                                className="px-3 py-2 rounded-xl text-[11px] text-white/40 hover:text-white/70 font-medium text-left transition-all hover:bg-white/[0.04]"
-                                                style={{ border: '1px solid rgba(255,255,255,0.05)' }}
+                                                className="px-4 py-2.5 rounded-xl text-[11px] text-white/40 hover:text-white/80 font-bold text-left transition-all bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.1] hover:translate-x-1"
                                             >
                                                 {s}
                                             </button>
@@ -230,37 +220,28 @@ const AIChat: React.FC = () => {
                             {messages.map((msg) => (
                                 <motion.div
                                     key={msg.id}
-                                    initial={{ opacity: 0, y: 8 }}
+                                    initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.2 }}
-                                    className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     {msg.role === 'assistant' && (
-                                        <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: msg.error ? 'rgba(239,68,68,0.15)' : 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.2))', border: `1px solid ${msg.error ? 'rgba(239,68,68,0.2)' : 'rgba(99,102,241,0.15)'}` }}>
-                                            <Sparkles className={`w-3 h-3 ${msg.error ? 'text-red-400' : 'text-white'}`} />
+                                        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 bg-white/5 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)]">
+                                            <Sparkles className={`w-4 h-4 ${msg.error ? 'text-red-400' : 'text-white/60'}`} />
                                         </div>
                                     )}
                                     <div
-                                        className={`max-w-[75%] px-3 py-2 text-[13px] leading-relaxed ${msg.role === 'user'
-                                            ? 'rounded-2xl rounded-br-md text-white'
+                                        className={`max-w-[85%] px-4 py-3 text-[13px] leading-relaxed font-medium ${msg.role === 'user'
+                                            ? 'rounded-2xl rounded-tr-sm bg-white text-black shadow-xl shadow-white/5'
                                             : msg.error
-                                                ? 'rounded-2xl rounded-bl-md text-red-300/80'
-                                                : 'rounded-2xl rounded-bl-md text-white/70'
+                                                ? 'rounded-2xl rounded-tl-sm bg-red-500/10 border border-red-500/20 text-red-200/90'
+                                                : 'rounded-2xl rounded-tl-sm bg-white/[0.04] border border-white/[0.06] text-white/80'
                                             }`}
-                                        style={{
-                                            background: msg.role === 'user'
-                                                ? 'linear-gradient(135deg, #ffffff, #6366f1)'
-                                                : msg.error
-                                                    ? 'rgba(239,68,68,0.08)'
-                                                    : 'rgba(255,255,255,0.04)',
-                                            border: msg.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.04)',
-                                        }}
                                     >
                                         {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
                                     </div>
                                     {msg.role === 'user' && (
-                                        <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0 mt-0.5 border border-white/[0.06]">
-                                            <User className="w-3 h-3 text-white/40" />
+                                        <div className="w-8 h-8 rounded-xl bg-white/[0.08] flex items-center justify-center shrink-0 mt-0.5 border border-white/[0.1]">
+                                            <User className="w-4 h-4 text-white/60" />
                                         </div>
                                     )}
                                 </motion.div>
@@ -268,49 +249,43 @@ const AIChat: React.FC = () => {
 
                             {/* Typing Indicator */}
                             {isTyping && (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2 items-start">
-                                    <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.2))', border: '1px solid rgba(99,102,241,0.15)' }}>
-                                        <Sparkles className="w-3 h-3 text-white" />
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
+                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/5 border border-white/10">
+                                        <Loader size={16} />
                                     </div>
-                                    <div className="px-3 py-2.5 rounded-2xl rounded-bl-md flex items-center gap-1" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                                        {[0, 0.15, 0.3].map((delay, i) => (
-                                            <motion.div key={i} animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay }} className="w-1.5 h-1.5 rounded-full bg-blue-400/60" />
-                                        ))}
+                                    <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-white/[0.03] border border-white/[0.06] flex items-center gap-1.5">
+                                        <span className="text-[11px] font-black uppercase tracking-widest text-white/20 animate-pulse">Analyzing context...</span>
                                     </div>
                                 </motion.div>
                             )}
 
                             {/* Scroll anchor & button */}
-                            <div ref={messagesEndRef} className="h-1" />
+                            <div ref={messagesEndRef} className="h-2" />
                         </div>
 
                         {showScrollBtn && (
-                            <button onClick={scrollToBottom} className="absolute bottom-[60px] left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center backdrop-blur-sm hover:bg-white/15 transition-all z-10">
-                                <ChevronDown className="w-4 h-4 text-white/50" />
+                            <button onClick={scrollToBottom} className="absolute bottom-[80px] left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center backdrop-blur-xl hover:bg-white/20 transition-all z-10 shadow-2xl">
+                                <ChevronDown className="w-5 h-5 text-white/80" />
                             </button>
                         )}
 
                         {/* Input */}
-                        <div className="px-3 py-2.5 border-t border-white/[0.06]">
+                        <div className="px-4 py-4 border-t border-white/[0.08] bg-white/[0.02]">
                             <div className="relative flex items-center gap-2">
                                 <input
                                     type="text"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                                    placeholder="Ask about your academics..."
-                                    className="flex-1 bg-white/[0.04] border border-white/[0.06] rounded-xl py-2.5 px-3 text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-white/15 transition-all"
+                                    placeholder="Execute command..."
+                                    className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-2xl py-3 px-4 text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-white/20 transition-all focus:bg-white/[0.06] font-medium"
                                 />
                                 <button
                                     onClick={() => handleSend()}
                                     disabled={!input.trim() || isTyping}
-                                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-all disabled:opacity-20"
-                                    style={{
-                                        background: input.trim() && !isTyping ? 'linear-gradient(135deg, #ffffff, #6366f1)' : 'rgba(255,255,255,0.04)',
-                                        border: '1px solid rgba(255,255,255,0.06)',
-                                    }}
+                                    className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shadow-xl ${input.trim() && !isTyping ? 'bg-white text-black hover:scale-105 active:scale-95' : 'bg-white/[0.04] border border-white/[0.06] text-white/20 opacity-40 cursor-not-allowed'}`}
                                 >
-                                    <Send className="w-4 h-4 text-white" />
+                                    <Send className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>

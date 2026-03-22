@@ -101,7 +101,7 @@ export function requireCsrf(req: Request, res: Response, next: NextFunction): vo
   }
 
   const authCookie = readCookie(req, 'acadhub_access_token')
-  if (!authCookie) {
+  if (!authCookie || req.path.includes('/auth/')) {
     next()
     return
   }

@@ -8,7 +8,7 @@ import {
     PointElement, LineElement, Tooltip, Legend, Filler
 } from 'chart.js';
 import {
-    AlertTriangle, TrendingUp, Trash2, Edit2,
+    AlertTriangle, TrendingUp, Trash, Edit2,
     Plus, Zap, Target,
     Activity, ShieldCheck, CheckCircle2
 } from 'lucide-react';
@@ -21,7 +21,7 @@ import { attendanceService } from '@/services/attendance.service';
 import Sparkles from '@/components/ui/Sparkles';
 import { LazyBarChartWrapper, LazyLineChartWrapper } from '@/components/ui/LazyCharts';
 
-import Skeleton from '@/components/ui/Skeleton';
+import Loader from '@/components/ui/Loader';
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend, Filler);
 
 const ATTENDED_STATUSES = new Set(['present', 'late', 'approved_medical', 'medical', 'duty', 'substituted']);
@@ -113,8 +113,8 @@ const ProgressRing: React.FC<{ pct: number; size?: number; strokeWidth?: number;
 
 
 /* ══════════════════════════════════════════════════════════════════
-   DASHBOARD
-   ══════════════════════════════════════════════════════════════════ */
+ Dashing Hub Dashboard
+ ══════════════════════════════════════════════════════════════════ */
 const Dashboard: React.FC = () => {
     const { showToast } = useToast();
     const { user } = useAuth();
@@ -231,12 +231,8 @@ const Dashboard: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="space-y-4 pb-32 max-w-[1320px] mx-auto px-5">
-                <Skeleton className="h-[400px] w-full rounded-3xl" />
-                <div className="grid grid-cols-2 gap-3">
-                    <Skeleton className="h-80 rounded-2xl" />
-                    <Skeleton className="h-80 rounded-2xl" />
-                </div>
+            <div className="flex items-center justify-center h-[80vh]">
+                <Loader size={40} />
             </div>
         );
     }
@@ -350,7 +346,7 @@ const Dashboard: React.FC = () => {
                         icon: <ShieldCheck size={15} />
                     },
                 ].map((card) => (
-                    <motion.div key={card.label} variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="rounded-[2rem] glass-panel border border-white/[0.06] p-6">
+                    <motion.div key={card.label} variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="rounded-[2.5rem] glass-glow border border-white/[0.08] p-7 transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.6)]">
                         <div className="flex items-center justify-between mb-5">
                             <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{card.label}</span>
                             <span className={`${card.tone} opacity-80`}>{card.icon}</span>
@@ -362,7 +358,7 @@ const Dashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-6">
-                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-2 rounded-[2rem] glass-panel border border-white/[0.06] p-6 min-h-[340px] flex flex-col">
+                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-2 rounded-[2.5rem] glass-panel border border-white/[0.06] p-8 min-h-[340px] flex flex-col shadow-2xl">
                     <div className="flex items-center gap-2 mb-3">
                         <Sparkles size={14} className="text-red-400/50" />
                         <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Attention Required</span>
@@ -373,7 +369,7 @@ const Dashboard: React.FC = () => {
                     </div>
                 </motion.div>
 
-                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-3 rounded-[2rem] glass-panel border border-white/[0.06] p-6 min-h-[340px] flex flex-col">
+                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-3 rounded-[2.5rem] glass-panel border border-white/[0.06] p-8 min-h-[340px] flex flex-col shadow-2xl">
                     <div className="flex items-center gap-2 mb-3">
                         <TrendingUp size={14} className="text-white/40" />
                         <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Stability Trend</span>
@@ -455,7 +451,7 @@ const Dashboard: React.FC = () => {
                                                     <Edit2 size={12} />
                                                 </button>
                                                 <button onClick={() => handleDeleteSubject(subject._id, subject.name)} className="p-1.5 rounded-lg hover:bg-red-500/5 text-white/10 hover:text-red-500/40 transition-colors">
-                                                    <Trash2 size={12} />
+                                                    <Trash size={12} />
                                                 </button>
                                             </div>
                                         </div>

@@ -134,7 +134,7 @@ const Modal: React.FC<ModalProps> = ({
                         <div
                             ref={contentRef}
                             tabIndex={-1}
-                            className="p-6 text-white/80 overflow-y-auto flex-1 custom-scrollbar focus:outline-none"
+                            className="p-6 overflow-y-auto flex-1 custom-scrollbar focus:outline-none"
                         >
                             {children}
                         </div>

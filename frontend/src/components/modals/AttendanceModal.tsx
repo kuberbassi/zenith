@@ -472,7 +472,7 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                             'medical': 'text-white bg-white/5',
                                             'approved_medical': 'text-white bg-white/5',
                                             'cancelled': 'text-white/60 bg-white/5',
-                                            'substituted': 'text-purple-400 bg-purple-500/10'
+                                            'substituted': 'text-white bg-white/10 border border-white/20'
                                         };
                                         const statusColor = statusColors[log.status] || 'text-white/60 bg-white/5';
 
@@ -550,7 +550,7 @@ const SubjectRow = ({
                             { id: 'absent', label: 'Absent', color: 'bg-red-500/15 text-red-400 border border-red-500/30' },
                             { id: 'medical', label: 'Medical Leave', color: 'bg-white/7 text-white border border-white/15' }, // Map to approved_medical
                             { id: 'cancelled', label: 'Cancelled', color: 'bg-white/10 text-white/70 border border-white/20' },
-                            { id: 'substituted', label: 'Substituted', color: 'bg-purple-500/15 text-purple-400 border border-purple-500/30' },
+                            { id: 'substituted', label: 'Substituted', color: 'bg-white/15 text-white border border-white/30' },
                         ].map(opt => (
                             <button
                                 key={opt.id}
@@ -577,8 +577,8 @@ const SubjectRow = ({
                             return sId === detailSubstitutedBy;
                         });
                         return (
-                            <div className="animate-fade-in p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
-                                <label className="text-xs font-bold text-purple-400 uppercase block mb-2">
+                            <div className="animate-fade-in p-3 bg-white/[0.04] rounded-xl border border-white/[0.1]">
+                                <label className="text-xs font-bold text-white/60 uppercase block mb-2">
                                     Substituted By
                                 </label>
                                 <SubstitutionDropdown
@@ -774,17 +774,17 @@ const SubstitutionDropdown = ({ subjects, value, selectedName, onChange }: {
             <button
                 type="button"
                 onClick={() => setOpen(!open)}
-                className="w-full glass-panel border border-white/[0.08] text-white rounded-xl px-4 py-2.5 text-sm text-left flex items-center justify-between hover:border-purple-500/30 transition-all"
+                className="w-full glass-panel border border-white/[0.08] text-white rounded-xl px-4 py-2.5 text-sm text-left flex items-center justify-between hover:border-white/20 transition-all"
             >
                 <span className={value ? 'text-white' : 'text-white/30'}>{selectedName || 'Select Subject...'}</span>
                 <svg className={`w-4 h-4 text-white/30 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
             {open && (
-                <div className="absolute left-0 right-0 z-[60] mt-1 rounded-xl border border-white/[0.1] glass-panel shadow-2xl overflow-hidden max-h-[180px] overflow-y-auto custom-scrollbar" style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}>
+                <div className="absolute left-0 right-0 z-[60] mt-1 rounded-xl border border-white/[0.12] bg-[#0c0d12]/95 backdrop-blur-3xl shadow-2xl overflow-hidden max-h-[180px] overflow-y-auto custom-scrollbar" style={{ boxShadow: '0 16px 48px rgba(0,0,0,0.8)' }}>
                     <button
                         type="button"
                         onClick={() => { onChange(''); setOpen(false); }}
-                        className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${!value ? 'bg-purple-500/15 text-purple-400' : 'text-white/50 hover:bg-white/[0.05] hover:text-white'}`}
+                        className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${!value ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/[0.05] hover:text-white'}`}
                     >
                         Select Subject...
                     </button>
@@ -796,7 +796,7 @@ const SubstitutionDropdown = ({ subjects, value, selectedName, onChange }: {
                                 key={`sub-drop-${sId}`}
                                 type="button"
                                 onClick={() => { onChange(sId); setOpen(false); }}
-                                className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${isSelected ? 'bg-purple-500/15 text-purple-400' : 'text-white/70 hover:bg-white/[0.05] hover:text-white'}`}
+                                className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${isSelected ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/[0.05] hover:text-white'}`}
                             >
                                 {s.name}
                             </button>

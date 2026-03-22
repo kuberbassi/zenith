@@ -28,8 +28,6 @@ const NoticesWidget: React.FC = () => {
     const notices = (noticesData as Notice[]) || [];
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Removed manual loadNotices/useEffect as React Query handles it
-
     return (
         <>
             <GlassCard className="h-full flex flex-col p-6 !bg-surface">
