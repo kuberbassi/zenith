@@ -13,6 +13,11 @@ import LoadingSpinner from './components/ui/LoadingSpinner';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import './index.css';
 
+// Hooks
+import { useAutoUpdate } from './hooks/useAutoUpdate';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useHaptics } from './hooks/useHaptics';
+
 // Pages
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -34,8 +39,6 @@ const TermsOfService = lazy(() => import('./pages/TermsOfService.tsx'));
 const NotFound = lazy(() => import('./pages/NotFound.tsx'));
 
 const SkillTracker = lazy(() => import('./pages/SkillTracker.tsx'));
-
-
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -215,11 +218,6 @@ const AppRoutes: React.FC = () => {
   );
 };
 
-
-// Main App Component
-import { useAutoUpdate } from './hooks/useAutoUpdate';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-
 // Keyboard shortcuts wrapper - must be inside BrowserRouter
 const KeyboardShortcutsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useKeyboardShortcuts();
@@ -228,6 +226,7 @@ const KeyboardShortcutsProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 const AppContent: React.FC = () => {
   useAutoUpdate(); // Automatically check for updates and reload if needed
+  useHaptics(); // Add haptic feedback to every click and interaction
 
   return (
     <div className="min-h-screen bg-background text-on-background font-sans transition-colors duration-300 selection:bg-primary-container selection:text-primary">
