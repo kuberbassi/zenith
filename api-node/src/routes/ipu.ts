@@ -102,22 +102,38 @@ async function scrapeIpuProfile(client: AxiosInstance): Promise<Record<string, s
 
 /** Detect if the account is locked/blocked */
 function detectAccountLockout(html: string): string | null {
-  const lower = html.toLowerCase()
-  const lockoutPhrases = [
-    'account.*lock', 'account.*block', 'account.*disabled', 'account.*suspend',
-    'too many.*attempt', 'maximum.*attempt', 'contact.*department', 'contact.*examination',
-    'temporarily.*block', 'temporarily.*lock', 'try.*after', 'try.*later',
+  const $ = cheerio.load(html)
+  const candidates = $('h1, h2, h3, .error, .alert, .danger, .warning, .message, #content, p')
+    .map((_i, el) => $(el).text().replace(/\s+/g, ' ').trim())
+    .get()
+    .filter(Boolean)
+
+  const explicitLockoutPatterns = [
+    /your account is locked/i,
+    /account has been locked/i,
+    /account is blocked/i,
+    /account has been blocked/i,
+    /account is disabled/i,
+    /account has been disabled/i,
+    /account is suspended/i,
+    /too many login attempts/i,
+    /maximum login attempts/i,
+    /maximum attempts exceeded/i,
+    /please contact examination division/i,
+    /please contact examination department/i,
   ]
-  for (const phrase of lockoutPhrases) {
-    if (new RegExp(phrase, 'i').test(lower)) {
-      // Extract the actual message
-      const $ = cheerio.load(html)
-      const msg = $('h2, h3, .error, .alert, .message, #content, .warning, p').filter((_i, el) => {
-        return new RegExp(phrase, 'i').test($(el).text())
-      }).first().text().trim()
-      return msg || 'Your account appears to be locked. Please contact the examination department or wait and try later.'
+
+  for (const text of candidates) {
+    if (explicitLockoutPatterns.some((pattern) => pattern.test(text))) {
+      return text
     }
   }
+
+  const pageText = $.root().text().replace(/\s+/g, ' ').trim()
+  if (/your account is locked/i.test(pageText) && /examination/i.test(pageText)) {
+    return 'Your account is locked. Please contact Examination Division, GGSIP University.'
+  }
+
   return null
 }
 
@@ -264,6 +280,21 @@ function extractPortalMessage($: cheerio.CheerioAPI): string | null {
     if (text && text.length >= 8) return text
   }
   return null
+}
+
+function isIpuLoginPage(html: string): boolean {
+  const lower = String(html || '').toLowerCase()
+  const loginIndicators = [
+    'j_username',
+    'j_password',
+    'loginaction',
+    'login.jsp',
+    'name="username"',
+    'name="passwd"',
+    'captchaservlet',
+    'security check',
+  ]
+  return loginIndicators.some((indicator) => lower.includes(indicator))
 }
 
 
@@ -638,6 +669,7 @@ router.post('/auto-fetch', async (req: AuthRequest, res) => {
   if (!enrollment || !pwd) return fail(res, 'Enrollment number and password are required.', 'MISSING_FIELDS', 400)
 
   try {
+    await destroyIpuSessionEverywhere(req.userId!)
     const session = await getHydratedIpuSession(req.userId!, HEADERS, { forceFresh: true })
     const resp = await session.client.get(IPU_LOGIN_URL, { responseType: 'text' })
     const html = resp.data
@@ -754,8 +786,7 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     }
 
     // Check if still on login page (support both old and new portal field names)
-    const loginIndicators = ['j_username', 'j_password', 'loginaction', 'login.jsp', 'name="username"', 'name="passwd"', 'captchaservlet']
-    const stillOnLogin = loginIndicators.some((ind) => pageLower.includes(ind))
+    const stillOnLogin = isIpuLoginPage(pageText)
 
     // Check for error messages
     const failureSignals = ['invalid', 'incorrect', 'wrong captcha', 'please try again', 'authentication failed', 'login failed', 'unsuccess']
@@ -781,6 +812,28 @@ router.post('/fetch-results', async (req: AuthRequest, res) => {
     }
 
     // Successful login — scrape profile first, then fetch results
+    let homeHtml = ''
+    try {
+      const homeResp = await browserSession.client.get(IPU_HOME_URL, {
+        headers: { Referer: loginUrl },
+        timeout: 10_000,
+      })
+      homeHtml = String(homeResp.data || '')
+    } catch (homeErr: any) {
+      console.warn('[IPU] Student home verification failed:', homeErr?.message || homeErr)
+    }
+
+    if (!homeHtml || isIpuLoginPage(homeHtml)) {
+      browserSession.markLoginFailure()
+      await persistIpuSessionState(userId, browserSession)
+      return fail(
+        res,
+        'Portal login did not reach the student dashboard. Please verify your credentials and use a fresh CAPTCHA.',
+        'LOGIN_FAILED',
+        401,
+      )
+    }
+
     browserSession.markLoginSuccess()
     browserSession.authenticatedAt = Date.now()
     await persistIpuSessionState(userId, browserSession)

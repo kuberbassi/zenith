@@ -17,6 +17,7 @@ export interface IpuSession {
     captchaIssuedAt: number
     attemptsForCaptcha: number
     failedLoginAttempts: number
+    cooldownUntil: number
     authenticatedAt?: number
   }
   hydrateState: (state?: Partial<{
@@ -24,6 +25,7 @@ export interface IpuSession {
     captchaIssuedAt: number
     attemptsForCaptcha: number
     failedLoginAttempts: number
+    cooldownUntil: number
     authenticatedAt?: number
   }> | null) => void
   authenticatedAt?: number
@@ -34,6 +36,7 @@ export type PersistedIpuSessionState = {
   captchaIssuedAt: number
   attemptsForCaptcha: number
   failedLoginAttempts: number
+  cooldownUntil: number
   authenticatedAt?: number
 }
 
@@ -58,6 +61,7 @@ export async function loadPersistedIpuSessionState(userId: string): Promise<Pers
     captchaIssuedAt: Number(state.captchaIssuedAt ?? 0),
     attemptsForCaptcha: Number(state.attemptsForCaptcha ?? 0),
     failedLoginAttempts: Number(state.failedLoginAttempts ?? 0),
+    cooldownUntil: Number(state.cooldownUntil ?? 0),
     authenticatedAt: state.authenticatedAt == null ? undefined : Number(state.authenticatedAt),
   }
 }
@@ -96,6 +100,7 @@ export function getOrCreateIpuSession(userId: string, headers: Record<string, st
     let captchaIssuedAt = 0
     let attemptsForCaptcha = 0
     let failedLoginAttempts = 0
+    let cooldownUntil = 0
 
     const client = axios.create({
       headers,
@@ -150,20 +155,23 @@ export function getOrCreateIpuSession(userId: string, headers: Record<string, st
     }
     const markLoginFailure = () => {
       failedLoginAttempts += 1
+      cooldownUntil = Date.now() + 15 * 60 * 1000
     }
     const markLoginSuccess = () => {
       attemptsForCaptcha = 0
       failedLoginAttempts = 0
+      cooldownUntil = 0
     }
     const canAttemptLogin = () => {
+      if (cooldownUntil && Date.now() < cooldownUntil) {
+        const minutesLeft = Math.max(1, Math.ceil((cooldownUntil - Date.now()) / 60000))
+        return { ok: false, reason: `Login retries are paused locally to protect your IPU account. Wait about ${minutesLeft} minute(s), then fetch a fresh CAPTCHA before trying again.` }
+      }
       if (!captchaIssuedAt || Date.now() - captchaIssuedAt > 5 * 60 * 1000) {
         return { ok: false, reason: 'CAPTCHA expired. Refresh it before trying again.' }
       }
       if (attemptsForCaptcha >= 1) {
         return { ok: false, reason: 'This CAPTCHA was already submitted once. Refresh it before retrying so the portal does not count repeated failures.' }
-      }
-      if (failedLoginAttempts >= 2) {
-        return { ok: false, reason: 'Portal login retries were blocked locally after multiple failures to protect your account. Wait a bit and fetch a fresh CAPTCHA before retrying.' }
       }
       return { ok: true }
     }
@@ -172,6 +180,7 @@ export function getOrCreateIpuSession(userId: string, headers: Record<string, st
       captchaIssuedAt,
       attemptsForCaptcha,
       failedLoginAttempts,
+      cooldownUntil,
       authenticatedAt: _sessions.get(userId)?.authenticatedAt,
     })
     const hydrateState = (state?: Partial<PersistedIpuSessionState> | null) => {
@@ -179,6 +188,7 @@ export function getOrCreateIpuSession(userId: string, headers: Record<string, st
       captchaIssuedAt = Number(state?.captchaIssuedAt ?? 0)
       attemptsForCaptcha = Number(state?.attemptsForCaptcha ?? 0)
       failedLoginAttempts = Number(state?.failedLoginAttempts ?? 0)
+      cooldownUntil = Number(state?.cooldownUntil ?? 0)
       const current = _sessions.get(userId)
       if (current) current.authenticatedAt = state?.authenticatedAt == null ? undefined : Number(state.authenticatedAt)
     }
@@ -205,6 +215,9 @@ export async function getHydratedIpuSession(userId: string, headers: Record<stri
     destroyIpuSession(userId)
   }
   const session = getOrCreateIpuSession(userId, headers)
+  if (opts?.forceFresh) {
+    return session
+  }
   const state = await loadPersistedIpuSessionState(userId)
   if (state) {
     session.hydrateState(state)

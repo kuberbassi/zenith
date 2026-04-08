@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import type { ChartOptions } from 'chart.js';
 import {
     Eye, EyeOff, Zap, GraduationCap,
+    RefreshCw,
     ShieldCheck, X, Download
 } from 'lucide-react';
 import Loader from '@/components/ui/Loader';
@@ -239,9 +240,11 @@ const Results: React.FC = () => {
         }
     }
 
-    async function refreshCaptcha() {
-        if (captchaLoading || fetching) return;
-        setCaptchaLoading(true); setCaptchaCode('');
+    async function refreshCaptcha(force = false) {
+        if (captchaLoading || (fetching && !force)) return;
+        setCaptchaLoading(true);
+        setError(null);
+        setCaptchaCode('');
         try {
             const data: any = await attendanceService.getIPUCaptcha();
             if (data?.captcha_image) {
@@ -251,6 +254,7 @@ const Results: React.FC = () => {
                     field_names: data.field_names || {},
                     login_action: data.login_action,
                 });
+                setStep('captcha');
             }
         } catch { setError('Failed to refresh CAPTCHA.'); }
         finally { setCaptchaLoading(false); }
@@ -285,7 +289,13 @@ const Results: React.FC = () => {
                 setStep('form');
                 setPassword('');
             }
-            if (status === 401 || status === 429) showToast('error', 'Use a fresh CAPTCHA before retrying.');
+            if (status === 401) {
+                await refreshCaptcha(true);
+                showToast('error', 'Loaded a fresh CAPTCHA. Try again carefully.');
+            }
+            if (status === 429) {
+                showToast('error', msg);
+            }
             // For other failures (wrong captcha/creds) just show the error.
             // User can click ↻ to manually get a new CAPTCHA.
         } finally { setFetching(false); }
@@ -563,8 +573,8 @@ const Results: React.FC = () => {
                                 <h2 className="text-xl font-black text-white tracking-tight">Security Check</h2>
                                 <p className="text-xs text-white/30 font-medium">Verify human identity</p>
                             </div>
-                            <button disabled={captchaLoading || fetching} onClick={refreshCaptcha} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed">
-                                <Loader size={20} />
+                            <button disabled={captchaLoading || fetching} onClick={() => refreshCaptcha()} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed">
+                                <RefreshCw size={18} className={captchaLoading ? 'animate-spin' : ''} />
                             </button>
                         </div>
                         <div className="p-4 bg-white rounded-2xl mb-6 flex justify-center shadow-inner overflow-hidden">

@@ -78,52 +78,62 @@ async function scrapeIPUNotices(): Promise<Notice[]> {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
-      timeout: 10_000,
+      timeout: 20_000,
       responseType: 'text',
     })
 
     const html: string = resp.data
-    const rowRe = /<tr[^>]*>(.*?)<\/tr>/gis
+    const $ = cheerio.load(html)
     const notices: Notice[] = []
-    let count = 0
+    const seen = new Set<string>()
 
-    let match: RegExpExecArray | null
-    while ((match = rowRe.exec(html)) !== null && count < 150) {
-      count++
+    const collectNotice = (titleRaw: string, hrefRaw: string, dateCandidate = '') => {
+      const title = titleRaw.replace(/\s+/g, ' ').trim()
+      let href = hrefRaw.trim()
+      if (!title || title.length < 5 || !href) return
+
+      const hrefLower = href.toLowerCase()
+      const titleLower = title.toLowerCase()
+      const looksLikeNotice = ['.pdf', 'notice', 'upload', 'circular', 'download', 'order', 'datesheet'].some((kw) => hrefLower.includes(kw))
+        || ['notice', 'circular', 'result', 'admission', 'exam', 'schedule', 'invitation', 'quotation'].some((kw) => titleLower.includes(kw))
+      if (!looksLikeNotice) return
+
+      if (!href.startsWith('http')) href = `http://www.ipu.ac.in/${href.replace(/^\/+/, '')}`
+      const dedupeKey = `${title}__${href}`
+      if (seen.has(dedupeKey)) return
+      seen.add(dedupeKey)
+
+      notices.push({
+        title: title.slice(0, 250),
+        link: href,
+        date: extractNoticeDate(dateCandidate) || extractNoticeDate(title) || extractNoticeDate(href) || '',
+        category: categorizeNotice(title),
+      })
+    }
+
+    $('tr').each((_rowIndex, row) => {
+      if (notices.length >= 200) return false
       try {
-        const rowHtml = match[1]
-        const $row = cheerio.load(rowHtml, null, false)
-        const link = $row('a[href]').first()
-        if (!link.length) continue
-
-        const title = link.text().trim()
-        let href = (link.attr('href') || '').trim()
-        if (!title || title.length < 5) continue
-
-        const hrefLower = href.toLowerCase()
-        if (!['.pdf', 'notice', 'upload', 'circular', 'download', 'order', 'datesheet'].some((kw) => hrefLower.includes(kw))) continue
-        if (!href.startsWith('http')) href = `http://www.ipu.ac.in/${href.replace(/^\/+/, '')}`
-
+        const $row = $(row)
+        const link = $row.find('a[href]').first()
+        if (!link.length) return
         let dateStr: string | null = null
-
-        $row('td').each((_i, td) => {
+        $row.find('td').each((_i, td) => {
           if (dateStr) return
-          const txt = $row(td).text().trim()
+          const txt = $(td).text().trim()
           dateStr = extractNoticeDate(txt) ?? dateStr
         })
-
-        if (!dateStr) dateStr = extractNoticeDate(title)
-        if (!dateStr) dateStr = extractNoticeDate(href)
-
-        notices.push({
-          title: title.slice(0, 250),
-          link: href,
-          date: dateStr || '',
-          category: categorizeNotice(title),
-        })
+        collectNotice(link.text(), link.attr('href') || '', dateStr || '')
       } catch {
-        continue
+        return
       }
+    })
+
+    if (!notices.length) {
+      $('a[href]').each((_i, el) => {
+        if (notices.length >= 200) return
+        collectNotice($(el).text(), $(el).attr('href') || '')
+      })
     }
 
     notices.sort((a, b) => {
@@ -159,6 +169,10 @@ async function backgroundRefresh() {
   }
 }
 
+// Warm notice cache on server start so the first user is less likely to wait on a live scrape.
+refreshing = true
+void backgroundRefresh()
+
 router.get('/notices', async (req, res) => {
   const categoryFilter = req.query.category as string | undefined
   const forceRefresh = req.query.force === 'true'
@@ -175,7 +189,7 @@ router.get('/notices', async (req, res) => {
   if (cache.length > 0) {
     let notices = cache
     if (categoryFilter) notices = notices.filter((n) => n.category === categoryFilter)
-    ok(res, notices)
+    ok(res, notices, 200, 300)
     return
   }
 
@@ -188,9 +202,9 @@ router.get('/notices', async (req, res) => {
     }
     let notices = cache
     if (categoryFilter) notices = notices.filter((n) => n.category === categoryFilter)
-    ok(res, notices)
+    ok(res, notices, 200, 300)
   } catch {
-    ok(res, [])
+    ok(res, [], 200, 60)
   }
 })
 
@@ -206,7 +220,7 @@ router.get('/stats', async (_req, res) => {
   for (const notice of cache) {
     stats[notice.category] = (stats[notice.category] || 0) + 1
   }
-  ok(res, stats)
+  ok(res, stats, 200, 300)
 })
 
 export default router

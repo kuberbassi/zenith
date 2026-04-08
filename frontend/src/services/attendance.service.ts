@@ -555,11 +555,16 @@ export const attendanceService = {
     },
 
     // Notices
-    getNotices: async (category?: string) => {
+    getNotices: async (category?: string, forceRefresh = false) => {
         const cacheKey = `notices:${category || 'all'}`;
-        const cached = getAnyCached<any[]>(cacheKey);
-        if (cached) return cached;
-        const params = category ? `?category=${encodeURIComponent(category)}` : '';
+        if (!forceRefresh) {
+            const cached = getAnyCached<any[]>(cacheKey);
+            if (cached) return cached;
+        }
+        const search = new URLSearchParams();
+        if (category) search.set('category', category);
+        if (forceRefresh) search.set('force', 'true');
+        const params = search.toString() ? `?${search.toString()}` : '';
         const response = await api.get(`/api/scraper/notices${params}`);
         const data = response.data.data;
         setAnyCached(cacheKey, data, 60_000, 60 * 60 * 1000);

@@ -47,6 +47,7 @@ const Notifications: React.FC = () => {
         }
     });
     const [loading, setLoading] = useState(notices.length === 0);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<boolean>(false);
 
     usePageMeta({
@@ -56,11 +57,12 @@ const Notifications: React.FC = () => {
 
     useEffect(() => { loadData(); }, []);
 
-    const loadData = async () => {
+    const loadData = async (force = false) => {
         try {
-            setLoading(true);
+            if (force || notices.length === 0) setLoading(true);
+            else setRefreshing(true);
             setError(false);
-            const data = await attendanceService.getNotices();
+            const data = await attendanceService.getNotices(undefined, force);
             const sorted = (data || []).slice().sort((a: Notice, b: Notice) => parseNoticeDate(b.date) - parseNoticeDate(a.date));
             setNotices(sorted);
         } catch (error) {
@@ -68,6 +70,7 @@ const Notifications: React.FC = () => {
             setError(true);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
@@ -93,11 +96,11 @@ const Notifications: React.FC = () => {
                     </div>
 
                     <button
-                        onClick={loadData}
+                        onClick={() => loadData(true)}
                         className="flex items-center gap-2 px-6 py-3 rounded-2xl glass-panel border border-white/[0.04] text-[10px] font-black text-white/40 uppercase tracking-widest hover:text-white hover:border-white/10 transition-all group"
                     >
-                        <Loader size={20} />
-                        Sync Frequency
+                        <RefreshCw size={16} className={refreshing || loading ? 'animate-spin' : ''} />
+                        {refreshing || loading ? 'Refreshing Feed' : 'Refresh Feed'}
                     </button>
                 </div>
             </motion.div>
@@ -108,7 +111,7 @@ const Notifications: React.FC = () => {
                         <AlertCircle className="text-red-500 flex-shrink-0 mt-1" size={24} />
                         <div className="flex-1">
                             <h3 className="font-black text-white uppercase tracking-widest text-sm mb-2">Comms Disruption</h3>
-                            <button onClick={loadData} className="text-[10px] font-black text-red-400 uppercase tracking-widest hover:text-red-300 transition-colors flex items-center gap-2">
+                            <button onClick={() => loadData(true)} className="text-[10px] font-black text-red-400 uppercase tracking-widest hover:text-red-300 transition-colors flex items-center gap-2">
                                 <RefreshCw size={12} /> Attempt Reconnection
                             </button>
                         </div>
@@ -116,10 +119,16 @@ const Notifications: React.FC = () => {
                 </motion.div>
             )}
 
-            {loading ? (
+            {loading && notices.length === 0 ? (
                 <div className="flex justify-center py-20"><LoadingSpinner /></div>
             ) : (
                 <div className="space-y-4">
+                    {refreshing && notices.length > 0 && (
+                        <div className="flex items-center gap-2 px-4 py-3 rounded-2xl border border-white/[0.04] glass-panel text-[10px] font-black text-white/35 uppercase tracking-[0.2em]">
+                            <Loader size={16} />
+                            Updating notice cache in background
+                        </div>
+                    )}
                     {notices.length > 0 ? (
                         notices.map((item, idx) => (
                             <motion.div
