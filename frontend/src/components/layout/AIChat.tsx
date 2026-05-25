@@ -170,7 +170,7 @@ const AIChat: React.FC = () => {
                                     <Sparkles className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="font-black text-white text-[13px] uppercase tracking-widest leading-none">AcadHub AI</h3>
+                                    <h3 className="font-black text-white text-[13px] uppercase tracking-widest leading-none">Zenith AI</h3>
                                     <span className="text-[10px] text-white/25 font-bold uppercase tracking-tighter">Llama 3.3 · Control Link</span>
                                 </div>
                             </div>

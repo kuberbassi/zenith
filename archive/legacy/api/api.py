@@ -2368,7 +2368,7 @@ def export_data():
     return Response(
         json_util.dumps(data_to_export, indent=4), 
         mimetype="application/json", 
-        headers={"Content-Disposition": "attachment;filename=acadhub_data.json"}
+        headers={"Content-Disposition": "attachment;filename=zenith_data.json"}
     )
 
 @api_bp.route('/deadlines', methods=['GET'])

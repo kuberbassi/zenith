@@ -32,7 +32,7 @@ const AiBotScreen = ({ navigation }) => {
     useEffect(() => {
         setMessages([{
             role: 'assistant',
-            content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm your AcadHub AI Assistant. I can help analyze your attendance, suggest focus areas, or answer questions about your subjects. How can I help you today?`,
+            content: `Hello ${user?.name?.split(' ')[0] || 'there'}! I'm your Zenith AI Assistant. I can help analyze your attendance, suggest focus areas, or answer questions about your subjects. How can I help you today?`,
             id: 'greeting'
         }]);
     }, [user]);

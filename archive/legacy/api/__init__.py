@@ -35,8 +35,8 @@ def create_app():
                  "http://localhost:8081",     # Expo Web
                  "http://localhost:19006",    # Expo Legacy
                  "http://192.168.0.159:8081", # Network IP
-                 "https://acadhubkb.vercel.app",
-                 "https://acadhub.kuberbassi.com"
+                 "https://zenithkb.vercel.app",
+                 "https://zenith.kuberbassi.com"
              ],
              "supports_credentials": True,
              "allow_headers": ["Content-Type", "Authorization", "Accept"],
@@ -139,7 +139,7 @@ def create_app():
         allowed_origins = [
             "http://localhost:5173", "http://127.0.0.1:5173",
             "http://localhost:8081", "http://localhost:19006",
-            "https://acadhubkb.vercel.app", "https://acadhub.kuberbassi.com"
+            "https://zenithkb.vercel.app", "https://zenith.kuberbassi.com"
         ]
         if request_origin in allowed_origins or (request_origin and request_origin.startswith("http://localhost:")):
             response.headers['Access-Control-Allow-Origin'] = request_origin
@@ -150,7 +150,7 @@ def create_app():
     @app.after_request
     def add_cors_headers(response):
         origin = request.headers.get('Origin')
-        if origin and (origin.startswith('http://localhost') or origin.startswith('https://acadhub')):
+        if origin and (origin.startswith('http://localhost') or origin.startswith('https://zenith')):
             response.headers['Access-Control-Allow-Origin'] = origin
             response.headers['Access-Control-Allow-Credentials'] = 'true'
             response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'

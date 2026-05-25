@@ -33,10 +33,10 @@ const SkillTracker: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [filter, setFilter] = useState(() => localStorage.getItem('acadhub_skills_filter') || 'all');
+    const [filter, setFilter] = useState(() => localStorage.getItem('zenith_skills_filter') || 'all');
 
     usePageMeta({
-        title: 'Skill Tracker | AcadHub',
+        title: 'Skill Tracker | Zenith',
         description: 'Log and track your technical and soft skills. Monitor progress and set learning milestones.',
     });
 
@@ -141,7 +141,7 @@ const SkillTracker: React.FC = () => {
 
             <div className="mb-10 flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 {['all', ...SKILL_CATEGORIES].map(cat => (
-                    <button key={cat} onClick={() => { setFilter(cat); localStorage.setItem('acadhub_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-white/10 border-white/20 text-white shadow-lg shadow-white/10' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
+                    <button key={cat} onClick={() => { setFilter(cat); localStorage.setItem('zenith_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-white/10 border-white/20 text-white shadow-lg shadow-white/10' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
                         {cat}
                     </button>
                 ))}

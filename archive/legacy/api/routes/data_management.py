@@ -61,7 +61,7 @@ def export_data():
         response_json = json.dumps(export_payload, default=str)
         
         sanitized_email = user_email.replace('@', '_at_').replace('.', '_')
-        filename = f"acadhub_export_{sanitized_email}_{datetime.now().strftime('%Y%m%d')}.json"
+        filename = f"zenith_export_{sanitized_email}_{datetime.now().strftime('%Y%m%d')}.json"
         
         response = make_response(response_json)
         response.headers["Content-Disposition"] = f"attachment; filename={filename}"

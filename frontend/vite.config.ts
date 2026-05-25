@@ -10,10 +10,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon-trans.png', 'acadhub-brand-v3.png', 'favicon-cropped.png', 'pwa-192x192.png', 'pwa-512x512.png'],
+      includeAssets: ['zenith-logo.png', 'zenith-logo.png', 'favicon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
-        name: 'AcadHub',
-        short_name: 'AcadHub',
+        name: 'Zenith',
+        short_name: 'Zenith',
         description: 'Smart Attendance Tracker',
         theme_color: '#000000',
         background_color: '#000000',

@@ -121,7 +121,7 @@ const Dashboard: React.FC = () => {
     const { data: dashboardData, isLoading: loading, refetch: loadDashboard } = useDashboard();
 
     usePageMeta({
-        title: 'Dashboard | AcadHub',
+        title: 'Dashboard | Zenith',
         description: 'Your academic overview — attendance, upcoming classes, and performance at a glance.',
     });
 

@@ -40,8 +40,8 @@ const Login: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     usePageMeta({
-        title: 'AcadHub | Student Center',
-        description: 'Sign in to AcadHub — your all-in-one student dashboard for IPU. Track attendance, sync results, manage timetables, and develop your skills.',
+        title: 'Zenith | Student Center',
+        description: 'Sign in to Zenith — your all-in-one student dashboard for IPU. Track attendance, sync results, manage timetables, and develop your skills.',
         indexable: true,
     });
 
@@ -68,12 +68,12 @@ const Login: React.FC = () => {
                     <div className="mb-8 flex justify-center relative">
                         <div className="absolute inset-0 bg-white/10 blur-3xl rounded-full" />
                         <div className="w-32 h-32 rounded-[2.5rem] glass-panel border border-white/10 flex items-center justify-center shadow-2xl relative z-10 overflow-hidden group">
-                            <img src="/pwa-192x192.png" alt="AcadHub" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                            <img src="/zenith-logo.png" alt="Zenith" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                         </div>
                     </div>
 
                     <h1 className="text-4xl font-black text-white mb-3 tracking-tighter uppercase font-display">
-                        AcadHub
+                        Zenith
                     </h1>
                     <p className="text-white/40 text-sm font-bold tracking-widest uppercase mb-10 leading-relaxed">
                         Institutional Nexus <br />

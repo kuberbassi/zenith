@@ -1,4 +1,4 @@
-# Security Middleware for AcadHub
+# Security Middleware for Zenith
 
 from flask import request, jsonify
 from functools import wraps

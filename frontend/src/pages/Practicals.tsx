@@ -19,7 +19,7 @@ const Practicals: React.FC = () => {
     const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
 
     usePageMeta({
-        title: 'Assignments & Practicals | AcadHub',
+        title: 'Assignments & Practicals | Zenith',
         description: 'Track practical records and assignment milestones across all your subjects.',
     });
 

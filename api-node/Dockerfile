@@ -1,8 +1,12 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 COPY package*.json ./
-RUN npm ci
+COPY prisma ./prisma
+COPY prisma.config.ts ./prisma.config.ts
+RUN npm install
 
 COPY . ./
 RUN npm run build

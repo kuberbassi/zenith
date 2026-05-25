@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://acadhub.kuberbassi.com/sitemap.xml
+Sitemap: https://zenith.kuberbassi.com/sitemap.xml

@@ -1,4 +1,4 @@
-# Calculation Engine for AcadHub
+# Calculation Engine for Zenith
 # All business logic for academic metrics
 
 class AttendanceCalculator:

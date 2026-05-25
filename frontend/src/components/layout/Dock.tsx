@@ -119,9 +119,9 @@ function DesktopDock() {
 
     useEffect(() => {
         // Route transitions can preserve pointer position without firing mouseenter again.
-        const lastPointer = window as Window & { __acadhubPointer?: { x: number; y: number } };
-        if (lastPointer.__acadhubPointer) {
-            const { x, y } = lastPointer.__acadhubPointer;
+        const lastPointer = window as Window & { __zenithPointer?: { x: number; y: number } };
+        if (lastPointer.__zenithPointer) {
+            const { x, y } = lastPointer.__zenithPointer;
             const bounds = dockRef.current?.getBoundingClientRect();
             const inside = !!bounds &&
                 x >= bounds.left &&
@@ -135,7 +135,7 @@ function DesktopDock() {
 
     useEffect(() => {
         const rememberPointer = (event: PointerEvent) => {
-            (window as Window & { __acadhubPointer?: { x: number; y: number } }).__acadhubPointer = {
+            (window as Window & { __zenithPointer?: { x: number; y: number } }).__zenithPointer = {
                 x: event.clientX,
                 y: event.clientY,
             };

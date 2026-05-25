@@ -37,7 +37,7 @@ const LoginScreen = () => {
 
     useEffect(() => {
         GoogleSignin.configure({
-            webClientId: '86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com', // Project 868 (AcadHub Mobile Kuber)
+            webClientId: '86874505738-k1263riddtq0sctihj5divb550d93pg0.apps.googleusercontent.com', // Project 868 (Zenith Mobile Kuber)
             offlineAccess: false,
             scopes: ['email', 'profile'],
         });
@@ -122,7 +122,7 @@ const LoginScreen = () => {
                             resizeMode="contain"
                         />
                     </LinearGradient>
-                    <Text style={styles.title}>AcadHub</Text>
+                    <Text style={styles.title}>Zenith</Text>
                     <Text style={styles.subtitle}>Your Academic Companion</Text>
                 </View>
 

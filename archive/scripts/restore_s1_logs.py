@@ -13,7 +13,7 @@ def generate_cuid():
 # Database connection details from .env (hardcoded for simplicity in this script, or parsed)
 
 DATABASE_URL = "postgresql://neondb_owner:npg_BfZNeVgzY3O4@ep-royal-resonance-a4tmdnsq-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
-BACKUP_FILE = r'c:\Users\kuber\Documents\Dev\Projects\acadhub\acadhub-data-2026-03-03.json'
+BACKUP_FILE = r'c:\Users\kuber\Documents\Dev\Projects\zenith\zenith-data-2026-03-03.json'
 USER_EMAIL = 'kuber@hmritm.ac.in'
 
 def main():

@@ -13,7 +13,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // ── URLs ───────────────────────────────────────────────────
-const PROD_URL = 'https://acadhub.kuberbassi.com';
+const PROD_URL = 'https://zenith.kuberbassi.com';
 
 const DEV_URLS = Platform.select({
   web: 'http://localhost:5001',

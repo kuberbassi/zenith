@@ -72,7 +72,7 @@ export default function LoginPage() {
               <path d="M12 2v20M3 7l9 5 9-5" stroke="rgba(167,139,250,0.4)" strokeWidth="1.5" strokeLinejoin="round"/>
             </svg>
           </div>
-          <span className="text-sm font-semibold text-white">AcadHub</span>
+          <span className="text-sm font-semibold text-white">Zenith</span>
         </div>
         <span className="section-label">Attendance Tracker</span>
       </nav>
@@ -161,7 +161,7 @@ export default function LoginPage() {
 
       {/* Footer */}
       <div className="relative z-10 text-center pb-6">
-        <p className="text-[10px]" style={{ color: '#2a2a2a' }}> 2026 AcadHub</p>
+        <p className="text-[10px]" style={{ color: '#2a2a2a' }}> 2026 Zenith</p>
       </div>
     </div>
   )

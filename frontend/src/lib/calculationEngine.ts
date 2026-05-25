@@ -1,5 +1,5 @@
 /**
- * AcadHub Calculation Engine
+ * Zenith Calculation Engine
  * Centralized logic for attendance and grade calculations
  */
 

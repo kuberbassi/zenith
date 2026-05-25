@@ -8,8 +8,8 @@ const NotFound: React.FC = () => {
     const { isAuthenticated } = useAuth();
 
     usePageMeta({
-        title: 'Page Not Found | AcadHub',
-        description: 'The page you requested does not exist on AcadHub.',
+        title: 'Page Not Found | Zenith',
+        description: 'The page you requested does not exist on Zenith.',
         indexable: false,
     });
 

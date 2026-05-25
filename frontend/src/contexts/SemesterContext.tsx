@@ -12,7 +12,7 @@ const SemesterContext = createContext<SemesterContextType | undefined>(undefined
 export const SemesterProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [currentSemester, setCurrentSemesterState] = useState<number>(() => {
         // Priority: user's manual selection in localStorage > user profile > default 1
-        const saved = localStorage.getItem('acadhub_semester');
+        const saved = localStorage.getItem('zenith_semester');
         if (saved) {
             const parsed = parseInt(saved, 10);
             if (!isNaN(parsed) && parsed >= 1 && parsed <= 8) return parsed;
@@ -26,12 +26,12 @@ export const SemesterProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     // On initial load, if localStorage has no semester, seed it from user profile (one-time)
     useEffect(() => {
-        const saved = localStorage.getItem('acadhub_semester');
+        const saved = localStorage.getItem('zenith_semester');
         if (!saved) {
             const user = authService.getStoredUser();
             const sem = user?.semester || user?.current_semester;
             if (sem) {
-                localStorage.setItem('acadhub_semester', sem.toString());
+                localStorage.setItem('zenith_semester', sem.toString());
                 setCurrentSemesterState(sem);
             }
         }
@@ -39,7 +39,7 @@ export const SemesterProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     const setCurrentSemester = (semester: number) => {
         setCurrentSemesterState(semester);
-        localStorage.setItem('acadhub_semester', semester.toString());
+        localStorage.setItem('zenith_semester', semester.toString());
         api.post('/api/profile/preferences', { last_semester: semester }).catch(() => {});
     };
 

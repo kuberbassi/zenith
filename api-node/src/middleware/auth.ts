@@ -39,11 +39,11 @@ function readCookie(req: Request, name: string): string | null {
 function getAuthToken(req: Request): string | null {
   const authHeader = req.headers.authorization
   if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7)
-  return readCookie(req, 'acadhub_access_token')
+  return readCookie(req, 'zenith_access_token')
 }
 
 export function getCsrfTokenFromRequest(req: Request): string | null {
-  return readCookie(req, 'acadhub_csrf_token')
+  return readCookie(req, 'zenith_csrf_token')
 }
 
 export async function requireAuth(
@@ -100,13 +100,13 @@ export function requireCsrf(req: Request, res: Response, next: NextFunction): vo
     return
   }
 
-  const authCookie = readCookie(req, 'acadhub_access_token')
+  const authCookie = readCookie(req, 'zenith_access_token')
   if (!authCookie || req.path.includes('/auth/')) {
     next()
     return
   }
 
-  const cookieToken = readCookie(req, 'acadhub_csrf_token')
+  const cookieToken = readCookie(req, 'zenith_csrf_token')
   const headerToken = String(req.headers['x-csrf-token'] ?? '').trim()
   if (!cookieToken || !headerToken || cookieToken !== headerToken) {
     res.status(403).json({ success: false, error: 'Invalid CSRF token', code: 'CSRF_INVALID' })

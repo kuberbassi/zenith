@@ -12,7 +12,7 @@ interface Notice {
     date: string;
 }
 
-const NOTICE_CACHE_KEY = 'acadhub_cache:notices:all';
+const NOTICE_CACHE_KEY = 'zenith_cache:notices:all';
 
 const parseNoticeDate = (raw: string) => {
     if (!raw) return 0;
@@ -51,7 +51,7 @@ const Notifications: React.FC = () => {
     const [error, setError] = useState<boolean>(false);
 
     usePageMeta({
-        title: 'Notices | AcadHub',
+        title: 'Notices | Zenith',
         description: 'Stay updated with the latest university notices and announcements from IPU.',
     });
 

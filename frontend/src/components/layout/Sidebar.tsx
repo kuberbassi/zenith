@@ -87,12 +87,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, setIsMobileOpen, isColl
                 {/* Logo */}
                 <div className={`flex items-center gap-3 px-6 py-5 ${isCollapsed ? 'justify-center px-0' : ''}`}>
                     <div className="flex items-center justify-center w-20 h-20 rounded-xl overflow-hidden shrink-0">
-                        <img src="/icon-trans.png" alt="AcadHub" className="w-full h-full object-contain scale-[2.5]" />
+                        <img src="/zenith-logo.png" alt="Zenith" className="w-full h-full object-contain scale-[2.5]" />
                     </div>
                     {!isCollapsed && (
                         <div>
                             <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-tertiary bg-clip-text text-transparent">
-                                AcadHub
+                                Zenith
                             </h1>
                             <p className="text-[10px] font-bold tracking-widest text-primary/80 uppercase">
                                 Student Center

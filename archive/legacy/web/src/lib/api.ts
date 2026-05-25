@@ -14,7 +14,7 @@ const api = axios.create({
 // Attach JWT token from localStorage
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('acadhub_token')
+    const token = localStorage.getItem('zenith_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -28,8 +28,8 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('acadhub_token')
-        localStorage.removeItem('acadhub_user')
+        localStorage.removeItem('zenith_token')
+        localStorage.removeItem('zenith_user')
         window.location.href = '/'
       }
     }

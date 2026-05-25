@@ -41,7 +41,7 @@ class OnboardingService {
     const steps = {
       [ONBOARDING_STEPS.WELCOME]: {
         id: 'welcome',
-        title: '👋 Welcome to AcadHub!',
+        title: '👋 Welcome to Zenith!',
         subtitle: 'Your personal academic assistant',
         description: 'Track attendance, manage courses, view results, and stay updated with notifications.',
         actionText: 'Get Started',
@@ -178,8 +178,8 @@ class OnboardingService {
         id: 'complete',
         title: '🎉 All Set!',
         subtitle: 'Ready to explore',
-        message: 'You\'re all set to use AcadHub. Explore the app and make the most of your academic journey!',
-        actionText: 'Start Using AcadHub',
+        message: 'You\'re all set to use Zenith. Explore the app and make the most of your academic journey!',
+        actionText: 'Start Using Zenith',
       },
     };
 

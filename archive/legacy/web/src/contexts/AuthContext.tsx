@@ -29,16 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Restore session from localStorage
   useEffect(() => {
-    const savedToken = localStorage.getItem('acadhub_token')
-    const savedUser = localStorage.getItem('acadhub_user')
+    const savedToken = localStorage.getItem('zenith_token')
+    const savedUser = localStorage.getItem('zenith_user')
 
     if (savedToken && savedUser) {
       try {
         setToken(savedToken)
         setUser(JSON.parse(savedUser))
       } catch {
-        localStorage.removeItem('acadhub_token')
-        localStorage.removeItem('acadhub_user')
+        localStorage.removeItem('zenith_token')
+        localStorage.removeItem('zenith_user')
       }
     }
     setIsLoading(false)
@@ -51,8 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { token: newToken, user: newUser } = res.data
       setToken(newToken)
       setUser(newUser)
-      localStorage.setItem('acadhub_token', newToken)
-      localStorage.setItem('acadhub_user', JSON.stringify(newUser))
+      localStorage.setItem('zenith_token', newToken)
+      localStorage.setItem('zenith_user', JSON.stringify(newUser))
     } catch (err) {
       throw err
     } finally {
@@ -63,8 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setUser(null)
     setToken(null)
-    localStorage.removeItem('acadhub_token')
-    localStorage.removeItem('acadhub_user')
+    localStorage.removeItem('zenith_token')
+    localStorage.removeItem('zenith_user')
   }, [])
 
   return (

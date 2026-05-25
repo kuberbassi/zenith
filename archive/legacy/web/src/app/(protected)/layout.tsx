@@ -62,7 +62,7 @@ function Sidebar() {
             </svg>
           </div>
           <div>
-            <span className="text-sm font-semibold text-white">AcadHub</span>
+            <span className="text-sm font-semibold text-white">Zenith</span>
             <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
               Attendance Tracker
             </p>

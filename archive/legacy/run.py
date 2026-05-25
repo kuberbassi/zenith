@@ -22,7 +22,7 @@ if __name__ == '__main__':
     import os
     is_dev = os.getenv('FLASK_ENV', 'production') == 'development'
     
-    print("🚀 Starting AcadHub Flask Server...")
+    print("🚀 Starting Zenith Flask Server...")
     print(f"📍 Server running at: http://localhost:5000")
     print(f"🔧 Mode: {'Development' if is_dev else 'Production'}")
     print(f"🛑 Press Ctrl+C to stop")

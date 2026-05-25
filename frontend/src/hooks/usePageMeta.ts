@@ -44,7 +44,7 @@ export function usePageMeta({ title, description, indexable = false }: PageMeta)
 
         return () => {
             // Restore defaults on unmount
-            document.title = 'AcadHub | Student Center';
+            document.title = 'Zenith | Student Center';
         };
     }, [title, description, indexable]);
 }

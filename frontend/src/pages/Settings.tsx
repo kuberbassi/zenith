@@ -34,8 +34,8 @@ const Settings: React.FC = () => {
     const { showToast } = useToast();
 
     usePageMeta({
-        title: 'Settings | AcadHub',
-        description: 'Manage your AcadHub profile, preferences, semester settings, and account data.',
+        title: 'Settings | Zenith',
+        description: 'Manage your Zenith profile, preferences, semester settings, and account data.',
     });
 
     const [activeTab, setActiveTab] = useState<TabKey>('profile');

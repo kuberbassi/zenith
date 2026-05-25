@@ -119,12 +119,12 @@ const TimeTable: React.FC = () => {
     const [subjects, setSubjects] = useState<any[]>([]);
     const [periods, setPeriods] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('acadhub_timetable_view') as 'grid' | 'list') || 'grid');
+    const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('zenith_timetable_view') as 'grid' | 'list') || 'grid');
 
-    const handleSetView = (v: 'grid' | 'list') => { setView(v); localStorage.setItem('acadhub_timetable_view', v); api.post('/api/profile/preferences', { timetable_view: v }).catch(() => {}); };
+    const handleSetView = (v: 'grid' | 'list') => { setView(v); localStorage.setItem('zenith_timetable_view', v); api.post('/api/profile/preferences', { timetable_view: v }).catch(() => {}); };
 
     usePageMeta({
-        title: 'Timetable | AcadHub',
+        title: 'Timetable | Zenith',
         description: 'View and manage your weekly class schedule. Customize periods and subjects per semester.',
     });
 

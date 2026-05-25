@@ -10,7 +10,7 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import axios from 'axios';
 import { saveData, getData } from './offlineStorage';
 
-const GITHUB_REPO = 'kuberbassi/acadhub';
+const GITHUB_REPO = 'kuberbassi/zenith';
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 
 class AutoUpdateService {
@@ -86,7 +86,7 @@ class AutoUpdateService {
 
       console.log('[AutoUpdate] Downloading APK...');
 
-      const downloadPath = `${FileSystem.documentDirectory}acadhub-update.apk`;
+      const downloadPath = `${FileSystem.documentDirectory}zenith-update.apk`;
       const { uri } = await FileSystem.downloadAsync(
         updateInfo.downloadUrl,
         downloadPath,

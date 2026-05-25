@@ -1,8 +1,8 @@
 {
-  "name": "acadhub-api",
+  "name": "zenith-api",
   "version": "1.0.0",
   "private": true,
-  "description": "AcadHub Node/Express API Server",
+  "description": "Zenith Node/Express API Server",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",

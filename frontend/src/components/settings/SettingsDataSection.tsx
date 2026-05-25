@@ -17,7 +17,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
             const url = URL.createObjectURL(blob);
             const anchor = document.createElement('a');
             anchor.href = url;
-            anchor.download = `acadhub_config_${new Date().toISOString().split('T')[0]}.json`;
+            anchor.download = `zenith_config_${new Date().toISOString().split('T')[0]}.json`;
             document.body.appendChild(anchor);
             anchor.click();
             anchor.remove();

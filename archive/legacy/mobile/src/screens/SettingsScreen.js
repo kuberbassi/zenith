@@ -279,7 +279,7 @@ const SettingsScreen = ({ navigation }) => {
             setLoading(true);
             const data = await attendanceService.exportData();
             const dataToSave = JSON.stringify(data, null, 2);
-            const fileUri = FileSystem.cacheDirectory + 'acadhub_backup.json';
+            const fileUri = FileSystem.cacheDirectory + 'zenith_backup.json';
             await FileSystem.writeAsStringAsync(fileUri, dataToSave);
             if (await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(fileUri);
@@ -860,7 +860,7 @@ const SettingsScreen = ({ navigation }) => {
                                                 try {
                                                     // Export data first
                                                     const exportData = await attendanceService.exportData();
-                                                    const filename = `acadhub-backup-BEFORE-DELETE-${userEmail.replace('@', '_at_').replace(/\./g, '_')}-${new Date().toISOString().split('T')[0]}.json`;
+                                                    const filename = `zenith-backup-BEFORE-DELETE-${userEmail.replace('@', '_at_').replace(/\./g, '_')}-${new Date().toISOString().split('T')[0]}.json`;
                                                     const fileUri = FileSystem.documentDirectory + filename;
 
                                                     // Write to file
@@ -982,7 +982,7 @@ const SettingsScreen = ({ navigation }) => {
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ gap: 4 }}>
                                 <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' }}>User Guide</Text>
-                                <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>Master AcadHub</Text>
+                                <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '900', letterSpacing: -0.5 }}>Master Zenith</Text>
                             </View>
                             <TouchableOpacity onPress={() => setShowHowToUse(false)} style={{ backgroundColor: 'rgba(255,255,255,0.2)', padding: 10, borderRadius: 20 }}>
                                 <X size={20} color="#FFF" />

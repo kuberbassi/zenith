@@ -26,7 +26,7 @@ def init_db():
             socketTimeoutMS=10000,          # 10s socket (was 30s — way too long for serverless)
             retryWrites=True,
             maxIdleTimeMS=45000,            # Close idle connections after 45s
-            appName='acadhub-vercel'        # Helps with Atlas monitoring
+            appName='zenith-vercel'        # Helps with Atlas monitoring
         )
         # Force a connection check to see if it fails immediately (DNS etc)
         # asking for a database is lazy in pymongo, but we want to know if it failed for the 'db' proxy logic

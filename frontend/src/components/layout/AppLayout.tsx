@@ -7,7 +7,7 @@ import AIChat from './AIChat';
 import { attendanceService } from '@/services/attendance.service';
 import { useSemester } from '@/contexts/SemesterContext';
 
-const CACHE_KEY_PREFIX = 'acadhub_cache:notifications:';
+const CACHE_KEY_PREFIX = 'zenith_cache:notifications:';
 
 const AppLayout: React.FC = () => {
     const [notificationCount, setNotificationCount] = useState(0);

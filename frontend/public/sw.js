@@ -2,7 +2,7 @@
 /// <reference lib="webworker" />
 
 // Cache version
-const CACHE_VERSION = 'acadhub-v2';
+const CACHE_VERSION = 'zenith-v2';
 const CACHE_ASSETS = [
     '/',
     '/index.html',
@@ -44,10 +44,10 @@ self.addEventListener('push', (event) => {
     console.log('[SW] Push received', event);
 
     let data = {
-        title: 'AcadHub Notification',
+        title: 'Zenith Notification',
         body: 'New update available',
-        icon: '/acadhub-brand-v3.png',
-        badge: '/acadhub-brand-v3.png',
+        icon: '/zenith-logo.png',
+        badge: '/zenith-logo.png',
         tag: 'default',
         data: {}
     };
@@ -63,8 +63,8 @@ self.addEventListener('push', (event) => {
 
     const options = {
         body: data.body,
-        icon: data.icon || '/acadhub-brand-v3.png',
-        badge: data.badge || '/acadhub-brand-v3.png',
+        icon: data.icon || '/zenith-logo.png',
+        badge: data.badge || '/zenith-logo.png',
         tag: data.tag,
         data: data.data,
         vibrate: [200, 100, 200],
@@ -73,7 +73,7 @@ self.addEventListener('push', (event) => {
             {
                 action: 'open',
                 title: 'View',
-                icon: '/acadhub-brand-v3.png'
+                icon: '/zenith-logo.png'
             }
         ]
     };

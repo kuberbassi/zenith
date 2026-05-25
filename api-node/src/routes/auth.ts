@@ -10,9 +10,9 @@ import { ok, fail } from '../utils/response.js'
 const router = Router()
 const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID)
 
-const ACCESS_COOKIE_NAME = 'acadhub_access_token'
-const REFRESH_COOKIE_NAME = 'acadhub_refresh_token'
-const CSRF_COOKIE_NAME = 'acadhub_csrf_token'
+const ACCESS_COOKIE_NAME = 'zenith_access_token'
+const REFRESH_COOKIE_NAME = 'zenith_refresh_token'
+const CSRF_COOKIE_NAME = 'zenith_csrf_token'
 const AUTH_PREF_KEY = 'auth_session'
 const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000

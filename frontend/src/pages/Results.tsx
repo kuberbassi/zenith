@@ -143,7 +143,7 @@ const Results: React.FC = () => {
     const { showToast } = useToast();
 
     usePageMeta({
-        title: 'Results | AcadHub',
+        title: 'Results | Zenith',
         description: 'View your semester-wise IPU results, CGPA, and grade breakdowns. Track academic performance over time.',
     });
 

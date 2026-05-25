@@ -3,7 +3,7 @@ import './globals.css'
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: 'AcadHub',
+  title: 'Zenith',
   description: 'Track your attendance, stay ahead.',
   icons: { icon: '/favicon.ico' },
 }

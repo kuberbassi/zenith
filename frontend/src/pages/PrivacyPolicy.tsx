@@ -8,7 +8,7 @@ const sections = [
     {
         icon: Eye,
         title: 'Introduction',
-        content: 'Welcome to AcadHub ("we," "our," or "us"). We are committed to protecting your privacy and ensuring you have a positive experience while using our application.'
+        content: 'Welcome to Zenith ("we," "our," or "us"). We are committed to protecting your privacy and ensuring you have a positive experience while using our application.'
     },
     {
         icon: Database,
@@ -24,7 +24,7 @@ const sections = [
         title: 'How We Use Your Information',
         content: 'We use your information solely to:',
         list: [
-            { label: 'Dashboard', desc: 'Provide and personalize the AcadHub dashboard and attendance tracking.' },
+            { label: 'Dashboard', desc: 'Provide and personalize the Zenith dashboard and attendance tracking.' },
             { label: 'Profile Optimization', desc: 'Display your academic status and social connections on your profile.' },
         ],
         note: 'We do not sell your personal data to third parties.'
@@ -37,7 +37,7 @@ const sections = [
     {
         icon: Globe,
         title: 'Google User Data',
-        content: 'AcadHub\'s use and transfer to any other app of information received from Google APIs will adhere to Google API Services User Data Policy, including the Limited Use requirements.',
+        content: 'Zenith\'s use and transfer to any other app of information received from Google APIs will adhere to Google API Services User Data Policy, including the Limited Use requirements.',
         link: { text: 'Google API Services User Data Policy', url: 'https://developers.google.com/terms/api-services-user-data-policy' }
     },
     {
@@ -51,8 +51,8 @@ const PrivacyPolicy: React.FC = () => {
     const navigate = useNavigate();
 
     usePageMeta({
-        title: 'Privacy Policy | AcadHub',
-        description: 'Read the AcadHub privacy policy to understand how we collect, use, and protect your data.',
+        title: 'Privacy Policy | Zenith',
+        description: 'Read the Zenith privacy policy to understand how we collect, use, and protect your data.',
         indexable: true,
     });
 

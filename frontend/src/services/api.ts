@@ -5,6 +5,17 @@ import { dispatchGlobalToast } from '@/components/ui/Toast';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 let refreshPromise: Promise<unknown> | null = null;
 
+const shouldHandleAsAuthExpiry = (requestUrl: string, error: AxiosError): boolean => {
+    const responseCode = String((error.response?.data as any)?.code || '');
+
+    if (requestUrl.includes('/api/ipu/')) return false;
+    if (['SESSION_EXPIRED', 'CAPTCHA_FAILED', 'LOGIN_FAILED', 'LOGIN_BLOCKED', 'ACCOUNT_LOCKED'].includes(responseCode)) {
+        return false;
+    }
+
+    return true;
+};
+
 const readCookie = (name: string): string | null => {
     const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
@@ -24,7 +35,7 @@ const api: AxiosInstance = axios.create({
 api.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
         if (config.headers) {
-            const csrfToken = readCookie('acadhub_csrf_token');
+            const csrfToken = readCookie('zenith_csrf_token');
             if (csrfToken && config.method && !['get', 'head', 'options'].includes(config.method.toLowerCase())) {
                 config.headers['X-CSRF-Token'] = csrfToken;
             }
@@ -49,8 +60,9 @@ api.interceptors.response.use(
             const isRefreshRequest = requestUrl.includes('/api/auth/refresh');
             const isLoginRequest = requestUrl.includes('/api/auth/google');
             const hasRetriedAuth = Boolean((config as any)?._authRefreshed);
+            const shouldRefreshAuth = shouldHandleAsAuthExpiry(requestUrl, error);
 
-            if (!isRefreshRequest && !isLoginRequest && !hasRetriedAuth) {
+            if (shouldRefreshAuth && !isRefreshRequest && !isLoginRequest && !hasRetriedAuth) {
                 try {
                     if (!refreshPromise) {
                         refreshPromise = api.post('/api/auth/refresh');
@@ -67,8 +79,10 @@ api.interceptors.response.use(
                 }
             }
 
-            localStorage.removeItem('user');
-            window.location.href = '/login';
+            if (shouldRefreshAuth) {
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+            }
         }
 
         // Handle 429 — show toast immediately, never retry

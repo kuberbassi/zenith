@@ -52,7 +52,7 @@ const Courses: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     usePageMeta({
-        title: 'Courses | AcadHub',
+        title: 'Courses | Zenith',
         description: 'Track your enrolled courses, progress, and learning milestones all in one place.',
     });
     const [editingCourse, setEditingCourse] = useState<Course | null>(null);

@@ -22,7 +22,7 @@ const ONBOARDING_SLIDES = [
     {
         id: '1',
         icon: Sparkles,
-        title: '✨ Welcome to AcadHub!',
+        title: '✨ Welcome to Zenith!',
         subtitle: 'Your smart attendance companion',
         steps: [
             "🚀 Let's set you up in a few steps",

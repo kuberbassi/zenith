@@ -304,7 +304,7 @@ router.get('/export_data', async (req: AuthRequest, res) => {
 
     const json = JSON.stringify(payload)
     const email = (user?.email ?? 'user').replace(/@/g, '_at_').replace(/\./g, '_')
-    const filename = `acadhub_export_${email}_${new Date().toISOString().slice(0, 10)}.json`
+    const filename = `zenith_export_${email}_${new Date().toISOString().slice(0, 10)}.json`
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.setHeader('Content-Type', 'application/json')

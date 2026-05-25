@@ -11,7 +11,7 @@ interface ShortcutConfig {
 }
 
 /**
- * Global keyboard shortcuts hook for AcadHub
+ * Global keyboard shortcuts hook for Zenith
  * 
  * Shortcuts:
  * - Ctrl+N: Open Notifications

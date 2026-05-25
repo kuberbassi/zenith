@@ -5,7 +5,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import Constants from 'expo-constants';
 
-const GITHUB_REPO = 'kuberbassi/acadhub';
+const GITHUB_REPO = 'kuberbassi/zenith';
 const CURRENT_VERSION = require('../../package.json').version;
 
 // Helper to compare semantic versions (returns true if v1 > v2)
@@ -97,7 +97,7 @@ const useUpdateChecker = () => {
                 apkAsset.browser_download_url,
                 downloadDest,
                 {
-                    headers: { 'User-Agent': 'AcadHub-Mobile/1.0' } // Standard User-Agent
+                    headers: { 'User-Agent': 'Zenith-Mobile/1.0' } // Standard User-Agent
                 },
                 (progress) => {
                     const pct = progress.totalBytesWritten / progress.totalBytesExpectedToWrite;

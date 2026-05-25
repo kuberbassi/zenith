@@ -20,7 +20,7 @@ const extractApiData = <T>(response: any, fallback: T): T => {
 
 const CACHE_TTL_MS = 12_000;
 const requestCache = new Map<string, { expiresAt: number; data: unknown }>();
-const PERSISTENT_CACHE_PREFIX = 'acadhub_cache:';
+const PERSISTENT_CACHE_PREFIX = 'zenith_cache:';
 
 const getPersistentCached = <T>(key: string): T | null => {
     try {

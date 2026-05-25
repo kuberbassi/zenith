@@ -1,7 +1,7 @@
-# AcadHub — Ultra-Extensive Project Documentation
+# Zenith — Ultra-Extensive Project Documentation
 
 > **Generated**: 2026-03-22 | **Version**: 3.0.0 | **Status**: Production (Public)
-> **Live URL**: https://acadhub.kuberbassi.com | **Deployment**: Vercel (bom1 region)
+> **Live URL**: https://zenith.kuberbassi.com | **Deployment**: Vercel (bom1 region)
 
 ---
 
@@ -29,7 +29,7 @@
 
 ## 1. Project Overview
 
-**AcadHub** is a full-stack academic management platform built for IPU (Indraprastha University) students. It provides:
+**Zenith** is a full-stack academic management platform built for IPU (Indraprastha University) students. It provides:
 
 - **Attendance Tracking** — Mark, edit, delete attendance with substitution support, calendar view, bunk-guard calculations
 - **IPU Results Scraping** — Automated login to IPU exam portal with CAPTCHA handling, result fetching, SGPA/CGPA calculations
@@ -93,7 +93,7 @@
 ## 3. Folder Structure Analysis
 
 ```
-acadhub/                          # Monorepo root
+zenith/                          # Monorepo root
 ├── api/                          # Vercel serverless catch-all proxy
 │   └── [[...path]].js           # 173B — Routes all /api/* to api-node
 ├── api-node/                     # ⭐ Node.js/Express API (PRIMARY BACKEND)
@@ -619,7 +619,7 @@ acadhub/                          # Monorepo root
 },
 {
   "key": "Content-Security-Policy",
-  "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://accounts.google.com https://api.groq.com https://acadhub.kuberbassi.com; frame-src https://accounts.google.com"
+  "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://accounts.google.com https://api.groq.com https://zenith.kuberbassi.com; frame-src https://accounts.google.com"
 },
 {
   "key": "Permissions-Policy",
@@ -644,16 +644,16 @@ acadhub/                          # Monorepo root
 
 | # | Issue | Impact | Fix |
 |---|-------|--------|-----|
-| 1 | **Canonical URL points to `/login`** | 🔴 Wrong canonical | Change to `https://acadhub.kuberbassi.com/` |
+| 1 | **Canonical URL points to `/login`** | 🔴 Wrong canonical | Change to `https://zenith.kuberbassi.com/` |
 | 2 | **SPA with no SSR/SSG** | 🔴 Search engines can't index authenticated pages | Add pre-rendering for public pages (login, privacy, terms) |
 | 3 | **No JSON-LD structured data** | 🟡 Missing rich snippets | Add WebApplication, Organization, and FAQ schema |
 | 4 | **OG image is just icon** | 🟡 Poor social previews | Create 1200x630 social sharing image with branding |
-| 5 | **No dynamic page titles** | 🟡 All pages show "AcadHub \| Student Center" | Use `usePageMeta` hook consistently on all pages |
+| 5 | **No dynamic page titles** | 🟡 All pages show "Zenith \| Student Center" | Use `usePageMeta` hook consistently on all pages |
 | 6 | **Sitemap only has 7 URLs** | 🟡 Incomplete | Add all public routes (privacy, terms, login) |
 | 7 | **No alt text on images** | 🟡 Accessibility + SEO | Add descriptive alt attributes to all images |
 | 8 | **Missing `lang` attribute on dynamic content** | 🟢 Minor | Already has `lang="en"` on HTML tag |
 | 9 | **No 404 page** | 🟡 Poor UX for search engines | Add custom 404 page instead of redirect to "/" |
-| 10 | **Twitter @acadhub handle** | 🟢 Minor | Verify handle exists or remove |
+| 10 | **Twitter @zenith handle** | 🟢 Minor | Verify handle exists or remove |
 
 ### Recommended JSON-LD Schema (add to `index.html`)
 ```html
@@ -661,8 +661,8 @@ acadhub/                          # Monorepo root
 {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  "name": "AcadHub",
-  "url": "https://acadhub.kuberbassi.com",
+  "name": "Zenith",
+  "url": "https://zenith.kuberbassi.com",
   "description": "All-in-one student dashboard for IPU - attendance tracking, results, timetables, and AI assistant",
   "applicationCategory": "EducationalApplication",
   "operatingSystem": "Web",
@@ -751,7 +751,7 @@ ESTIMATED TOTAL: ~1.6MB of JS deps (before tree-shaking)
 
 ### Recommended Structure
 ```
-acadhub/
+zenith/
 ├── packages/
 │   ├── shared/          # Shared types, enums, constants
 │   └── calculations/    # Shared calculation logic

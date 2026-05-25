@@ -1,5 +1,5 @@
 console.log("\n==================================");
-console.log("🛠️  ACADHUB BUILD ENVIRONMENT CHECK");
+console.log("🛠️  ZENITH BUILD ENVIRONMENT CHECK");
 console.log("==================================");
 
 const clientId = process.env.VITE_GOOGLE_CLIENT_ID;

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AcadHub",
-    "slug": "acad-hub-mobile-kuber",
+    "name": "Zenith",
+    "slug": "Zenith-mobile-kuber",
     "description": "Your ultimate academic companion for tracking attendance, results, and skills.",
     "version": "3.5.0",
     "orientation": "portrait",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kuberbassi.acadhub",
+      "bundleIdentifier": "com.kuberbassi.zenith",
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true
       }
@@ -24,7 +24,7 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.kuberbassi.acadhubmobilekuber",
+      "package": "com.kuberbassi.zenithmobilekuber",
       "versionCode": 350,
       "softwareKeyboardLayoutMode": "pan",
       "googleServicesFile": "./google-services.json",
@@ -37,7 +37,7 @@
     "web": {
       "favicon": "./assets/icon.png"
     },
-    "scheme": "acadhub",
+    "scheme": "zenith",
     "plugins": [
       "@react-native-google-signin/google-signin",
       "./plugins/withGradleWrapper",

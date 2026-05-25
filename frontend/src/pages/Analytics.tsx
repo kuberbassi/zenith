@@ -24,7 +24,7 @@ const Analytics: React.FC = () => {
     const targetThreshold = user?.attendance_threshold || 75;
 
     usePageMeta({
-        title: 'Analytics | AcadHub',
+        title: 'Analytics | Zenith',
         description: 'Deep-dive into your attendance trends, subject performance, and academic analytics.',
     });
 

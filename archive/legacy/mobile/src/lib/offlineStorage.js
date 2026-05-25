@@ -13,7 +13,7 @@ const fallbackStorage = {
   set: (key, value) => {
     memoryStore.set(key, String(value));
     // Persist to AsyncStorage (fire and forget)
-    AsyncStorage.setItem(`acadhub_fallback_${key}`, String(value)).catch(e =>
+    AsyncStorage.setItem(`zenith_fallback_${key}`, String(value)).catch(e =>
       console.error('[OfflineStorage] Fallback persist failed:', e)
     );
   },
@@ -22,7 +22,7 @@ const fallbackStorage = {
   },
   delete: (key) => {
     memoryStore.delete(key);
-    AsyncStorage.removeItem(`acadhub_fallback_${key}`).catch(() => { });
+    AsyncStorage.removeItem(`zenith_fallback_${key}`).catch(() => { });
   },
   clearAll: () => {
     memoryStore.clear();
@@ -48,7 +48,7 @@ const getStorage = () => {
     
     // Check if NitroModules are available (not available in Expo Go)
     // MMKV v3+ depends on NitroModules being linked natively
-    storageInstance = new RNMMKV({ id: 'acadhub.offline' });
+    storageInstance = new RNMMKV({ id: 'zenith.offline' });
     console.log('[OfflineStorage] MMKV initialized successfully.');
   } catch (error) {
     console.warn('[OfflineStorage] MMKV init failed (expected in Expo Go), using AsyncStorage fallback.', error.message);
@@ -302,7 +302,7 @@ export const backupData = async () => {
     }
 
     await AsyncStorage.setItem(
-      'acadhub_backup',
+      'zenith_backup',
       JSON.stringify(backup)
     );
 
@@ -319,7 +319,7 @@ export const backupData = async () => {
  */
 export const restoreFromBackup = async () => {
   try {
-    const backup = await AsyncStorage.getItem('acadhub_backup');
+    const backup = await AsyncStorage.getItem('zenith_backup');
     if (!backup) return false;
 
     const parsed = JSON.parse(backup);
@@ -344,13 +344,13 @@ export const initializeOfflineStorage = async () => {
   try {
     // 1. Load data from AsyncStorage into memoryStore for Expo Go fallback
     const allKeys = await AsyncStorage.getAllKeys();
-    const fallbackKeys = allKeys.filter(k => k.startsWith('acadhub_fallback_'));
+    const fallbackKeys = allKeys.filter(k => k.startsWith('zenith_fallback_'));
 
     if (fallbackKeys.length > 0) {
       const pairs = await AsyncStorage.multiGet(fallbackKeys);
       pairs.forEach(([key, value]) => {
         if (value !== null) {
-          const originalKey = key.replace('acadhub_fallback_', '');
+          const originalKey = key.replace('zenith_fallback_', '');
           memoryStore.set(originalKey, value);
         }
       });

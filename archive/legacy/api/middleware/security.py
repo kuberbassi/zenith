@@ -12,7 +12,7 @@ def init_security_headers(app):
     @app.after_request
     def add_security_headers(response):
         # Strip system information
-        response.headers['Server'] = 'AcadHub-Secure-Shield'
+        response.headers['Server'] = 'Zenith-Secure-Shield'
         response.headers.pop('X-Powered-By', None)
         
         # Standard Security Headers
