@@ -30,7 +30,7 @@ export const authService = {
         try {
             const response = await api.get('/api/auth/me');
             return response.data.data;
-        } catch (error) {
+        } catch {
             return null;
         }
     },
@@ -74,6 +74,22 @@ export const authService = {
             }
         }
         return null;
+    },
+
+    // Fetch active sessions
+    getActiveSessions: async (): Promise<any[]> => {
+        const response = await api.get('/api/auth/sessions');
+        return response.data.data ?? response.data;
+    },
+
+    // Revoke a specific session
+    revokeSession: async (sessionId: string): Promise<void> => {
+        await api.delete(`/api/auth/sessions/${sessionId}`);
+    },
+
+    // Revoke all other sessions
+    revokeOtherSessions: async (): Promise<void> => {
+        await api.delete('/api/auth/sessions');
     },
 
     // Store user

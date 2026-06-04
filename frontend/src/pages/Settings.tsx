@@ -18,6 +18,7 @@ import { authService } from '@/services/auth.service';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 import SystemLogsSection from '@/components/settings/SystemLogsSection';
 import SettingsDataSection from '@/components/settings/SettingsDataSection';
+import SessionsSection from '@/components/settings/SessionsSection';
 
 
 
@@ -25,7 +26,7 @@ import SettingsDataSection from '@/components/settings/SettingsDataSection';
 
 /* ── System Logs Sub-Component ─────────────────────────────────────────── */
 /* ── Main Settings Component ───────────────────────────────────────────── */
-type TabKey = 'profile' | 'activity' | 'data';
+type TabKey = 'profile' | 'activity' | 'data' | 'sessions';
 
 const Settings: React.FC = () => {
     const { user, logout, setUser } = useAuth();
@@ -87,7 +88,8 @@ const Settings: React.FC = () => {
 
     const handleProfileSave = async () => {
         try {
-            const { picture, ...profileFormData } = profileForm;
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { picture: _picture, ...profileFormData } = profileForm;
             await attendanceService.updateProfile({ name, ...profileFormData });
 
             // Also sync thresholds to preferences endpoint for full consistency
@@ -167,6 +169,7 @@ const Settings: React.FC = () => {
     const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
         { key: 'profile', label: 'Identity', icon: <User size={14} /> },
         { key: 'activity', label: 'History', icon: <Clock size={14} /> },
+        { key: 'sessions', label: 'Security', icon: <ShieldCheck size={14} /> },
         { key: 'data', label: 'Storage', icon: <Shield size={14} /> },
     ];
 
@@ -336,6 +339,11 @@ const Settings: React.FC = () => {
                             onDeleteAccount={handleDeleteAccount}
                             showToast={showToast}
                         />
+                    )}
+
+                    {/* SESSIONS TAB */}
+                    {activeTab === 'sessions' && (
+                        <SessionsSection showToast={showToast} />
                     )}
                 </motion.div>
             </AnimatePresence>

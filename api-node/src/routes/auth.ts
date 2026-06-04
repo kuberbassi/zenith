@@ -83,32 +83,62 @@ function hashRefreshToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
-async function getAuthSessionState(userId: string): Promise<AuthSessionState> {
+type AuthSession = {
+  id: string
+  refresh_token_hash: string
+  refresh_expires_at: number
+  refresh_issued_at: number
+  ip?: string | null
+  user_agent?: string | null
+  last_active_at: number
+}
+
+const AUTH_SESSIONS_KEY = 'auth_sessions'
+
+async function getAuthSessions(userId: string): Promise<AuthSession[]> {
   const pref = await prisma.userPreference.findUnique({
     where: { user_id: userId },
     select: { preferences: true },
   })
   const preferences = (pref?.preferences ?? {}) as Record<string, unknown>
-  const raw = preferences[AUTH_PREF_KEY]
-  if (!raw || typeof raw !== 'object') return {}
-  const state = raw as Record<string, unknown>
-  return {
-    refresh_token_hash: typeof state.refresh_token_hash === 'string' ? state.refresh_token_hash : undefined,
-    refresh_expires_at: state.refresh_expires_at == null ? undefined : Number(state.refresh_expires_at),
-    refresh_issued_at: state.refresh_issued_at == null ? undefined : Number(state.refresh_issued_at),
+  let sessions: AuthSession[] = []
+
+  const rawSessions = preferences[AUTH_SESSIONS_KEY]
+  if (Array.isArray(rawSessions)) {
+    sessions = rawSessions as AuthSession[]
+  } else {
+    // Migrate legacy single session
+    const oldSession = preferences[AUTH_PREF_KEY] as Record<string, unknown> | undefined
+    if (oldSession && typeof oldSession === 'object' && oldSession.refresh_token_hash) {
+      sessions = [{
+        id: crypto.randomBytes(16).toString('hex'),
+        refresh_token_hash: String(oldSession.refresh_token_hash),
+        refresh_expires_at: Number(oldSession.refresh_expires_at ?? (Date.now() + REFRESH_TOKEN_TTL_MS)),
+        refresh_issued_at: Number(oldSession.refresh_issued_at ?? Date.now()),
+        last_active_at: Date.now(),
+      }]
+    }
   }
+
+  const now = Date.now()
+  const activeSessions = sessions.filter(s => s.refresh_expires_at > now)
+
+  if (activeSessions.length !== sessions.length || (!rawSessions && sessions.length > 0)) {
+    await persistAuthSessions(userId, activeSessions)
+  }
+
+  return activeSessions
 }
 
-async function persistAuthSessionState(userId: string, session: AuthSessionState | null): Promise<void> {
+async function persistAuthSessions(userId: string, sessions: AuthSession[]): Promise<void> {
   const pref = await prisma.userPreference.findUnique({
     where: { user_id: userId },
     select: { preferences: true },
   })
   const current = ((pref?.preferences ?? {}) as Record<string, unknown>) || {}
-  const next: Record<string, unknown> = { ...current }
-
-  if (session) next[AUTH_PREF_KEY] = session
-  else delete next[AUTH_PREF_KEY]
+  const next = { ...current }
+  next[AUTH_SESSIONS_KEY] = sessions
+  delete next[AUTH_PREF_KEY] // Clear legacy single session key
 
   await prisma.userPreference.upsert({
     where: { user_id: userId },
@@ -124,10 +154,16 @@ async function findUserIdByRefreshHash(refreshTokenHash: string): Promise<string
 
   for (const row of prefRows) {
     const preferences = (row.preferences ?? {}) as Record<string, unknown>
-    const raw = preferences[AUTH_PREF_KEY]
-    if (!raw || typeof raw !== 'object') continue
-    const session = raw as Record<string, unknown>
-    if (session.refresh_token_hash === refreshTokenHash) return row.user_id
+    const rawSessions = preferences[AUTH_SESSIONS_KEY]
+    if (Array.isArray(rawSessions)) {
+      const found = (rawSessions as AuthSession[]).some(s => s.refresh_token_hash === refreshTokenHash)
+      if (found) return row.user_id
+    } else {
+      const oldSession = preferences[AUTH_PREF_KEY] as Record<string, unknown> | undefined
+      if (oldSession && oldSession.refresh_token_hash === refreshTokenHash) {
+        return row.user_id
+      }
+    }
   }
 
   return null
@@ -135,9 +171,13 @@ async function findUserIdByRefreshHash(refreshTokenHash: string): Promise<string
 
 async function revokeRefreshSessionByToken(refreshToken: string | null | undefined): Promise<void> {
   if (!refreshToken) return
-  const userId = await findUserIdByRefreshHash(hashRefreshToken(refreshToken))
+  const hash = hashRefreshToken(refreshToken)
+  const userId = await findUserIdByRefreshHash(hash)
   if (!userId) return
-  await persistAuthSessionState(userId, null)
+
+  const sessions = await getAuthSessions(userId)
+  const updated = sessions.filter(s => s.refresh_token_hash !== hash)
+  await persistAuthSessions(userId, updated)
 }
 
 async function logAuthEvent(req: any, userId: string, action: string, description: string): Promise<void> {
@@ -148,16 +188,32 @@ async function logAuthEvent(req: any, userId: string, action: string, descriptio
   }).catch(() => null)
 }
 
-async function issueAuthSession(res: any, userId: string): Promise<void> {
+async function issueAuthSession(req: any, res: any, userId: string, replaceOldHash?: string): Promise<void> {
   const accessToken = signAccessToken(userId)
   const refreshToken = crypto.randomBytes(48).toString('hex')
   const now = Date.now()
 
-  await persistAuthSessionState(userId, {
+  const ip = req.ip || req.socket?.remoteAddress || null
+  const user_agent = (req.headers['user-agent'] as string) || null
+
+  const sessions = await getAuthSessions(userId)
+  const filtered = replaceOldHash ? sessions.filter(s => s.refresh_token_hash !== replaceOldHash) : sessions
+
+  const newSession: AuthSession = {
+    id: crypto.randomBytes(16).toString('hex'),
     refresh_token_hash: hashRefreshToken(refreshToken),
     refresh_expires_at: now + REFRESH_TOKEN_TTL_MS,
     refresh_issued_at: now,
-  })
+    last_active_at: now,
+    ip,
+    user_agent,
+  }
+
+  const updated = [...filtered, newSession]
+    .sort((a, b) => b.last_active_at - a.last_active_at)
+    .slice(0, 10) // Cap active sessions at 10
+
+  await persistAuthSessions(userId, updated)
 
   setAccessCookie(res, accessToken)
   setRefreshCookie(res, refreshToken)
@@ -229,7 +285,7 @@ router.post('/google', async (req, res) => {
       }
     }
 
-    await issueAuthSession(res, user.id)
+    await issueAuthSession(req, res, user.id)
     void logAuthEvent(req, user.id, 'auth_login', 'Signed in with Google OAuth')
     ok(res, { user: userResponse(user) })
   } catch (err) {
@@ -246,27 +302,34 @@ router.post('/refresh', async (req, res) => {
       return fail(res, 'Refresh token missing', 'REFRESH_MISSING', 401)
     }
 
-    const userId = await findUserIdByRefreshHash(hashRefreshToken(refreshToken))
+    const hash = hashRefreshToken(refreshToken)
+    const userId = await findUserIdByRefreshHash(hash)
     if (!userId) {
       clearAuthCookies(res)
       return fail(res, 'Refresh token invalid', 'REFRESH_INVALID', 401)
     }
 
-    const session = await getAuthSessionState(userId)
-    if (!session.refresh_expires_at || session.refresh_expires_at < Date.now()) {
-      await persistAuthSessionState(userId, null)
+    const sessions = await getAuthSessions(userId)
+    const activeSession = sessions.find(s => s.refresh_token_hash === hash)
+    if (!activeSession) {
+      clearAuthCookies(res)
+      return fail(res, 'Refresh session not found', 'REFRESH_INVALID', 401)
+    }
+
+    if (activeSession.refresh_expires_at < Date.now()) {
+      await persistAuthSessions(userId, sessions.filter(s => s.refresh_token_hash !== hash))
       clearAuthCookies(res)
       return fail(res, 'Refresh token expired', 'REFRESH_EXPIRED', 401)
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
-      await persistAuthSessionState(userId, null)
+      await persistAuthSessions(userId, sessions.filter(s => s.refresh_token_hash !== hash))
       clearAuthCookies(res)
       return fail(res, 'Refresh user not found', 'REFRESH_INVALID', 401)
     }
 
-    await issueAuthSession(res, user.id)
+    await issueAuthSession(req, res, user.id, hash)
     void logAuthEvent(req, user.id, 'auth_refresh', 'Rotated web refresh token')
     ok(res, { user: userResponse(user) })
   } catch (err) {
@@ -281,6 +344,73 @@ router.get('/me', requireAuth, (req: AuthRequest, res) => {
     setAccessCookie(res, authHeader.slice(7))
   }
   ok(res, userResponse(req.user!))
+})
+
+// ─── Active Sessions Management ────────────────────────────────────────────────
+
+router.get('/sessions', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const sessions = await getAuthSessions(userId)
+    
+    const currentRefreshToken = readCookie(req, REFRESH_COOKIE_NAME)
+    const currentHash = currentRefreshToken ? hashRefreshToken(currentRefreshToken) : null
+
+    const payload = sessions.map(s => ({
+      id: s.id,
+      ip: s.ip || 'Unknown',
+      user_agent: s.user_agent || 'Unknown',
+      refresh_issued_at: s.refresh_issued_at,
+      last_active_at: s.last_active_at,
+      is_current: s.refresh_token_hash === currentHash,
+    }))
+
+    ok(res, payload)
+  } catch (err) {
+    console.error('[auth/sessions GET]', err)
+    fail(res, 'Failed to fetch sessions', 'FETCH_FAILED', 500)
+  }
+})
+
+router.delete('/sessions/:id', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const sessionId = req.params.id
+    const sessions = await getAuthSessions(userId)
+    const sessionToRevoke = sessions.find(s => s.id === sessionId)
+    if (!sessionToRevoke) {
+      fail(res, 'Session not found', 'NOT_FOUND', 404)
+      return
+    }
+
+    const updated = sessions.filter(s => s.id !== sessionId)
+    await persistAuthSessions(userId, updated)
+    
+    void logAuthEvent(req, userId, 'auth_revoke_session', `Revoked device session: ${sessionToRevoke.user_agent || 'Unknown'}`)
+    ok(res, { message: 'Session revoked successfully' })
+  } catch (err) {
+    console.error('[auth/sessions DELETE]', err)
+    fail(res, 'Failed to revoke session', 'REVOKE_FAILED', 500)
+  }
+})
+
+router.delete('/sessions', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const currentRefreshToken = readCookie(req, REFRESH_COOKIE_NAME)
+    const currentHash = currentRefreshToken ? hashRefreshToken(currentRefreshToken) : null
+
+    const sessions = await getAuthSessions(userId)
+    const currentSession = sessions.find(s => s.refresh_token_hash === currentHash)
+    const updated = currentSession ? [currentSession] : []
+    await persistAuthSessions(userId, updated)
+    
+    void logAuthEvent(req, userId, 'auth_revoke_other_sessions', 'Revoked all other active sessions')
+    ok(res, { message: 'All other sessions revoked successfully' })
+  } catch (err) {
+    console.error('[auth/sessions/all DELETE]', err)
+    fail(res, 'Failed to revoke other sessions', 'REVOKE_FAILED', 500)
+  }
 })
 
 router.get('/debug_db', requireAuth, async (req: AuthRequest, res) => {

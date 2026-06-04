@@ -22,10 +22,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const initAuth = async () => {
             const storedUser = authService.getStoredUser();
             if (storedUser) {
-                // Optimistically set user
+                // Optimistically set user and stop loading so the UI renders instantly
                 setUser(storedUser);
+                setLoading(false);
 
-                // Verify session with backend to prevent "glitchy" redirect
+                // Verify session with backend in the background
                 try {
                     const verifiedUser = await authService.getCurrentUser();
                     if (!verifiedUser) {
@@ -34,7 +35,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         setUser(null);
                         authService.logout();
                     } else {
-                        // CRITICAL FIX: Update state AND storage with fresh data (e.g. new PFP)
+                        // Update state AND storage with fresh data (e.g. new PFP)
                         setUser(verifiedUser);
                         authService.storeUser(verifiedUser);
                     }
@@ -43,8 +44,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     setUser(null);
                     authService.logout();
                 }
+            } else {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
         initAuth();

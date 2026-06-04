@@ -3,15 +3,14 @@ import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import type { ChartOptions } from 'chart.js';
 import {
-    Eye, EyeOff, Zap, GraduationCap,
+    GraduationCap,
     RefreshCw,
-    ShieldCheck, X, Download
+    X, Download, UploadCloud, Plus, Trash2, Edit
 } from 'lucide-react';
 import Loader from '@/components/ui/Loader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { attendanceService } from '@/services/attendance.service';
-import Button from '@/components/ui/Button';
 import ResultsDashboard from '@/components/results/ResultsDashboard';
 
 /*  Grade utilities  */
@@ -127,15 +126,7 @@ function getSubjectPercentage(subject: any) {
 }
 
 /*  Types  */
-type Step = 'loading' | 'form' | 'captcha' | 'results';
-
-interface CaptchaInfo {
-    captcha_image: string;
-    hidden_fields: Record<string, string>;
-    field_names: Record<string, string>;
-    login_action?: string;
-    ocr_attempted?: string;
-}
+type Step = 'loading' | 'form' | 'results';
 
 /*  Component  */
 const Results: React.FC = () => {
@@ -148,14 +139,6 @@ const Results: React.FC = () => {
     });
 
     const [step, setStep] = useState<Step>('loading');
-    const [enrollmentNo, setEnrollmentNo] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPw, setShowPw] = useState(false);
-    const [captchaInfo, setCaptchaInfo] = useState<CaptchaInfo | null>(null);
-    const [captchaCode, setCaptchaCode] = useState('');
-    const [captchaLoading, setCaptchaLoading] = useState(false);
-    const [fetching, setFetching] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const [results, setResults] = useState<any | null>(null);
     const [selectedSem, setSelectedSem] = useState<string>('overall');
     const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -165,12 +148,21 @@ const Results: React.FC = () => {
     const [pdfSem, setPdfSem] = useState<string>('overall');
     const [pdfLoading, setPdfLoading] = useState(false);
 
+    // PDF parsing/upload states
+    const [uploadLoading, setUploadLoading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    
+    // Result editor modal states
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [editorSem, setEditorSem] = useState<number>(1);
+    const [editorStudentInfo, setEditorStudentInfo] = useState<any>({
+        name: '', enrollment_number: '', institute: '', program: '', batch: ''
+    });
+    const [editorSubjects, setEditorSubjects] = useState<any[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
+
     const accentColor = '#ffffff';
     const gridColor = 'rgba(255,255,255,0.04)';
-
-    useEffect(() => {
-        if (user?.enrollment_number) setEnrollmentNo(user.enrollment_number);
-    }, [user?.enrollment_number]);
 
     useEffect(() => { loadSavedResults(); }, []);
 
@@ -190,8 +182,7 @@ const Results: React.FC = () => {
     }
 
     function handleSyncClick() {
-        setError(null);
-        setPassword('');
+        setUploadError(null);
         setStep('form');
     }
 
@@ -210,98 +201,158 @@ const Results: React.FC = () => {
         }
     }
 
-    async function handleAutoFetch() {
-        if (!enrollmentNo.trim()) { setError('Please enter your enrollment number.'); return; }
-        if (!password.trim()) { setError('Please enter your IPU portal password.'); return; }
-        setError(null); setFetching(true);
+    // PDF File upload handler
+    async function handlePdfUpload(file: File) {
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+            setUploadError('Only PDF files are supported.');
+            return;
+        }
+        setUploadLoading(true);
+        setUploadError(null);
         try {
-            const data: any = await attendanceService.autoFetchIPUResults({ enrollment_number: enrollmentNo, password });
-            if (data?.captcha_required) {
-                setCaptchaInfo({
-                    captcha_image: data.captcha_image,
-                    hidden_fields: data.hidden_fields || {},
-                    field_names: data.field_names || {},
-                    login_action: data.login_action,
-                    ocr_attempted: data.ocr_attempted,
-                });
-                setCaptchaCode(data.ocr_attempted || '');
-                setStep('captcha');
-            } else if (data?.semesters !== undefined) {
-                await loadSavedResults();
-                setLastUpdated(new Date().toISOString());
-                showToast('success', 'Results synced successfully!');
-            } else {
-                setError('Could not retrieve results.');
-            }
-        } catch (e: any) {
-            setError(e?.response?.data?.error || 'Failed to reach server.');
+            const data = await attendanceService.parseResultPdf(file);
+            setEditorStudentInfo({
+                name: data.studentInfo?.student_name || user?.name || '',
+                enrollment_number: data.studentInfo?.enrollment_number || user?.enrollment_number || '',
+                institute: data.studentInfo?.institute || '',
+                program: data.studentInfo?.program || '',
+                batch: data.studentInfo?.batch || '',
+            });
+            const subList = (data.subjects || []).map((s: any, idx: number) => ({
+                id: s.paper_code || `sub_${idx}`,
+                paper_code: s.paper_code || '',
+                subject_name: s.subject_name || '',
+                credits: s.credits || 4,
+                internal_theory: s.internal_theory || s.internal_practical || 0,
+                external_theory: s.external_theory || s.external_practical || 0,
+            }));
+            setEditorSubjects(subList);
+            setEditorSem(data.subjects?.[0]?.semester || 1);
+            setIsEditorOpen(true);
+        } catch (err: any) {
+            console.error('[pdf upload error]', err);
+            setUploadError(err.response?.data?.error || 'Failed to parse results sheet. Make sure it matches the standard format.');
         } finally {
-            setFetching(false);
+            setUploadLoading(false);
         }
     }
 
-    async function refreshCaptcha(force = false) {
-        if (captchaLoading || (fetching && !force)) return;
-        setCaptchaLoading(true);
-        setError(null);
-        setCaptchaCode('');
-        try {
-            const data: any = await attendanceService.getIPUCaptcha();
-            if (data?.captcha_image) {
-                setCaptchaInfo({
-                    captcha_image: data.captcha_image,
-                    hidden_fields: data.hidden_fields || {},
-                    field_names: data.field_names || {},
-                    login_action: data.login_action,
-                });
-                setStep('captcha');
-            }
-        } catch { setError('Failed to refresh CAPTCHA.'); }
-        finally { setCaptchaLoading(false); }
+    // Modal helpers
+    function isLabSubject(name: string, credits: number) {
+        const upper = String(name).toUpperCase();
+        return credits === 2 || upper.includes('LAB') || upper.includes('PRACTICAL') || upper.includes('WORKSHOP') || upper.includes('GRAPHICS') || upper.includes('PROJECT');
     }
 
-    async function handleFetchResults() {
-        if (fetching) return;
-        if (!captchaCode.trim()) { setError('Please enter CAPTCHA.'); return; }
-        setError(null); setFetching(true);
-        try {
-            const payload = {
-                enrollment_number: enrollmentNo, password, captcha: captchaCode,
-                hidden_fields: captchaInfo?.hidden_fields || {},
-                field_names: captchaInfo!.field_names,
-                login_action: captchaInfo?.login_action || '',
-            };
-            const data: any = await attendanceService.fetchIPUResults(payload);
-            if (data?.semesters !== undefined) {
-                await loadSavedResults();
-                setLastUpdated(new Date().toISOString());
-                showToast('success', 'Results synced successfully!');
-            } else {
-                setError('Invalid credentials or CAPTCHA. Click ↻ to get a new CAPTCHA.');
+    function handleSubjectChange(id: string, field: string, value: any) {
+        setEditorSubjects(prev => prev.map(s => {
+            if (s.id === id) {
+                return { ...s, [field]: value };
             }
-        } catch (e: any) {
-            const status = e?.response?.status;
-            const msg = e?.response?.data?.error || 'Failed to fetch.';
-            setError(msg);
-            setCaptchaCode('');
-            // 423 = account locked — stop immediately, never refresh captcha
-            if (status === 423) {
-                setStep('form');
-                setPassword('');
-            }
-            if (status === 401) {
-                await refreshCaptcha(true);
-                showToast('error', 'Loaded a fresh CAPTCHA. Try again carefully.');
-            }
-            if (status === 429) {
-                showToast('error', msg);
-            }
-            // For other failures (wrong captcha/creds) just show the error.
-            // User can click ↻ to manually get a new CAPTCHA.
-        } finally { setFetching(false); }
+            return s;
+        }));
     }
 
-    const inputCls = 'w-full px-4 py-3 rounded-xl border border-white/10 bg-white/[0.02] text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/25 transition-all';
+    function handleAddSubject() {
+        const newSub = {
+            id: `new_sub_${Date.now()}`,
+            paper_code: '',
+            subject_name: '',
+            credits: 4,
+            internal_theory: 0,
+            external_theory: 0,
+        };
+        setEditorSubjects(prev => [...prev, newSub]);
+    }
+
+    function handleDeleteSubject(id: string) {
+        setEditorSubjects(prev => prev.filter(s => s.id !== id));
+    }
+
+    function calculateDynamicGrade(total: number) {
+        if (total >= 90) return 'O';
+        if (total >= 75) return 'A+';
+        if (total >= 65) return 'A';
+        if (total >= 55) return 'B+';
+        if (total >= 50) return 'B';
+        if (total >= 45) return 'C+';
+        if (total >= 40) return 'C';
+        return 'F';
+    }
+
+    function calculateDynamicSGPA(subjects: any[]) {
+        let weightedSum = 0;
+        let totalCredits = 0;
+
+        for (const sub of subjects) {
+            const credits = parseInt(sub.credits) || 0;
+            const internal = parseFloat(sub.internal_theory) || 0;
+            const external = parseFloat(sub.external_theory) || 0;
+            const total = internal + external;
+            const grade = calculateDynamicGrade(total);
+            const gp = GRADE_POINTS[grade] ?? 0;
+
+            totalCredits += credits;
+            weightedSum += credits * gp;
+        }
+
+        return totalCredits > 0 ? parseFloat((weightedSum / totalCredits).toFixed(2)) : 0;
+    }
+
+    async function handleSaveEditor() {
+        if (editorSubjects.length === 0) {
+            showToast('error', 'Add at least one subject');
+            return;
+        }
+        if (editorSubjects.some(s => !s.subject_name.trim())) {
+            showToast('error', 'Please enter names for all subjects');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const processedSubjects = editorSubjects.map(sub => {
+                const internal = parseFloat(sub.internal_theory) || 0;
+                const external = parseFloat(sub.external_theory) || 0;
+                const isLab = isLabSubject(sub.subject_name, parseInt(sub.credits) || 4);
+
+                return {
+                    name: sub.subject_name,
+                    code: sub.paper_code,
+                    credits: parseInt(sub.credits) || 0,
+                    internal_theory: isLab ? 0 : internal,
+                    external_theory: isLab ? 0 : external,
+                    internal_practical: isLab ? internal : 0,
+                    external_practical: isLab ? external : 0,
+                };
+            });
+
+            await attendanceService.saveResults({
+                semester: editorSem,
+                subjects: processedSubjects,
+            });
+
+            if (editorStudentInfo.enrollment_number && editorStudentInfo.enrollment_number !== user?.enrollment_number) {
+                await attendanceService.updateProfile({
+                    enrollment_number: editorStudentInfo.enrollment_number,
+                    college: editorStudentInfo.institute || user?.college || '',
+                    course: editorStudentInfo.program || user?.course || '',
+                    batch: editorStudentInfo.batch || user?.batch || '',
+                }).catch(() => {});
+            }
+
+            showToast('success', `Semester ${editorSem} results saved successfully!`);
+            setIsEditorOpen(false);
+            await loadSavedResults();
+        } catch (err: any) {
+            console.error('[editor save error]', err);
+            showToast('error', err.response?.data?.error || 'Failed to save results');
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
+
 
     /*  Computed metrics  */
     const metrics = useMemo(() => {
@@ -487,110 +538,78 @@ const Results: React.FC = () => {
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } }}
             className="pb-28 max-w-[1320px] mx-auto pt-20 px-3 md:px-5"
         >
-            {/*  Auth / Sync Form  */}
+            {/*  PDF Uploader Dropzone  */}
             {step === 'form' && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    className="max-w-md mx-auto mt-10"
+                    className="max-w-xl mx-auto mt-10"
                 >
-                    <div className="mb-4 rounded-3xl border border-amber-500/25 bg-amber-500/[0.06] p-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-2xl border border-amber-500/20 bg-amber-500/10 flex items-center justify-center">
-                                <ShieldCheck size={18} className="text-amber-400" />
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-black text-white">Password Information</h3>
-                                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-amber-300/60">Portal safety guidance</p>
-                            </div>
-                        </div>
-                        <ul className="space-y-2 text-sm leading-6 text-white/70">
-                            <li>Default password is your father&apos;s full name in capital letters.</li>
-                            <li>Include spaces exactly as registered on the IPU portal.</li>
-                            <li className="text-red-300">3 wrong attempts can temporarily lock your account.</li>
-                        </ul>
-                        <div className="mt-4 border-t border-white/10 pt-4 text-sm leading-6 text-white/55">
-                            Your credentials are never stored on our servers. They are only used for the live IPU session needed to fetch results.
-                        </div>
-                    </div>
-
-                    <div className="rounded-3xl border border-white/[0.08] glass-panel p-8 shadow-2xl" style={{ boxShadow: '0 0 40px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                    <div className="rounded-[2.5rem] border border-white/[0.08] glass-panel p-8 shadow-2xl relative overflow-hidden" style={{ boxShadow: '0 0 40px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+                        <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-white/5 blur-[100px] pointer-events-none" />
+                        
                         <div className="flex items-center gap-4 mb-8">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10">
+                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shrink-0">
                                 <GraduationCap size={24} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-black text-white tracking-tight">{results ? 'Sync Results' : 'Academic Portal'}</h2>
-                                <p className="text-xs text-white/30 font-medium tracking-wider uppercase">{results ? 'Fetch latest semester data' : 'Secure Result Retrieval'}</p>
+                                <h2 className="text-xl font-black text-white tracking-tight">Upload Result PDF</h2>
+                                <p className="text-xs text-white/30 font-medium tracking-wider uppercase">Parse & save portal result sheets</p>
                             </div>
                         </div>
 
                         {results && (
                             <button
                                 onClick={() => setStep('results')}
-                                className="w-full mb-4 py-2.5 rounded-xl bg-white/5 border border-white/[0.05] text-xs text-white/30 font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
+                                className="w-full mb-6 py-2.5 rounded-xl bg-white/5 border border-white/[0.05] text-xs text-white/40 font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
                             >
-                                Back to Results
+                                Back to Dashboard
                             </button>
                         )}
 
-                        {error && <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400">{error}</div>}
+                        {uploadError && (
+                            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400">
+                                {uploadError}
+                            </div>
+                        )}
 
-                        <form onSubmit={(e) => { e.preventDefault(); handleAutoFetch(); }} className="space-y-4">
-                            <div>
-                                <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 ml-1">Enrollment Number</label>
-                                <input type="text" value={enrollmentNo} onChange={e => setEnrollmentNo(e.target.value)} placeholder="00000000000" className={inputCls} required />
+                        <div
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                const file = e.dataTransfer.files?.[0];
+                                if (file) void handlePdfUpload(file);
+                            }}
+                            className="border-2 border-dashed border-white/10 hover:border-white/20 rounded-3xl p-12 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/[0.01] transition-all group"
+                            onClick={() => {
+                                const input = document.createElement('input');
+                                input.type = 'file';
+                                input.accept = '.pdf';
+                                input.onchange = (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                    if (file) void handlePdfUpload(file);
+                                };
+                                input.click();
+                            }}
+                        >
+                            {uploadLoading ? (
+                                <Loader size={32} />
+                            ) : (
+                                <UploadCloud size={40} className="text-white/20 group-hover:text-white/40 transition-colors" />
+                            )}
+                            <div className="text-center">
+                                <p className="text-sm font-bold text-white/80 group-hover:text-white transition-colors">
+                                    {uploadLoading ? 'Reading document structure...' : 'Drop your result PDF here'}
+                                </p>
+                                <p className="text-xs text-white/30 font-medium mt-1">
+                                    {uploadLoading ? 'Extracting academic marks map' : 'or click to browse from device'}
+                                </p>
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-bold text-white/20 uppercase tracking-widest mb-2 ml-1">Portal Password</label>
-                                <div className="relative">
-                                    <input type={showPw ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="********" className={inputCls} required />
-                                    <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors">
-                                        {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                                    </button>
-                                </div>
-                            </div>
-                            <Button
-                                type="submit" isLoading={fetching}
-                                className="w-full h-12 justify-center rounded-xl bg-white/10 text-white font-black tracking-widest uppercase text-xs hover:bg-white/20 transition-all shadow-lg shadow-white/10"
-                                icon={<Zap size={14} />}
-                            >
-                                {results ? 'Sync Now' : 'Initialize Link'}
-                            </Button>
-                        </form>
-                    </div>
-                </motion.div>
-            )}
+                        </div>
 
-            {/*  Captcha  */}
-            {step === 'captcha' && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                    className="max-w-md mx-auto mt-10"
-                >
-                    <div className="rounded-3xl border border-white/[0.08] glass-panel p-8">
-                        <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-5">
-                            <div>
-                                <h2 className="text-xl font-black text-white tracking-tight">Security Check</h2>
-                                <p className="text-xs text-white/30 font-medium">Verify human identity</p>
-                            </div>
-                            <button disabled={captchaLoading || fetching} onClick={() => refreshCaptcha()} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/40 active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-not-allowed">
-                                <RefreshCw size={18} className={captchaLoading ? 'animate-spin' : ''} />
-                            </button>
+                        <div className="mt-8 rounded-2xl bg-white/[0.01] border border-white/[0.03] p-4 text-[11px] leading-relaxed text-white/40">
+                            <span className="font-bold text-white/60 block mb-1">Instruction:</span>
+                            Upload the PDF results sheet downloaded directly from the IPU portal. The system will extract your program, subjects, grades, and default credits automatically, allowing you to review them before saving.
                         </div>
-                        <div className="p-4 bg-white rounded-2xl mb-6 flex justify-center shadow-inner overflow-hidden">
-                            {captchaInfo?.captcha_image
-                                ? <img src={captchaInfo.captcha_image.startsWith('data:') ? captchaInfo.captcha_image : `data:image/png;base64,${captchaInfo.captcha_image}`} alt="captcha" className="h-14 contrast-125 object-contain" />
-                                : <div className="h-14 flex items-center justify-center text-black/20 font-black text-[10px] uppercase">Loading Visual...</div>
-                            }
-                        </div>
-                        <form onSubmit={(e) => { e.preventDefault(); handleFetchResults(); }}>
-                            <input disabled={fetching} value={captchaCode} onChange={e => setCaptchaCode(e.target.value)} placeholder="Enter code exactly as shown" className={`${inputCls} mb-3 text-center tracking-[0.2em] font-black disabled:opacity-60`} autoCapitalize="none" autoCorrect="off" spellCheck={false} required />
-                            <p className="mb-4 text-[11px] text-amber-400/70">CAPTCHA is case-sensitive and single-use. Refresh before every retry.</p>
-                            <div className="flex gap-2">
-                                <Button type="button" onClick={() => setStep('form')} variant="secondary" className="flex-1 justify-center rounded-xl bg-white/5 border border-white/5 text-white/40 text-[10px] font-black uppercase tracking-widest">Back</Button>
-                                <Button type="submit" isLoading={fetching} className="flex-1 justify-center rounded-xl bg-white/10 text-white font-black tracking-widest uppercase text-[10px] shadow-lg shadow-white/10">Verify</Button>
-                            </div>
-                        </form>
                     </div>
                 </motion.div>
             )}
@@ -690,6 +709,231 @@ const Results: React.FC = () => {
                                     ? <><Loader size={20} /> Generating…</>
                                     : <><Download size={12} /> Download PDF</>
                                 }
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+            {/* ── Interactive Results Editor Modal ──────────────────────── */}
+            {isEditorOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.97 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="w-full max-w-5xl rounded-3xl border border-white/[0.08] glass-panel shadow-2xl my-8 overflow-hidden flex flex-col max-h-[90vh]"
+                        style={{ boxShadow: '0 50px 100px -20px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06)' }}
+                    >
+                        {/* Header */}
+                        <div className="p-6 md:p-8 border-b border-white/[0.06] flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0 bg-white/[0.01]">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shrink-0">
+                                    <Edit size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-white tracking-tight">Confirm Academic Records</h3>
+                                    <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mt-1">Verify extracted grades, marks, and credits</p>
+                                </div>
+                            </div>
+
+                            {/* SGPA Banner */}
+                            <div className="flex gap-4 items-center self-start md:self-auto">
+                                <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[100px]">
+                                    <span className="block text-[9px] font-black text-white/40 uppercase tracking-widest">Calculated SGPA</span>
+                                    <span className="text-2xl font-black text-white">{calculateDynamicSGPA(editorSubjects).toFixed(2)}</span>
+                                </div>
+                                <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[100px]">
+                                    <span className="block text-[9px] font-black text-white/40 uppercase tracking-widest">Total Credits</span>
+                                    <span className="text-2xl font-black text-white">
+                                        {editorSubjects.reduce((acc, s) => acc + (parseInt(s.credits) || 0), 0)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Modal Body (Scrollable) */}
+                        <div className="p-6 md:p-8 overflow-y-auto space-y-8 flex-1">
+                            {/* Student Metadata Form */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 rounded-2xl bg-white/[0.01] border border-white/[0.03] p-6">
+                                <div className="md:col-span-3">
+                                    <h4 className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-4">Extracted Student Information</h4>
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Student Name</label>
+                                    <input
+                                        type="text"
+                                        value={editorStudentInfo.name}
+                                        onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, name: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Enrollment Number</label>
+                                    <input
+                                        type="text"
+                                        value={editorStudentInfo.enrollment_number}
+                                        onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, enrollment_number: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Target Semester</label>
+                                    <select
+                                        value={editorSem}
+                                        onChange={(e) => setEditorSem(parseInt(e.target.value) || 1)}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-[#0a0a0c] text-xs text-white"
+                                    >
+                                        {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
+                                            <option key={s} value={s}>Semester {s}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Institute / College</label>
+                                    <input
+                                        type="text"
+                                        value={editorStudentInfo.institute}
+                                        onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, institute: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-white"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Program / Course</label>
+                                    <input
+                                        type="text"
+                                        value={editorStudentInfo.program}
+                                        onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, program: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-white"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Subjects Table */}
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Extracted Subjects & Grades</h4>
+                                    <button
+                                        onClick={handleAddSubject}
+                                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[9px] font-black uppercase tracking-widest text-white/80 transition-all flex items-center gap-1.5"
+                                    >
+                                        <Plus size={10} /> Add Subject
+                                    </button>
+                                </div>
+
+                                <div className="border border-white/[0.06] rounded-2xl overflow-hidden bg-white/[0.01] overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-xs min-w-[800px]">
+                                        <thead>
+                                            <tr className="border-b border-white/[0.06] bg-white/[0.02] text-white/40 text-[9px] font-black uppercase tracking-widest">
+                                                <th className="p-4 w-[15%]">Paper Code</th>
+                                                <th className="p-4 w-[40%]">Subject Name</th>
+                                                <th className="p-4 w-[10%] text-center">Credits</th>
+                                                <th className="p-4 w-[10%] text-center">Internal</th>
+                                                <th className="p-4 w-[10%] text-center">External</th>
+                                                <th className="p-4 w-[10%] text-center">Total</th>
+                                                <th className="p-4 w-[10%] text-center">Grade</th>
+                                                <th className="p-4 w-[5%]"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/[0.04]">
+                                            {editorSubjects.map((sub) => {
+                                                const internal = parseFloat(sub.internal_theory) || 0;
+                                                const external = parseFloat(sub.external_theory) || 0;
+                                                const total = internal + external;
+                                                const grade = calculateDynamicGrade(total);
+
+                                                return (
+                                                    <tr key={sub.id} className="hover:bg-white/[0.005]">
+                                                        <td className="p-3">
+                                                            <input
+                                                                type="text"
+                                                                value={sub.paper_code}
+                                                                onChange={(e) => handleSubjectChange(sub.id, 'paper_code', e.target.value)}
+                                                                placeholder="e.g. BS103"
+                                                                className="w-full px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-white font-mono"
+                                                            />
+                                                        </td>
+                                                        <td className="p-3">
+                                                            <input
+                                                                type="text"
+                                                                value={sub.subject_name}
+                                                                onChange={(e) => handleSubjectChange(sub.id, 'subject_name', e.target.value)}
+                                                                placeholder="Subject Title"
+                                                                className="w-full px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-white"
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <input
+                                                                type="number"
+                                                                value={sub.credits}
+                                                                onChange={(e) => handleSubjectChange(sub.id, 'credits', parseInt(e.target.value) || 0)}
+                                                                className="w-16 px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-center text-white"
+                                                                min="0"
+                                                                max="8"
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <input
+                                                                type="number"
+                                                                value={sub.internal_theory}
+                                                                onChange={(e) => handleSubjectChange(sub.id, 'internal_theory', parseFloat(e.target.value) || 0)}
+                                                                className="w-16 px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-center text-white"
+                                                                min="0"
+                                                                max="100"
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <input
+                                                                type="number"
+                                                                value={sub.external_theory}
+                                                                onChange={(e) => handleSubjectChange(sub.id, 'external_theory', parseFloat(e.target.value) || 0)}
+                                                                className="w-16 px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-center text-white"
+                                                                min="0"
+                                                                max="100"
+                                                            />
+                                                        </td>
+                                                        <td className="p-3 text-center font-bold text-white/80">
+                                                            {total}
+                                                        </td>
+                                                        <td className="p-3 text-center font-black">
+                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] ${gradeBgClass(grade)}`}>
+                                                                {grade}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3 text-center">
+                                                            <button
+                                                                onClick={() => handleDeleteSubject(sub.id)}
+                                                                className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 md:p-8 border-t border-white/[0.06] flex items-center justify-end gap-3 shrink-0 bg-white/[0.01]">
+                            <button
+                                onClick={() => setIsEditorOpen(false)}
+                                disabled={isSaving}
+                                className="px-5 py-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-xs font-black text-white/40 hover:bg-white/[0.06] transition-all disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleSaveEditor}
+                                disabled={isSaving}
+                                className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-black text-white transition-all shadow-lg shadow-white/5 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {isSaving ? (
+                                    <><RefreshCw size={12} className="animate-spin" /> Saving...</>
+                                ) : (
+                                    'Save & Commit Results'
+                                )}
                             </button>
                         </div>
                     </motion.div>

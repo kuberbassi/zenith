@@ -94,7 +94,7 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
     }
     const userTarget = req.user?.attendance_threshold ?? 75
 
-    const [subjects, logs] = await Promise.all([
+    const [subjects, logs, resultRows] = await Promise.all([
       prisma.subject.findMany({
         where: { user_id: userId, semester },
         select: { id: true, name: true, attended: true, total: true, target: true, semester: true },
@@ -103,6 +103,11 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
         where: { user_id: userId, semester },
         select: { date: true, status: true, subject_name: true },
         orderBy: { date: 'desc' },
+      }),
+      prisma.semesterResult.findMany({
+        where: { user_id: userId },
+        orderBy: { semester: 'asc' },
+        select: { semester: true, sgpa: true, subjects: true },
       }),
     ])
 
@@ -211,11 +216,6 @@ router.get('/reports_data', async (req: AuthRequest, res) => {
       atRiskCount === 0 ? 'All subjects above target' :
       worstSubject?.name ? `Recover ${worstSubject.name}` : 'Recover weak subjects'
 
-    const resultRows = await prisma.semesterResult.findMany({
-      where: { user_id: userId },
-      orderBy: { semester: 'asc' },
-      select: { semester: true, sgpa: true, subjects: true },
-    })
     const resultSubjects = resultRows.flatMap((row: any) => Array.isArray(row.subjects) ? row.subjects as Array<Record<string, unknown>> : [])
     const cgpaCalc = resultRows.length ? GradeCalculator.calculateCGPA(resultRows.map((row: any) => row.subjects as Array<Record<string, unknown>>)) : { cgpa: 0 }
     const completedResultSubjects = resultSubjects.filter((subject: any) => !subject.is_pending && subject.grade !== '-')

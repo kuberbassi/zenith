@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
+import multer from 'multer'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { GradeCalculator } from '../lib/calculations.js'
@@ -8,6 +9,7 @@ import { ok, created, fail } from '../utils/response.js'
 import { mergePreferredRecord } from '../utils/recordMerge.js'
 import { buildResultsPayload } from '../utils/resultsPayload.js'
 import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
+import { parseResultPdf } from '../utils/pdfParser.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -255,6 +257,28 @@ router.post('/subjects/:id/attendance-count', async (req: AuthRequest, res) => {
 })
 
 // ─── Semester Results ────────────────────────────────────────────────────────
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+})
+
+router.post('/results/parse-pdf', upload.single('file'), async (req: AuthRequest, res) => {
+    try {
+        if (!req.file) {
+            fail(res, 'No file uploaded', 'MISSING_FILE', 400)
+            return
+        }
+
+        const result = await parseResultPdf(req.file.buffer)
+        ok(res, result)
+    } catch (err) {
+        console.error('[academic/results/parse-pdf POST]', err)
+        fail(res, 'Failed to parse PDF result', 'PARSE_FAILED', 500)
+    }
+})
 
 router.get('/results', async (req: AuthRequest, res) => {
     try {

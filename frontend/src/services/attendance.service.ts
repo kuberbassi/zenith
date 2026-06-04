@@ -114,6 +114,10 @@ export const attendanceService = {
     },
 
     // Dashboard
+    getDashboardLocalCache: (semester: number = 1): DashboardData | null => {
+        return getPersistentCached<DashboardData>(`dashboard:${semester}`);
+    },
+
     getDashboardData: async (semester: number = 1, refresh = false): Promise<DashboardData> => {
         const cacheKey = `dashboard:${semester}`;
         if (!refresh) {
@@ -122,7 +126,7 @@ export const attendanceService = {
         }
         const response = await api.get(`/api/dashboard/data?semester=${semester}${refresh ? '&refresh=1' : ''}`);
         const data = response.data.data;
-        setCached(cacheKey, data, 15_000);
+        setAnyCached(cacheKey, data, 15_000, 24 * 60 * 60 * 1000); // 15s memory cache, 24h localStorage persistence
         return data;
     },
 
@@ -132,6 +136,10 @@ export const attendanceService = {
     },
 
     // Reports
+    getReportsLocalCache: (semester: number = 1): ReportsData | null => {
+        return getPersistentCached<ReportsData>(`reports:${semester}`);
+    },
+
     getReportsData: async (semester: number = 1, refresh = false): Promise<ReportsData> => {
         const cacheKey = `reports:${semester}`;
         if (!refresh) {
@@ -140,7 +148,7 @@ export const attendanceService = {
         }
         const response = await api.get(`/api/dashboard/reports_data?semester=${semester}${refresh ? '&refresh=1' : ''}`);
         const data = response.data.data;
-        setCached(cacheKey, data, 15_000);
+        setAnyCached(cacheKey, data, 15_000, 24 * 60 * 60 * 1000); // 15s memory cache, 24h localStorage persistence
         return data;
     },
 
@@ -663,5 +671,20 @@ export const attendanceService = {
         const response = await api.post('/api/academic/results/sync', payload);
         return response.data.data;
     },
-};
 
+    parseResultPdf: async (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await api.post('/api/academic/results/parse-pdf', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data.data ?? response.data;
+    },
+
+    saveResults: async (payload: { semester: number; subjects: any[] }) => {
+        const response = await api.post('/api/academic/results', payload);
+        return response.data.data ?? response.data;
+    },
+};

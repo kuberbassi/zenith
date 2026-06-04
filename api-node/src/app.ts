@@ -10,6 +10,7 @@ import { detectPlatform } from './middleware/platform.js'
 import { flaskRewrite, compatHandlers } from './routes/compat.js'
 import docsRoutes from './routes/docs.js'
 import v1Router from './routes/v1.js'
+import { xssSanitize } from './middleware/xss.js'
 
 const app = express()
 
@@ -57,6 +58,15 @@ const aiLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+/** Rate limiter for PDF upload result parser - 5 req / 1 min per IP */
+const pdfUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'Rate limit exceeded for PDF parsing. Please wait.', code: 'PDF_RATE_LIMIT_EXCEEDED' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // Apply global protection to all /api/* routes
 app.use('/api', apiLimiter)
 
@@ -67,6 +77,8 @@ app.use('/api/v1/auth', strictLimiter)
 app.use('/api/auth', strictLimiter)
 app.use('/api/v1/ai', aiLimiter)
 app.use('/api/ai', aiLimiter)
+app.use('/api/v1/academic/results/parse-pdf', pdfUploadLimiter)
+app.use('/api/academic/results/parse-pdf', pdfUploadLimiter)
 
 /* ── Compression ─────────────────────────────────────────── */
 app.use(compression({ threshold: 1024 })) // skip tiny responses
@@ -76,6 +88,7 @@ app.use('/api/data/import_data', express.json({ limit: '10mb' }))
 app.use('/api/v1/data/import_data', express.json({ limit: '10mb' }))
 app.use(express.json({ limit: '1mb' }))
 app.use(express.urlencoded({ extended: true, limit: '1mb' }))
+app.use(xssSanitize)
 if (ENV.NODE_ENV === 'development') {
   app.use(morgan('dev'))
 } else if (ENV.NODE_ENV !== 'test') {
