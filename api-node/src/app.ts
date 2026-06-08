@@ -40,14 +40,32 @@ app.use(helmet({
     : false,
 }))
 app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) return callback(null, true)
-      return callback(new Error('Origin not allowed by CORS'))
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Timezone', 'X-Device-Id'],
+  cors((req, callback) => {
+    const origin = req.header('Origin')
+    const host = req.header('Host')
+    let isAllowed = false
+
+    if (!origin) {
+      isAllowed = true
+    } else if (allowedOrigins.has(origin)) {
+      isAllowed = true
+    } else {
+      try {
+        const originUrl = new URL(origin)
+        if (host && (originUrl.host === host || originUrl.hostname === host.split(':')[0])) {
+          isAllowed = true
+        }
+      } catch {
+        // invalid origin format
+      }
+    }
+
+    callback(null, {
+      origin: isAllowed ? (origin || true) : false,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Timezone', 'X-Device-Id'],
+    })
   }),
 )
 
@@ -184,7 +202,7 @@ app.use(
     console.error('[Error]', err)
     res.status(500).json({
       success: false,
-      error: err.message || String(err),
+      error: ENV.NODE_ENV === 'development' ? (err.message ?? 'Internal server error') : 'Internal server error',
       code: 'INTERNAL_ERROR',
     })
   },
