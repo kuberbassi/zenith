@@ -51,6 +51,32 @@ export function getNotionTagStyles(text: string) {
     };
 }
 
+export function getLevelTagStyles(level: string) {
+    const lvl = (level || 'beginner').toLowerCase();
+    switch (lvl) {
+        case 'beginner':
+            return {
+                className: 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50'
+            };
+        case 'intermediate':
+            return {
+                className: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/40 dark:border-blue-900/30'
+            };
+        case 'advanced':
+            return {
+                className: 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200/40 dark:border-amber-900/30'
+            };
+        case 'expert':
+            return {
+                className: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200/40 dark:border-emerald-900/30'
+            };
+        default:
+            return {
+                className: 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200/50 dark:border-slate-700/50'
+            };
+    }
+}
+
 const SkillTracker: React.FC = () => {
     const { showToast } = useToast();
     const [skills, setSkills] = useState<Skill[]>([]);
@@ -187,7 +213,7 @@ const SkillTracker: React.FC = () => {
                                 <p className="text-xs font-bold text-on-surface-variant/30 uppercase tracking-wider">No skills in this category</p>
                             </div>
                         ) : filteredSkills.map((skill, idx) => {
-                            const levelTag = getNotionTagStyles(skill.level);
+                            const levelTag = getLevelTagStyles(skill.level);
                             const catTag = getNotionTagStyles(skill.category);
                             return (
                                 <motion.div
@@ -203,11 +229,11 @@ const SkillTracker: React.FC = () => {
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-sm font-bold text-on-surface break-words">{skill.name}</p>
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    <span style={levelTag.style} className={`px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded text-center leading-tight ${levelTag.className}`}>
+                                                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full text-center leading-tight ${levelTag.className}`}>
                                                         {skill.level}
                                                     </span>
-                                                    <span style={catTag.style} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider leading-tight ${catTag.className}`}>
+                                                    <span style={catTag.style} className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider leading-tight ${catTag.className}`}>
                                                         {skill.category}
                                                     </span>
                                                 </div>
@@ -232,16 +258,14 @@ const SkillTracker: React.FC = () => {
                                     {/* Desktop View Layout */}
                                     <div className="hidden md:flex flex-1 items-center justify-between w-full">
                                         <div className="flex flex-1 items-center gap-3 min-w-0">
-                                            {/* Level badge */}
-                                            <span style={levelTag.style} className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded min-w-[70px] text-center shrink-0 ${levelTag.className}`}>
-                                                {skill.level}
-                                            </span>
-
-                                            {/* Name + category */}
+                                            {/* Name + tags */}
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-bold text-on-surface truncate">{skill.name}</p>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <span style={catTag.style} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${catTag.className}`}>
+                                                <div className="flex items-center gap-1.5 mt-1.5">
+                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full text-center shrink-0 ${levelTag.className}`}>
+                                                        {skill.level}
+                                                    </span>
+                                                    <span style={catTag.style} className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${catTag.className}`}>
                                                         {skill.category}
                                                     </span>
                                                 </div>
