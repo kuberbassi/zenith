@@ -354,19 +354,25 @@ router.post('/results/sync', async (req: AuthRequest, res) => {
         const maxMarksSum = processedSubjects.reduce((a, s: any) => a + (parseFloat(s.max_marks) || 100), 0)
         const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
 
-        const existingResult = await prisma.semesterResult.findFirst({
+        // Wipe all existing results for this semester to ensure clean sync and prevent duplicate entries
+        await prisma.semesterResult.deleteMany({
             where: { user_id: userId, semester },
         })
-        if (existingResult) {
-            await prisma.semesterResult.update({
-                where: { id: existingResult.id },
-                data: { subjects: processedSubjects, sgpa: finalSgpa, total_credits: sgpaCalc.total_credits, student_info: studentInfo, source: 'ipu_scraper', total_marks: String(totalMarksSum), max_marks: String(maxMarksSum), enrollment_number: meta.nrollno || null, updated_at: new Date() },
-            })
-        } else {
-            await prisma.semesterResult.create({
-                data: { user_id: userId, semester, subjects: processedSubjects, sgpa: finalSgpa, total_credits: sgpaCalc.total_credits, student_info: studentInfo, source: 'ipu_scraper', total_marks: String(totalMarksSum), max_marks: String(maxMarksSum), enrollment_number: meta.nrollno || null },
-            })
-        }
+
+        await prisma.semesterResult.create({
+            data: {
+                user_id: userId,
+                semester,
+                subjects: processedSubjects,
+                sgpa: finalSgpa,
+                total_credits: sgpaCalc.total_credits,
+                student_info: studentInfo,
+                source: 'ipu_scraper',
+                total_marks: String(totalMarksSum),
+                max_marks: String(maxMarksSum),
+                enrollment_number: meta.nrollno || null
+            },
+        })
 
         sysLog(req, userId, 'Results Synced', `Fetched results for Semester ${semester} via direct API`).catch(() => { })
         await clearUserViewCache(userId).catch(() => { })
@@ -408,37 +414,24 @@ router.post('/results', async (req: AuthRequest, res) => {
             admission_year: studentInfo.admission_year || '',
         } : undefined
 
-        const existingResultManual = await prisma.semesterResult.findFirst({
-            where: { user_id: userId, semester },
+        // Wipe all existing results for this semester to ensure a clean commit and replace old entries
+        await prisma.semesterResult.deleteMany({
+            where: { user_id: userId, semester }
         })
-        if (existingResultManual) {
-            await prisma.semesterResult.update({
-                where: { id: existingResultManual.id },
-                data: {
-                    subjects: processedSubjects,
-                    sgpa: sgpaCalc.sgpa,
-                    total_credits: sgpaCalc.total_credits,
-                    total_marks: totalMarksSum ? String(totalMarksSum) : null,
-                    max_marks: maxMarksSum ? String(maxMarksSum) : null,
-                    ...(normalizedStudentInfo ? { student_info: normalizedStudentInfo as any } : {}),
-                    updated_at: new Date()
-                },
-            })
-        } else {
-            await prisma.semesterResult.create({
-                data: {
-                    user_id: userId,
-                    semester,
-                    subjects: processedSubjects,
-                    sgpa: sgpaCalc.sgpa,
-                    total_credits: sgpaCalc.total_credits,
-                    total_marks: totalMarksSum ? String(totalMarksSum) : null,
-                    max_marks: maxMarksSum ? String(maxMarksSum) : null,
-                    enrollment_number: normalizedStudentInfo?.roll_no || user?.enrollment_number || null,
-                    student_info: (normalizedStudentInfo || null) as any,
-                },
-            })
-        }
+
+        await prisma.semesterResult.create({
+            data: {
+                user_id: userId,
+                semester,
+                subjects: processedSubjects,
+                sgpa: sgpaCalc.sgpa,
+                total_credits: sgpaCalc.total_credits,
+                total_marks: totalMarksSum ? String(totalMarksSum) : null,
+                max_marks: maxMarksSum ? String(maxMarksSum) : null,
+                enrollment_number: normalizedStudentInfo?.roll_no || user?.enrollment_number || null,
+                student_info: (normalizedStudentInfo || null) as any,
+            },
+        })
 
         sysLog(req, userId, 'Result Updated', `Semester ${semester} result saved. SGPA: ${sgpaCalc.sgpa}`).catch(() => { })
         await clearUserViewCache(userId).catch(() => { })

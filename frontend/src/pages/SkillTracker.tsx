@@ -196,39 +196,75 @@ const SkillTracker: React.FC = () => {
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    className={`group flex items-center gap-4 px-5 py-4 hover:bg-surface-container transition-all ${idx < filteredSkills.length - 1 ? 'border-b border-outline' : ''}`}
+                                    className={`group flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 sm:p-5 hover:bg-surface-container transition-all ${idx < filteredSkills.length - 1 ? 'border-b border-outline' : ''}`}
                                 >
-                                    {/* Level badge */}
-                                    <span style={levelTag.style} className={`flex-shrink-0 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded min-w-[70px] text-center ${levelTag.className}`}>
-                                        {skill.level}
-                                    </span>
+                                    {/* Mobile View Layout */}
+                                    <div className="flex flex-col gap-2.5 w-full md:hidden">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-bold text-on-surface truncate">{skill.name}</p>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    <span style={levelTag.style} className={`px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded text-center leading-none ${levelTag.className}`}>
+                                                        {skill.level}
+                                                    </span>
+                                                    <span style={catTag.style} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider leading-none ${catTag.className}`}>
+                                                        {skill.category}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
+                                                    <Edit2 size={11} />
+                                                </button>
+                                                <button onClick={() => handleDelete(skill._id!)} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer">
+                                                    <Trash size={11} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 w-full mt-1">
+                                            <div className="flex-1 h-1 bg-on-surface/10 rounded-full overflow-hidden">
+                                                <div className="h-full bg-on-surface" style={{ width: `${skill.progress}%` }} />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-on-surface-variant/50 w-8 text-right shrink-0">{skill.progress}%</span>
+                                        </div>
+                                    </div>
 
-                                    {/* Name + category */}
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-bold text-on-surface truncate">{skill.name}</p>
-                                        <div className="flex items-center gap-1.5 mt-1">
-                                            <span style={catTag.style} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${catTag.className}`}>
-                                                {skill.category}
+                                    {/* Desktop View Layout */}
+                                    <div className="hidden md:flex flex-1 items-center justify-between w-full">
+                                        <div className="flex flex-1 items-center gap-3 min-w-0">
+                                            {/* Level badge */}
+                                            <span style={levelTag.style} className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded min-w-[70px] text-center shrink-0 ${levelTag.className}`}>
+                                                {skill.level}
                                             </span>
-                                        </div>
-                                    </div>
 
-                                    {/* Progress */}
-                                    <div className="hidden sm:flex items-center gap-3 flex-shrink-0 w-36">
-                                        <div className="flex-1 h-1 bg-on-surface/10 rounded-full overflow-hidden">
-                                            <div className="h-full bg-on-surface" style={{ width: `${skill.progress}%` }} />
+                                            {/* Name + category */}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-on-surface truncate">{skill.name}</p>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <span style={catTag.style} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${catTag.className}`}>
+                                                        {skill.category}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <span className="text-[10px] font-bold text-on-surface-variant/50 w-8 text-right">{skill.progress}%</span>
-                                    </div>
 
-                                    {/* Actions */}
-                                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                                        <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
-                                            <Edit2 size={11} />
-                                        </button>
-                                        <button onClick={() => handleDelete(skill._id!)} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer">
-                                            <Trash size={11} />
-                                        </button>
+                                        {/* Progress */}
+                                        <div className="flex items-center gap-3 w-36 shrink-0">
+                                            <div className="flex-1 h-1 bg-on-surface/10 rounded-full overflow-hidden">
+                                                <div className="h-full bg-on-surface" style={{ width: `${skill.progress}%` }} />
+                                            </div>
+                                            <span className="text-[10px] font-bold text-on-surface-variant/50 w-8 text-right shrink-0">{skill.progress}%</span>
+                                        </div>
+
+                                        {/* Actions */}
+                                        <div className="flex items-center gap-1.5 shrink-0 ml-4">
+                                            <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
+                                                <Edit2 size={11} />
+                                            </button>
+                                            <button onClick={() => handleDelete(skill._id!)} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer">
+                                                <Trash size={11} />
+                                            </button>
+                                        </div>
                                     </div>
                                 </motion.div>
                             );

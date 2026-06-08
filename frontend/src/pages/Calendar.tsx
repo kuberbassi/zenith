@@ -165,17 +165,17 @@ const Calendar: React.FC = () => {
                                             : 'bg-transparent border-outline/30 hover:bg-surface-container/40 hover:border-on-surface'
                                         }`}
                                 >
-                                    <span className={`text-sm md:text-lg font-bold ${isToday ? 'text-on-surface' : 'text-on-surface-variant/80'}`}>
+                                    <span className={`text-xs sm:text-sm md:text-base font-bold ${isToday ? 'text-on-surface' : 'text-on-surface-variant/80'} leading-none ${total > 0 ? 'mb-1.5' : ''}`}>
                                         {day}
                                     </span>
 
                                     {total > 0 && (
-                                        <div className="absolute bottom-1.5 flex justify-center gap-0.5 px-0.5">
+                                        <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-0.5 h-1">
                                             {present.slice(0, 3).map((_, idx) => (
-                                                <div key={`p-${idx}`} className="w-1.5 h-1.5 rounded-full bg-on-surface" />
+                                                <div key={`p-${idx}`} className="w-1 h-1 rounded-full bg-on-surface" />
                                             ))}
                                             {absent.slice(0, 3).map((_, idx) => (
-                                                <div key={`a-${idx}`} className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                                <div key={`a-${idx}`} className="w-1 h-1 rounded-full bg-red-500" />
                                             ))}
                                         </div>
                                     )}
@@ -185,7 +185,7 @@ const Calendar: React.FC = () => {
                     </div>
 
                     {/* Legend */}
-                    <div className="mt-8 pt-5 border-t border-outline flex items-center justify-center gap-8 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40">
+                    <div className="mt-8 pt-5 border-t border-outline flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40">
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-on-surface" />
                             <span>Present</span>

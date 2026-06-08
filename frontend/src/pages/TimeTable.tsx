@@ -194,18 +194,18 @@ const TimeTable: React.FC = () => {
     };
 
     return (
-        <div className="pb-24 max-w-[1400px] mx-auto">
+        <div className="pb-32 sm:pb-24 max-w-[1400px] mx-auto">
             {/* Page Header */}
             <div className="mb-8">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">
                     Schedule / Timetable
                 </p>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-on-surface tracking-tight">Timetable</h1>
                         <p className="text-xs text-on-surface-variant/40 mt-0.5">Semester {currentSemester}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
                         {/* View toggle */}
                         <div className="flex border border-outline rounded-lg overflow-hidden">
                             <button
@@ -259,7 +259,7 @@ const TimeTable: React.FC = () => {
                                             return (
                                                 <div key={`${day}-${period.id}`} className="min-h-[80px] border-b border-r border-outline last:border-r-0 p-1 flex">
                                                     {slot ? (
-                                                        <motion.div onClick={() => handleEditSlot(slot)} whileHover={{ scale: 1.01 }} className={`h-full w-full rounded-lg p-2.5 flex flex-col justify-center items-center text-center cursor-pointer transition-all border ${isBreak ? 'bg-surface-container-low border-outline opacity-60 hover:opacity-100' : 'bg-surface hover:bg-surface-container border-outline'}`}>
+                                                        <motion.div onClick={() => handleEditSlot(slot)} whileHover={{ scale: 1.01 }} className={`h-full w-full rounded-lg p-1.5 sm:p-2.5 flex flex-col justify-center items-center text-center cursor-pointer transition-all border ${isBreak ? 'bg-surface-container-low border-outline opacity-60 hover:opacity-100' : 'bg-surface hover:bg-surface-container border-outline'}`}>
                                                             <span className="text-[8px] font-semibold uppercase tracking-wider text-on-surface-variant/60">{slot.type}</span>
                                                             <span className="text-xs font-bold text-on-surface leading-tight mt-1">{subject?.name || slot.subject_name || slot.subjectName || slot.label || slot.name || (isBreak ? 'Break' : '—')}</span>
                                                             {slot.classroom && <span className="text-[9px] font-medium text-on-surface-variant/40 mt-1 leading-none">{slot.classroom}</span>}

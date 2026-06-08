@@ -181,21 +181,35 @@ html {
 
 /* Fluid Animation Utilities */
 .fluid-hover {
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fluid-hover:hover {
   border-color: var(--md-sys-color-primary) !important;
+  transform: translateY(-1px);
 }
 
 button:not(.no-fluid),
-a:not(.no-fluid) {
-  transition: all 0.2s ease;
+a:not(.no-fluid),
+select:not(.no-fluid),
+.interactive-card,
+[role="button"] {
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              background-color 0.2s ease, 
+              border-color 0.2s ease, 
+              box-shadow 0.2s ease !important;
+}
+
+button:not(.no-fluid):hover,
+a:not(.no-fluid):hover,
+[role="button"]:hover {
+  transform: scale(1.02);
 }
 
 button:not(.no-fluid):active,
-a:not(.no-fluid):active {
-  transform: scale(0.98);
+a:not(.no-fluid):active,
+[role="button"]:active {
+  transform: scale(0.96) !important;
 }
 
 .perspective-1000 {
@@ -267,13 +281,35 @@ h6 {
   @apply font-display tracking-normal font-bold text-[var(--md-sys-color-on-surface)];
 }
 
+@keyframes pageEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer utilities {
   .animate-fade-in {
-    animation: fadeIn 0.3s ease-out;
+    animation: pageEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .animate-fade-up {
-    animation: fadeUp 0.4s ease-out;
+    animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
 

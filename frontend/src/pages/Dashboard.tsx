@@ -86,7 +86,6 @@ const SubjectRow: React.FC<{
     classesNeeded: (attended: number, total: number) => number;
     classesCanSkip: (attended: number, total: number) => number;
     triggerBubbleMenu: (subjectId: string, e: any) => void;
-    handleQuickMark: (subjectId: string, status: 'present' | 'absent') => void;
     setEditingSubject: (subject: any) => void;
     handleDeleteSubject: (subjectId: string, subjectName: string) => void;
 }> = ({
@@ -95,7 +94,6 @@ const SubjectRow: React.FC<{
     classesNeeded,
     classesCanSkip,
     triggerBubbleMenu,
-    handleQuickMark,
     setEditingSubject,
     handleDeleteSubject,
 }) => {
@@ -141,22 +139,7 @@ const SubjectRow: React.FC<{
                     {isCritical ? `Need ${needed} cls` : `${canSkip} Bunks`}
                 </span>
             </td>
-            <td className="px-6 py-4 text-center">
-                <div className="flex justify-center gap-1">
-                    <button
-                        onClick={() => handleQuickMark(subject._id, 'present')}
-                        className="px-2 py-1 rounded border border-outline bg-surface text-[10px] font-bold text-on-surface-variant hover:text-on-surface hover:border-on-surface transition-colors cursor-pointer"
-                    >
-                        P
-                    </button>
-                    <button
-                        onClick={() => handleQuickMark(subject._id, 'absent')}
-                        className="px-2 py-1 rounded border border-outline bg-surface text-[10px] font-bold text-on-surface-variant hover:text-red-500 hover:border-outline transition-colors cursor-pointer"
-                    >
-                        A
-                    </button>
-                </div>
-            </td>
+
             <td className="px-6 py-4 text-right">
                 <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
@@ -351,7 +334,7 @@ const Dashboard: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         
                         {/* Bento Card 1: Academic Health */}
-                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all lg:col-span-2">
+                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all lg:col-span-2">
                             <div className="flex items-center justify-between mb-4">
                                 <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Overall Academic Health</span>
                                 <Activity size={13} className="text-on-surface-variant/40" />
@@ -376,24 +359,24 @@ const Dashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2 border-t border-outline pt-4 mt-6">
+                            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 border-t border-outline pt-4 mt-6">
                                 <div className="text-left">
                                     <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Deficit Risk</span>
-                                    <span className={`text-base font-bold ${riskCount > 0 ? 'text-red-500' : 'text-on-surface'}`}>{riskCount} Subjects</span>
+                                    <span className={`text-xs sm:text-sm md:text-base font-bold ${riskCount > 0 ? 'text-red-500' : 'text-on-surface'}`}>{riskCount} {riskCount === 1 ? 'Subject' : 'Subjects'}</span>
                                 </div>
                                 <div className="text-left">
                                     <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Safe Bunks</span>
-                                    <span className="text-base font-bold text-on-surface">{safeBunks} Remaining</span>
+                                    <span className="text-xs sm:text-sm md:text-base font-bold text-on-surface">{safeBunks} Left</span>
                                 </div>
                                 <div className="text-left">
                                     <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Total Tracked</span>
-                                    <span className="text-base font-bold text-on-surface">{safeCount}/{subjectCount} Courses</span>
+                                    <span className="text-xs sm:text-sm md:text-base font-bold text-on-surface">{safeCount}/{subjectCount}</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Bento Card 2: Student Target */}
-                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all">
+                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all">
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Academic Target</span>
@@ -439,7 +422,7 @@ const Dashboard: React.FC = () => {
                             </div>
                         </div>
                                           {/* Bento Card 3: Today's Schedule */}
-                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px]">
+                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px]">
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Today's Schedule</span>
@@ -481,7 +464,7 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Bento Card 4: Recent Notes */}
-                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px] lg:col-span-2">
+                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px] lg:col-span-2">
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Recent Notes & Checklists</span>
@@ -580,7 +563,7 @@ const Dashboard: React.FC = () => {
                                 </div>
                                 ) : (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-left border-collapse text-xs select-none min-w-[850px]">
+                                    <table className="w-full text-left border-collapse text-xs select-none min-w-[650px]">
                                         <thead>
                                             <tr className="border-b border-outline bg-surface-container/50 text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-wider">
                                                 <th className="px-6 py-3">Code</th>
@@ -589,7 +572,6 @@ const Dashboard: React.FC = () => {
                                                 <th className="px-6 py-3 text-center">Attended</th>
                                                 <th className="px-6 py-3 text-center">Percentage</th>
                                                 <th className="px-6 py-3 text-center">Can Bunk / Needed</th>
-                                                <th className="px-6 py-3 text-center">Quick Mark</th>
                                                 <th className="px-6 py-3 text-right">Actions</th>
                                             </tr>
                                         </thead>
@@ -602,7 +584,6 @@ const Dashboard: React.FC = () => {
                                                     classesNeeded={classesNeeded}
                                                     classesCanSkip={classesCanSkip}
                                                     triggerBubbleMenu={triggerBubbleMenu}
-                                                    handleQuickMark={handleQuickMark}
                                                     setEditingSubject={setEditingSubject}
                                                     handleDeleteSubject={handleDeleteSubject}
                                                 />
