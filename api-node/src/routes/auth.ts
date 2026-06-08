@@ -312,9 +312,9 @@ router.post('/google', async (req, res) => {
     await issueAuthSession(req, res, user.id)
     void logAuthEvent(req, user.id, 'auth_login', 'Signed in with Google OAuth')
     ok(res, { user: userResponse(user) })
-  } catch (err) {
+  } catch (err: any) {
     console.error('[auth/google]', err)
-    fail(res, 'Authentication failed', 'AUTH_FAILED', 500)
+    fail(res, `Authentication failed: ${err?.message || String(err)}`, 'AUTH_FAILED', 500)
   }
 })
 
