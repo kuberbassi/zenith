@@ -91,9 +91,10 @@ const Login: React.FC = () => {
                                     try {
                                         if (!credentialResponse.credential) throw new Error('No credential received');
                                         await loginWithGoogle(credentialResponse.credential);
-                                    } catch (err) {
+                                    } catch (err: any) {
                                         console.error('❌ Backend login failed:', err);
-                                        setError('Login failed. Please try again.');
+                                        const errMsg = err.response?.data?.error || err.message || 'Login failed. Please try again.';
+                                        setError(errMsg);
                                     }
                                 }}
                                 onError={() => {
