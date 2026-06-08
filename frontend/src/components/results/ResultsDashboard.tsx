@@ -12,6 +12,11 @@ ChartJS.register(
     ArcElement, Filler, ChartTooltip, Legend,
 );
 
+function isLabSubject(name: string, credits: number) {
+    const upper = String(name || '').toUpperCase();
+    return credits <= 1 || upper.includes('LAB') || upper.includes('PRACTICAL') || upper.includes('WORKSHOP') || upper.includes('SEMINAR') || upper.includes('VIVA');
+}
+
 type ResultsDashboardProps = {
     user: any;
     results: any;
@@ -208,8 +213,11 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                             <tbody className="divide-y divide-outline text-xs">
                                 {currentSubjects.map((sub: any, i: number) => {
                                     const { total, maxMarks } = getSubjectMarks(sub);
-                                    const displayInternal = getSubjectDisplayMark(sub.internal ?? sub.internal_theory ?? sub.internal_practical);
-                                    const displayExternal = getSubjectDisplayMark(sub.external ?? sub.external_theory ?? sub.external_practical);
+                                    const isLab = isLabSubject(sub.name || '', sub.credits ? Number(sub.credits) : 3);
+                                    const rawInternal = sub.internal ?? (isLab ? (sub.internal_practical ?? sub.internal_theory) : (sub.internal_theory ?? sub.internal_practical));
+                                    const rawExternal = sub.external ?? (isLab ? (sub.external_practical ?? sub.external_theory) : (sub.external_theory ?? sub.external_practical));
+                                    const displayInternal = getSubjectDisplayMark(rawInternal);
+                                    const displayExternal = getSubjectDisplayMark(rawExternal);
                                     return (
                                         <tr key={i} className="hover:bg-surface-container/50 transition-colors">
                                             <td className="px-5 py-3.5 font-mono text-on-surface-variant/50">{sub.code || '---'}</td>

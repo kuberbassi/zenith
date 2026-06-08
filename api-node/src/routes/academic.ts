@@ -344,7 +344,18 @@ router.post('/results/sync', async (req: AuthRequest, res) => {
             const external = parseFloat(row.majorprint === '-' ? '0' : row.majorprint) || 0
             const totalMarks = parseFloat(row.moderatedprint) || (internal + external)
             const isLabSub = /LAB|PRACTICAL|WORKSHOP|SEMINAR|VIVA/i.test(row.papername || '')
-            const sub = { name: row.papername, code: row.papercode, credits: isLabSub ? 1 : 3, internal_theory: internal, external_theory: external, total_marks: totalMarks, max_marks: 100, grade: '' }
+            const sub = {
+                name: row.papername,
+                code: row.papercode,
+                credits: isLabSub ? 1 : 3,
+                internal_theory: isLabSub ? 0 : internal,
+                external_theory: isLabSub ? 0 : external,
+                internal_practical: isLabSub ? internal : 0,
+                external_practical: isLabSub ? external : 0,
+                total_marks: totalMarks,
+                max_marks: 100,
+                grade: ''
+            }
             return { ...sub, ...GradeCalculator.calculateSubjectResult(sub) }
         })
 

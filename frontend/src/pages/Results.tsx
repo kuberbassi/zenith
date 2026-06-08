@@ -67,9 +67,21 @@ function parseNumeric(value: unknown): number | null {
     return Number.isNaN(num) ? null : num;
 }
 
+function isLabSubject(name: string, credits: number) {
+    const upper = String(name || '').toUpperCase();
+    return credits <= 1 || upper.includes('LAB') || upper.includes('PRACTICAL') || upper.includes('WORKSHOP') || upper.includes('SEMINAR') || upper.includes('VIVA');
+}
+
 function getSubjectMarks(subject: any) {
-    const internal = parseNumeric(subject.internal ?? subject.internal_theory ?? subject.internal_practical) ?? 0;
-    const external = parseNumeric(subject.external ?? subject.external_theory ?? subject.external_practical) ?? 0;
+    const name = subject.name || subject.subject_name || '';
+    const credits = parseNumeric(subject.credits) ?? 3;
+    const isLab = isLabSubject(name, credits);
+
+    const internalVal = subject.internal ?? (isLab ? (subject.internal_practical ?? subject.internal_theory) : (subject.internal_theory ?? subject.internal_practical));
+    const externalVal = subject.external ?? (isLab ? (subject.external_practical ?? subject.external_theory) : (subject.external_theory ?? subject.external_practical));
+
+    const internal = parseNumeric(internalVal) ?? 0;
+    const external = parseNumeric(externalVal) ?? 0;
     const total = parseNumeric(subject.total_marks ?? subject.marks);
     const maxMarks = parseNumeric(subject.max_marks) ?? 100;
     return {
@@ -262,10 +274,6 @@ const Results: React.FC = () => {
     }
 
     // Modal helpers
-    function isLabSubject(name: string, credits: number) {
-        const upper = String(name).toUpperCase();
-        return credits <= 1 || upper.includes('LAB') || upper.includes('PRACTICAL') || upper.includes('WORKSHOP') || upper.includes('SEMINAR') || upper.includes('VIVA');
-    }
 
     function handleSubjectChange(id: string, field: string, value: any) {
         setEditorSubjects(prev => prev.map(s => {
