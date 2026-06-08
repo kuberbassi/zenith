@@ -29,7 +29,6 @@ import profileRoutes from './profile.js'
 import skillsRoutes from './skills.js'
 import dataRoutes from './data.js'
 import ipuRoutes from './ipu.js'
-import scraperRoutes from './scraper.js'
 import aiRoutes from './ai.js'
 import notesRoutes from './notes.js'
 
@@ -45,7 +44,6 @@ v1Router.use('/profile', profileRoutes)
 v1Router.use('/skills', skillsRoutes)
 v1Router.use('/data', dataRoutes)
 v1Router.use('/ipu', ipuRoutes)
-v1Router.use('/scraper', scraperRoutes)
 v1Router.use('/ai', aiRoutes)
 v1Router.use('/notes', notesRoutes)
 

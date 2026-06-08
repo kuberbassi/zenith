@@ -17,7 +17,6 @@ import { useSemester } from '@/contexts/SemesterContext';
 import { Link } from 'react-router-dom';
 import { formatTeacherName } from '@/utils/formatters';
 import { useNotes } from '@/hooks/useNotes';
-import NoticesWidget from '@/components/dashboard/NoticesWidget';
 
 /* ── Helpers for Timetable slot subject mapping ── */
 const normalizeId = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
@@ -481,22 +480,17 @@ const Dashboard: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Bento Card 4: University Notices */}
-                        <div className="hover:border-on-surface transition-all min-h-[260px]">
-                            <NoticesWidget />
-                        </div>
-
-                        {/* Bento Card 5: Recent Notes */}
-                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px]">
+                        {/* Bento Card 4: Recent Notes */}
+                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px] lg:col-span-2">
                             <div>
                                 <div className="flex items-center justify-between mb-4">
                                     <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Recent Notes & Checklists</span>
                                     <FileText size={13} className="text-on-surface-variant/40" />
                                 </div>
                                 
-                                <div className="grid grid-cols-1 gap-4 my-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2">
                                     {notesPreview.length > 0 ? (
-                                        notesPreview.slice(0, 1).map((note, idx) => (
+                                        notesPreview.slice(0, 2).map((note, idx) => (
                                             <div key={note.id || idx} className="border border-outline bg-surface-container/20 rounded p-4 flex flex-col justify-between min-h-[120px]">
                                                 <div>
                                                     <h4 className="text-xs font-bold text-on-surface truncate">{note.title || 'Untitled'}</h4>
@@ -517,7 +511,7 @@ const Dashboard: React.FC = () => {
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="py-8 text-center border border-dashed border-outline rounded">
+                                        <div className="py-8 text-center border border-dashed border-outline rounded col-span-2">
                                             <p className="text-xs font-semibold text-on-surface-variant/30 italic">No notes created yet.</p>
                                         </div>
                                     )}

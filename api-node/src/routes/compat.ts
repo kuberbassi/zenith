@@ -21,7 +21,6 @@ const STATIC_REWRITES: Record<string, { path: string; method?: string }> = {
   '/api/system_logs': { path: '/api/profile/logs' },
   '/api/semester_results': { path: '/api/academic/results' },
   '/api/courses/manual': { path: '/api/academic/courses/manual' },
-  '/api/notices': { path: '/api/scraper/notices' },
   '/api/notifications': { path: '/api/dashboard/notifications' },
 }
 
