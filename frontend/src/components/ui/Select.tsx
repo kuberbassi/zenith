@@ -108,7 +108,7 @@ const Select: React.FC<SelectProps> = ({
                 }}
                 className={`
                     w-full px-5 py-3.5 rounded-2xl text-left
-                    bg-surface-container-highest
+                    bg-surface
                     border transition-all duration-200
                     text-on-surface text-sm font-medium
                     disabled:opacity-40 disabled:cursor-not-allowed

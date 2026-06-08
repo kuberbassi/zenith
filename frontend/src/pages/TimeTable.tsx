@@ -305,7 +305,7 @@ const TimeTable: React.FC = () => {
                                         );
                                     } else if (status === 'passed') {
                                         dotElement = (
-                                            <span className="h-2 w-2 rounded-full bg-on-surface-variant/20 flex-shrink-0" title="Completed Today" />
+                                            <span className="h-2 w-2 rounded-full bg-on-surface-variant/40 flex-shrink-0" title="Completed Today" />
                                         );
                                     } else {
                                         dotElement = (

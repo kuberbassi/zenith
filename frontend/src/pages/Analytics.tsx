@@ -262,7 +262,7 @@ const Analytics: React.FC = () => {
                                     <span className={`font-bold shrink-0 ${subject.percentage < targetThreshold ? 'text-red-500' : 'text-on-surface'}`}>{subject.percentage || 0}%</span>
                                 </div>
                                 <div className="h-1.5 w-full bg-on-surface/10 rounded overflow-hidden">
-                                    <div className={`h-full transition-all duration-500 ${subject.percentage < targetThreshold ? 'bg-red-500' : accentColor}`} style={{ width: `${subject.percentage || 0}%` }} />
+                                    <div className={`h-full transition-all duration-500 ${subject.percentage < targetThreshold ? 'bg-red-500' : 'bg-on-surface'}`} style={{ width: `${subject.percentage || 0}%` }} />
                                 </div>
                             </div>
                         ))}
