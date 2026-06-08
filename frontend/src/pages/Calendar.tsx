@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
-import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
-import Sparkles from '@/components/ui/Sparkles';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import AttendanceModal from '@/components/modals/AttendanceModal';
 import { attendanceService } from '@/services/attendance.service';
 import { useSemester } from '@/contexts/SemesterContext';
@@ -92,121 +89,126 @@ const Calendar: React.FC = () => {
     }, []);
 
     const { daysInMonth, startingDayOfWeek, year, month } = getDaysInMonth(currentDate);
-    const weekDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-
-    if (loading) return <LoadingSpinner fullScreen />;
+    const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto pb-32">
-
-            {/* ── Cinematic Hero ────────────────────────────────────────── */}
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-12 relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden shadow-2xl" style={{ boxShadow: '0 0 80px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-white/10/[0.02] blur-[150px] pointer-events-none" />
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                    <div className="text-center md:text-left">
-                        <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shadow-lg shadow-white/5">
-                                <CalendarIcon size={24} />
-                            </div>
-                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight uppercase">Operational Grid</h1>
-                        </div>
-                        <p className="text-white/30 font-bold text-xs md:text-sm tracking-[0.2em] uppercase max-w-md">Temporal mapping of academic engagements and attendance protocols.</p>
-                    </div>
-
-                    <div className="flex items-center gap-2 p-2 rounded-2xl glass-panel border border-white/[0.04] shadow-[inset_0_1px_10px_rgba(255,255,255,0.02)]">
-                        <button onClick={handlePrevMonth} className="w-10 h-10 rounded-xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"><ChevronLeft size={18} /></button>
-                        <div className="px-6 text-center min-w-[180px]">
-                            <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] mb-1">{currentDate.getFullYear()}</p>
-                            <p className="text-lg font-black text-white tracking-widest uppercase">{currentDate.toLocaleString('default', { month: 'long' })}</p>
-                        </div>
-                        <button onClick={handleNextMonth} className="w-10 h-10 rounded-xl flex items-center justify-center text-white/40 hover:text-white hover:bg-white/5 transition-all"><ChevronRight size={18} /></button>
+        <div className="max-w-4xl mx-auto pb-24 px-4 select-none">
+            {/* Page Header */}
+            <div className="mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">
+                    Attendance / Calendar
+                </p>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-bold text-on-surface tracking-tight">
+                        {currentDate.toLocaleString('default', { month: 'long' })} {currentDate.getFullYear()}
+                    </h1>
+                    <div className="flex items-center gap-1.5">
+                        <button onClick={handlePrevMonth} className="w-8 h-8 rounded border border-outline bg-surface flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer">
+                            <ChevronLeft size={14} />
+                        </button>
+                        <button onClick={handleNextMonth} className="w-8 h-8 rounded border border-outline bg-surface flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer">
+                            <ChevronRight size={14} />
+                        </button>
                     </div>
                 </div>
-            </motion.div>
-
-            {/* ── Calendar Grid ─────────────────────────────────────────── */}
-            <div className="rounded-[2.5rem] border border-white/[0.06] glass-panel p-4 md:p-8 relative overflow-hidden shadow-2xl" style={{ boxShadow: '0 40px 100px -20px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                {/* Weekday Headers */}
-                <div className="grid grid-cols-7 mb-6">
-                    {weekDays.map(day => (
-                        <div key={day} className="text-center text-[10px] font-black text-white/20 uppercase tracking-[0.3em] py-2">
-                            {day}
-                        </div>
-                    ))}
-                </div>
-
-                <div className="grid grid-cols-7 gap-2 md:gap-4 lg:gap-6">
-                    {/* Empty Slots */}
-                    {Array.from({ length: startingDayOfWeek }).map((_, i) => (
-                        <div key={`empty-${i}`} className="aspect-square opacity-0" />
-                    ))}
-
-                    {/* Days */}
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-                        const day = i + 1;
-                        const date = new Date(year, month, day);
-                        const attendance = getAttendanceForDate(date);
-                        const isToday = new Date().toDateString() === date.toDateString();
-                        const present = attendance.filter(a => a.status === 'present');
-                        const absent = attendance.filter(a => a.status === 'absent');
-                        const total = attendance.length;
-
-                        return (
-                            <motion.button
-                                key={day}
-                                whileHover={{ scale: 1.05, y: -4 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleDayClick(day)}
-                                className={`aspect-square rounded-2xl md:rounded-3xl p-2 md:p-4 relative flex flex-col items-center justify-center transition-all border ${isToday
-                                    ? 'bg-white/5 border-white/20 shadow-[0_0_30px_rgba(255,255,255,0.15)] z-10'
-                                    : total > 0
-                                        ? 'bg-white/[0.02] border-white/[0.08] hover:border-white/[0.15] hover:bg-white/[0.04]'
-                                        : 'bg-transparent border-transparent hover:bg-white/[0.01] hover:border-white/[0.04]'
-                                    }`}
-                            >
-                                <span className={`text-base md:text-2xl font-black ${isToday ? 'text-white' : 'text-white/80'}`}>
-                                    {day}
-                                </span>
-
-                                <div className="absolute bottom-2 md:bottom-4 flex flex-wrap justify-center gap-1 px-1">
-                                    {present.slice(0, 4).map((_, idx) => (
-                                        <div key={`p-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-white/60 shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
-                                    ))}
-                                    {absent.slice(0, 4).map((_, idx) => (
-                                        <div key={`a-${idx}`} className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-red-500/60 shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
-                                    ))}
-                                    {total > 8 && <Sparkles size={8} className="text-white/20" />}
-                                </div>
-                            </motion.button>
-                        );
-                    })}
-                </div>
-
-                {/* Legend */}
-                <div className="mt-12 pt-8 border-t border-white/[0.04] flex flex-wrap justify-center gap-10">
-                    <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
-                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Present Scan</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-red-500/60 shadow-[0_0_10px_rgba(239,68,68,0.4)]" />
-                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">Absent Signal</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="px-3 py-1 rounded-lg border border-white/20 bg-white/5 text-[10px] font-black text-white uppercase tracking-widest">Temporal Origin</div>
-                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">(Current Date)</span>
-                    </div>
-                </div>
+                <div className="mt-4 h-px bg-outline" />
             </div>
 
-            <AttendanceModal 
-                isOpen={isMarkModalOpen} 
-                onClose={() => setIsMarkModalOpen(false)} 
-                defaultDate={selectedDate || new Date()} 
-                onSuccess={() => loadData(false)} 
+            {loading ? (
+                /* Non-blocking Skeleton Grid */
+                <div className="border border-outline bg-surface rounded-lg p-5">
+                    <div className="grid grid-cols-7 gap-2">
+                        {weekDays.map(d => (
+                            <div key={d} className="h-6 bg-surface-container-high rounded animate-pulse" />
+                        ))}
+                        {Array.from({ length: 35 }).map((_, i) => (
+                            <div key={i} className="aspect-square bg-surface-container-high border border-outline rounded animate-pulse" />
+                        ))}
+                    </div>
+                </div>
+            ) : (
+                /* Calendar Grid */
+                <div className="rounded-lg border border-outline bg-surface p-5 relative overflow-hidden">
+                    {/* Weekday Headers */}
+                    <div className="grid grid-cols-7 mb-4">
+                        {weekDays.map(day => (
+                            <div key={day} className="text-center text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider py-1.5">
+                                {day}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-2">
+                        {/* Empty Slots */}
+                        {Array.from({ length: startingDayOfWeek }).map((_, i) => (
+                            <div key={`empty-${i}`} className="aspect-square border border-transparent" />
+                        ))}
+
+                        {/* Days */}
+                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                            const day = i + 1;
+                            const date = new Date(year, month, day);
+                            const attendance = getAttendanceForDate(date);
+                            const isToday = new Date().toDateString() === date.toDateString();
+                            const present = attendance.filter(a => a.status === 'present');
+                            const absent = attendance.filter(a => a.status === 'absent');
+                            const total = attendance.length;
+
+                            return (
+                                <button
+                                    key={day}
+                                    onClick={() => handleDayClick(day)}
+                                    className={`aspect-square rounded border p-1 md:p-2 relative flex flex-col items-center justify-center transition-all ${isToday
+                                        ? 'bg-on-surface/5 border-on-surface font-bold'
+                                        : total > 0
+                                            ? 'bg-surface-container/60 border-outline hover:bg-surface-container-high hover:border-on-surface'
+                                            : 'bg-transparent border-outline/30 hover:bg-surface-container/40 hover:border-on-surface'
+                                        }`}
+                                >
+                                    <span className={`text-sm md:text-lg font-bold ${isToday ? 'text-on-surface' : 'text-on-surface-variant/80'}`}>
+                                        {day}
+                                    </span>
+
+                                    {total > 0 && (
+                                        <div className="absolute bottom-1.5 flex justify-center gap-0.5 px-0.5">
+                                            {present.slice(0, 3).map((_, idx) => (
+                                                <div key={`p-${idx}`} className="w-1.5 h-1.5 rounded-full bg-on-surface" />
+                                            ))}
+                                            {absent.slice(0, 3).map((_, idx) => (
+                                                <div key={`a-${idx}`} className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                            ))}
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Legend */}
+                    <div className="mt-8 pt-5 border-t border-outline flex items-center justify-center gap-8 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-on-surface" />
+                            <span>Present</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                            <span>Absent</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="px-2 py-0.5 rounded border border-on-surface text-[8px] font-black">Today</div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <AttendanceModal
+                isOpen={isMarkModalOpen}
+                onClose={() => setIsMarkModalOpen(false)}
+                defaultDate={selectedDate || new Date()}
+                onSuccess={() => loadData(false)}
                 onLogsUpdate={handleLogsUpdate}
             />
-        </motion.div >
+        </div>
     );
 };
 

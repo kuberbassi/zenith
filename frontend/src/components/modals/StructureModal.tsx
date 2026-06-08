@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, Settings } from 'lucide-react';
+import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { attendanceService } from '@/services/attendance.service';
@@ -85,55 +85,53 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSucc
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-                    <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-2xl glass-panel rounded-[2.5rem] border border-white/[0.06] p-8 md:p-12 shadow-2xl overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
-
-                        <div className="flex items-center justify-between mb-10">
-                            <div className="flex items-center gap-5">
-                                <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-white/40 border border-white/5">
-                                    <Settings size={28} />
-                                </div>
-                                <div>
-                                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Temporal Grid</h3>
-                                    <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Institutional Calibration // Sector {semester}</p>
-                                </div>
-                            </div>
-                            <Button onClick={handleAddPeriod} variant="outlined" className="h-12 px-6 rounded-xl border-white/[0.08] text-white font-black tracking-widest uppercase text-[10px] hover:bg-white/5">
-                                Add Interval
-                            </Button>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Timetable Structure"
+            size="lg"
+        >
+            <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-surface-container border border-outline rounded-xl">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-outline/20">
+                            <Settings size={20} />
                         </div>
-
-                        <div className="max-h-[400px] overflow-y-auto pr-4 no-scrollbar space-y-4">
-                            {periods.map((period, idx) => (
-                                <motion.div key={period.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }} className="flex items-center gap-4 p-5 rounded-2xl glass-panel border border-white/[0.04] group hover:border-white/[0.1] transition-all">
-                                    <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-[10px] font-black text-white/20 border border-white/5">{idx + 1}</div>
-                                    <div className="flex-1 grid grid-cols-3 gap-4">
-                                        <Input value={period.name} onChange={e => handleUpdatePeriod(period.id, 'name', e.target.value)} placeholder="Interval ID" className="bg-transparent border-none p-0 h-8" />
-                                        <Input type="time" value={period.startTime} onChange={e => handleUpdatePeriod(period.id, 'startTime', e.target.value)} className="bg-transparent border-none p-0 h-8" />
-                                        <Input type="time" value={period.endTime} onChange={e => handleUpdatePeriod(period.id, 'endTime', e.target.value)} className="bg-transparent border-none p-0 h-8" />
-                                    </div>
-                                    <button onClick={() => handleRemovePeriod(period.id)} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/10 hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"><Trash2 size={16} /></button>
-                                </motion.div>
-                            ))}
-                            {periods.length === 0 && (
-                                <div className="py-20 text-center border border-dashed border-white/[0.04] rounded-3xl">
-                                    <p className="text-xs font-black text-white/10 uppercase tracking-widest">No temporal nodes detected</p>
-                                </div>
-                            )}
+                        <div>
+                            <p className="text-xs font-bold text-on-surface-variant/40 uppercase tracking-wider">Configure Slots</p>
+                            <p className="text-sm font-bold text-on-surface">Semester {semester} Grid</p>
                         </div>
-
-                        <div className="flex gap-4 mt-10">
-                            <Button variant="outlined" onClick={onClose} className="flex-1 h-14 rounded-2xl border-white/10 text-white font-black uppercase tracking-widest text-[10px]">Abort</Button>
-                            <Button onClick={handleSave} isLoading={loading} className="flex-[2] h-14 rounded-2xl bg-white/10 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-white/10">Commit Calibration</Button>
-                        </div>
-                    </motion.div>
+                    </div>
+                    <Button onClick={handleAddPeriod} variant="tonal" size="sm">
+                        Add Slot
+                    </Button>
                 </div>
-            )}
-        </AnimatePresence>
+
+                <div className="max-h-[350px] overflow-y-auto pr-1 space-y-3 custom-scrollbar">
+                    {periods.map((period, idx) => (
+                        <div key={period.id} className="flex items-center gap-4 p-4 rounded-xl border border-outline bg-surface-container-low group hover:border-primary/30 transition-all">
+                            <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-xs font-bold text-on-surface-variant/50 border border-outline/30">{idx + 1}</div>
+                            <div className="flex-1 grid grid-cols-3 gap-3">
+                                <Input label="Slot Name" value={period.name} onChange={e => handleUpdatePeriod(period.id, 'name', e.target.value)} placeholder="e.g. Period 1" className="h-10 text-xs px-3" />
+                                <Input label="Start Time" type="time" value={period.startTime} onChange={e => handleUpdatePeriod(period.id, 'startTime', e.target.value)} className="h-10 text-xs px-3" />
+                                <Input label="End Time" type="time" value={period.endTime} onChange={e => handleUpdatePeriod(period.id, 'endTime', e.target.value)} className="h-10 text-xs px-3" />
+                            </div>
+                            <button onClick={() => handleRemovePeriod(period.id)} className="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-on-surface-variant/50 hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 self-end mb-1"><Trash2 size={15} /></button>
+                        </div>
+                    ))}
+                    {periods.length === 0 && (
+                        <div className="py-16 text-center border border-dashed border-outline rounded-2xl">
+                            <p className="text-xs font-semibold text-on-surface-variant/50 uppercase tracking-widest">No slots configured</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-outline">
+                    <Button variant="text" onClick={onClose} className="flex-1">Cancel</Button>
+                    <Button onClick={handleSave} isLoading={loading} className="flex-[2] shadow-sm">Save Structure</Button>
+                </div>
+            </div>
+        </Modal>
     );
 };
 

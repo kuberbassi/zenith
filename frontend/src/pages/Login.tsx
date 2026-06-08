@@ -1,42 +1,14 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { usePageMeta } from '@/hooks/usePageMeta';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Stars, Float, Sphere, MeshDistortMaterial } from '@react-three/drei';
-
-const ThreeBackground = () => {
-    return (
-        <div className="absolute inset-0 z-0 bg-[#020205]">
-            <Canvas camera={{ position: [0, 0, 5], fov: 45 }}>
-                <ambientLight intensity={0.5} />
-                <directionalLight position={[10, 10, 5]} intensity={1} color="#ffffff" />
-                <directionalLight position={[-10, -10, -5]} intensity={0.5} color="#ffffff" />
-
-                <Suspense fallback={null}>
-                    <Stars radius={100} depth={50} count={8000} factor={7} saturation={0} fade={false} speed={2.5} />
-                    <Float speed={2} rotationIntensity={1.5} floatIntensity={2}>
-                        <Sphere args={[1, 64, 64]} scale={1.2}>
-                            <MeshDistortMaterial
-                                color="#000000"
-                                attach="material"
-                                distort={0.4}
-                                speed={1.5}
-                                roughness={0.2}
-                                metalness={0.8}
-                            />
-                        </Sphere>
-                    </Float>
-                </Suspense>
-                <OrbitControls autoRotate autoRotateSpeed={0.5} enableZoom={false} enablePan={false} />
-            </Canvas>
-        </div>
-    );
-};
+import { Sun, Moon } from 'lucide-react';
 
 const Login: React.FC = () => {
     const { loginWithGoogle } = useAuth();
+    const { theme, toggleTheme } = useTheme();
     const [error, setError] = useState<string | null>(null);
 
     usePageMeta({
@@ -46,42 +18,73 @@ const Login: React.FC = () => {
     });
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-black">
-            <ThreeBackground />
+        <div className="min-h-screen w-full flex flex-col justify-between items-center relative overflow-hidden bg-background text-on-background font-sans py-8">
+            {/* Subtle Geist Dot Grid Background */}
+            <div 
+                className="absolute inset-0 z-0 pointer-events-none opacity-[0.04] dark:opacity-[0.06]"
+                style={{
+                    backgroundImage: `radial-gradient(var(--md-sys-color-primary) 1px, transparent 1px)`,
+                    backgroundSize: '24px 24px',
+                }}
+            />
 
-            {/* Overlay Gradient */}
-            <div className="absolute inset-0 z-10 bg-gradient-to-t from-black via-transparent to-black/50 pointer-events-none" />
+            {/* Floating Top Header / Theme Toggle */}
+            <header className="w-full max-w-7xl px-6 flex justify-end z-10">
+                <button
+                    onClick={toggleTheme}
+                    className="w-9 h-9 flex items-center justify-center rounded-lg border border-outline bg-surface hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-all duration-200 cursor-pointer shadow-sm"
+                    title="Toggle theme"
+                >
+                    {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+                </button>
+            </header>
 
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-                className="z-20 w-full max-w-md px-4"
-            >
-                <div className="relative text-center p-10 md:p-12 rounded-[2.5rem] glass-panel/60 backdrop-blur-2xl border border-white/[0.08] shadow-2xl overflow-hidden"
-                    style={{ boxShadow: '0 0 80px rgba(255,255,255,0.1), inset 0 1px 0 rgba(255,255,255,0.1)' }}>
-
-                    {/* Glowing Accent */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent blur-sm" />
-
-                    {/* Icon */}
-                    <div className="mb-8 flex justify-center relative">
-                        <div className="absolute inset-0 bg-white/10 blur-3xl rounded-full" />
-                        <div className="w-32 h-32 rounded-[2.5rem] glass-panel border border-white/10 flex items-center justify-center shadow-2xl relative z-10 overflow-hidden group">
-                            <img src="/zenith-logo.png" alt="Zenith" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+            {/* Main Login Card Container */}
+            <main className="flex-1 flex items-center justify-center w-full max-w-md px-4 z-10 my-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                    className="w-full text-center p-8 md:p-10 rounded-2xl bg-surface border border-outline shadow-[0_8px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] select-none"
+                >
+                    {/* Logo Icon */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.1, duration: 0.4 }}
+                        className="mb-8 flex justify-center"
+                    >
+                        <div className="w-24 h-24 rounded-2xl overflow-hidden bg-surface-variant border border-outline shadow-sm flex items-center justify-center">
+                            <img src="/zenith-logo.png" alt="Zenith Logo" className="w-[72px] h-[72px] object-contain" />
                         </div>
-                    </div>
+                    </motion.div>
 
-                    <h1 className="text-4xl font-black text-white mb-3 tracking-tighter uppercase font-display">
-                        Zenith
-                    </h1>
-                    <p className="text-white/40 text-sm font-bold tracking-widest uppercase mb-10 leading-relaxed">
-                        Institutional Nexus <br />
-                        <span className="text-white">Authentication Required</span>
-                    </p>
+                    {/* Branding Titles */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.18, duration: 0.4 }}
+                        className="mb-8"
+                    >
+                        <h1 className="text-3xl font-extrabold text-on-background tracking-tight mb-2">
+                            Zenith
+                        </h1>
+                        <p className="text-sm text-on-surface-variant font-semibold tracking-wide uppercase">
+                            Student Portal
+                        </p>
+                        <p className="text-xs text-on-surface-variant/50 mt-1.5 font-medium">
+                            Sign in with your Google account to get started
+                        </p>
+                    </motion.div>
 
-                    <div className="flex flex-col items-center gap-4 relative z-20">
-                        <div className="hover:scale-105 transition-transform duration-300">
+                    {/* Google Login Component */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.25, duration: 0.4 }}
+                        className="flex flex-col items-center gap-4 relative z-20"
+                    >
+                        <div className="hover:scale-[1.01] transition-transform duration-200">
                             <GoogleLogin
                                 onSuccess={async (credentialResponse) => {
                                     setError(null);
@@ -90,34 +93,52 @@ const Login: React.FC = () => {
                                         await loginWithGoogle(credentialResponse.credential);
                                     } catch (err) {
                                         console.error('❌ Backend login failed:', err);
-                                        setError('Login sequence failed. Please recalibrate.');
+                                        setError('Login failed. Please try again.');
                                     }
                                 }}
                                 onError={() => {
                                     console.error('❌ Google Login Failed');
                                     setError('Auth provider failed. Please try again.');
                                 }}
-                                theme="filled_black"
+                                theme={theme === 'dark' ? 'filled_black' : 'outline'}
                                 size="large"
                                 width={280}
                                 text="continue_with"
-                                shape="pill"
+                                shape="circle"
                             />
                         </div>
                         {error && (
-                            <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-red-400 text-xs font-bold uppercase tracking-widest mt-2 bg-red-500/10 py-2 px-4 rounded-xl border border-red-500/20">
+                            <motion.p
+                                initial={{ opacity: 0, y: -8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-error text-xs font-semibold mt-1 bg-error/5 border border-error/15 py-2.5 px-4 rounded-xl w-full text-center"
+                            >
                                 {error}
                             </motion.p>
                         )}
-                    </div>
+                    </motion.div>
 
-                    <p className="mt-12 text-[10px] font-black tracking-widest uppercase text-white/20">
-                        By authenticating, you accept the <br />
-                        <a href="/terms" className="text-white/60 hover:text-white transition-colors">Terms of Protocol</a> &{' '}
-                        <a href="/privacy" className="text-white/60 hover:text-white transition-colors">Privacy Matrix</a>
-                    </p>
-                </div>
-            </motion.div>
+                    {/* Policies Agreement Info */}
+                    <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.35, duration: 0.4 }}
+                        className="mt-10 text-[11px] font-medium text-on-surface-variant/40 leading-relaxed pt-6 border-t border-outline"
+                    >
+                        By signing in, you accept the{' '}
+                        <a href="/terms" className="text-on-surface-variant/60 hover:text-on-surface transition-colors underline underline-offset-4 font-semibold">Terms of Service</a>
+                        {' '}&{' '}
+                        <a href="/privacy" className="text-on-surface-variant/60 hover:text-on-surface transition-colors underline underline-offset-4 font-semibold">Privacy Policy</a>
+                    </motion.p>
+                </motion.div>
+            </main>
+
+            {/* Stark minimal Footer */}
+            <footer className="w-full max-w-7xl px-6 text-center z-10">
+                <p className="text-[10px] text-on-surface-variant/30 font-medium tracking-wide">
+                    &copy; {new Date().getFullYear()} Zenith. All rights reserved.
+                </p>
+            </footer>
         </div>
     );
 };

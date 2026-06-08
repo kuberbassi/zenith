@@ -41,9 +41,9 @@ const SubjectCard: React.FC<SubjectCardProps> = ({ subject, onClick }) => {
             </div>
 
             {/* Progress Bar */}
-            <div className="mt-3 h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+            <div className="mt-3 h-1 w-full bg-on-surface/10 rounded-full overflow-hidden">
                 <div
-                    className={`h-full rounded-full ${isLow ? 'bg-error' : 'bg-primary'}`}
+                    className={`h-full rounded-full ${isLow ? 'bg-error' : 'bg-on-surface'}`}
                     style={{ width: `${Math.min(subject.percentage, 100)}%` }}
                 />
             </div>

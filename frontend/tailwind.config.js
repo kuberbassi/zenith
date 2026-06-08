@@ -58,14 +58,19 @@ export default {
 
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
-        display: ['Outfit', 'sans-serif'],
+        display: ['Inter', 'sans-serif'],
       },
 
       borderRadius: {
-        'DEFAULT': '16px',
-        'lg': '20px',
-        'xl': '24px',
-        '2xl': '32px',
+        'none': '0px',
+        'xs': '2px',
+        'sm': '4px',
+        'DEFAULT': '6px',
+        'md': '6px',
+        'lg': '8px',
+        'xl': '12px',
+        '2xl': '16px',
+        'full': '9999px',
       },
 
       backdropBlur: {

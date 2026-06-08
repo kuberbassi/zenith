@@ -22,8 +22,8 @@ const Button: React.FC<ButtonProps> = ({
     const baseClasses = "inline-flex items-center justify-center font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden shrink-0 whitespace-nowrap flex-nowrap";
 
     const variantClasses: Record<string, string> = {
-        primary: "bg-primary !text-black hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",
-        filled: "bg-primary !text-black hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",
+        primary: "bg-primary text-on-primary hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",
+        filled: "bg-primary text-on-primary hover:shadow-md hover:bg-primary/90 active:bg-primary/80 border border-transparent shadow-sm",
 
         secondary: "bg-secondary-container text-on-secondary-container hover:shadow-sm hover:bg-secondary-container/80 active:bg-secondary-container/70 border border-transparent",
         tonal: "bg-secondary-container text-on-secondary-container hover:bg-secondary-container/80 active:bg-secondary-container/70 border border-transparent shadow-none",

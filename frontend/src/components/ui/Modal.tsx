@@ -80,20 +80,24 @@ const Modal: React.FC<ModalProps> = ({
         if (isOpen) {
             document.addEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
         }
 
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'unset';
+            document.documentElement.style.overflow = 'unset';
         };
     }, [isOpen]); // only re-run when modal opens/closes, NOT on onClose identity change
 
     const sizeClasses = {
-        sm: 'max-w-md',
-        md: 'max-w-lg',
-        lg: 'max-w-2xl',
-        xl: 'max-w-4xl',
+        sm: 'max-w-[400px]',   // 400px
+        md: 'max-w-[480px]',   // 480px
+        lg: 'max-w-[560px]',   // 560px
+        xl: 'max-w-[680px]',   // 680px
     };
+
+    const hasCustomMaxWidth = className.split(' ').some(c => c.startsWith('max-w-'));
 
     return createPortal(
         <AnimatePresence>
@@ -106,7 +110,7 @@ const Modal: React.FC<ModalProps> = ({
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.15 }}
                         onClick={onClose}
-                        className="absolute inset-0 glass-panel/80 backdrop-blur-md will-change-[opacity]"
+                        className="absolute inset-0 bg-black/60 backdrop-blur-sm will-change-[opacity]"
                     />
 
                     {/* Modal - Theme-aware colors */}
@@ -115,15 +119,15 @@ const Modal: React.FC<ModalProps> = ({
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0.95, opacity: 0, y: 10 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-                        className={`relative w-full ${sizeClasses[size]} ${className} rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.5),_0_0_80px_rgba(255,255,255,0.05)] overflow-hidden will-change-transform max-h-[90vh] flex flex-col glass-panel border border-white/[0.08]`}
+                        className={`relative w-full ${hasCustomMaxWidth ? '' : sizeClasses[size]} ${className} rounded-2xl bg-surface border border-outline shadow-2xl overflow-hidden will-change-transform max-h-[90vh] flex flex-col`}
                     >
                         {/* Header */}
                         {title && (
-                            <div className="flex items-center justify-between p-6 bg-white/[0.02] border-b border-white/[0.08]">
-                                <h2 className="text-xl font-display font-medium text-white/90">{title}</h2>
+                            <div className="flex items-center justify-between px-5 py-4 md:px-6 md:py-4 bg-surface-container/20 border-b border-outline">
+                                <h2 className="text-base font-bold text-on-surface">{title}</h2>
                                 <button
                                     onClick={onClose}
-                                    className="p-1.5 rounded-xl hover:bg-white/[0.06] transition-colors text-white/40 hover:text-white/80"
+                                    className="p-1.5 rounded-xl hover:bg-surface-container transition-colors text-on-surface-variant/40 hover:text-on-surface"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -134,7 +138,7 @@ const Modal: React.FC<ModalProps> = ({
                         <div
                             ref={contentRef}
                             tabIndex={-1}
-                            className="p-6 overflow-y-auto flex-1 custom-scrollbar focus:outline-none"
+                            className="p-5 md:p-6 overflow-y-auto flex-1 custom-scrollbar focus:outline-none"
                         >
                             {children}
                         </div>

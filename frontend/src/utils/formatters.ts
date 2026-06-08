@@ -22,3 +22,8 @@ export const formatNumber = (num: number, decimals: number = 1): string => {
 export const formatPercentage = (value: number): string => {
     return `${value.toFixed(1)}%`;
 };
+
+export const formatTeacherName = (name: string): string => {
+    if (!name) return 'Unknown';
+    return name.trim();
+};

@@ -6,6 +6,7 @@ import { ENV } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
 import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middleware/auth.js'
 import { ok, fail } from '../utils/response.js'
+import { getClientIp } from '../utils/ip.js'
 
 const router = Router()
 const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID)
@@ -85,6 +86,7 @@ function hashRefreshToken(token: string) {
 
 type AuthSession = {
   id: string
+  device_id?: string | null
   refresh_token_hash: string
   refresh_expires_at: number
   refresh_issued_at: number
@@ -123,11 +125,28 @@ async function getAuthSessions(userId: string): Promise<AuthSession[]> {
   const now = Date.now()
   const activeSessions = sessions.filter(s => s.refresh_expires_at > now)
 
-  if (activeSessions.length !== sessions.length || (!rawSessions && sessions.length > 0)) {
-    await persistAuthSessions(userId, activeSessions)
+  // Deduplicate active sessions on the fly by device_id (or user_agent + ip if device_id is missing)
+  const seenDevices = new Set<string>()
+  const seenUaIp = new Set<string>()
+  const deduplicated: AuthSession[] = []
+
+  for (const s of activeSessions) {
+    if (s.device_id) {
+      if (seenDevices.has(s.device_id)) continue
+      seenDevices.add(s.device_id)
+    } else if (s.user_agent && s.ip) {
+      const key = `${s.user_agent}-${s.ip}`
+      if (seenUaIp.has(key)) continue
+      seenUaIp.add(key)
+    }
+    deduplicated.push(s)
   }
 
-  return activeSessions
+  if (deduplicated.length !== sessions.length || (!rawSessions && sessions.length > 0)) {
+    await persistAuthSessions(userId, deduplicated)
+  }
+
+  return deduplicated
 }
 
 async function persistAuthSessions(userId: string, sessions: AuthSession[]): Promise<void> {
@@ -181,7 +200,7 @@ async function revokeRefreshSessionByToken(refreshToken: string | null | undefin
 }
 
 async function logAuthEvent(req: any, userId: string, action: string, description: string): Promise<void> {
-  const ip = req.ip || req.socket?.remoteAddress || null
+  const ip = getClientIp(req)
   const user_agent = (req.headers['user-agent'] as string) || null
   await prisma.systemLog.create({
     data: { user_id: userId, action, description, ip, user_agent },
@@ -193,14 +212,21 @@ async function issueAuthSession(req: any, res: any, userId: string, replaceOldHa
   const refreshToken = crypto.randomBytes(48).toString('hex')
   const now = Date.now()
 
-  const ip = req.ip || req.socket?.remoteAddress || null
+  const ip = getClientIp(req)
   const user_agent = (req.headers['user-agent'] as string) || null
+  const deviceId = (req.headers['x-device-id'] as string) || null
 
   const sessions = await getAuthSessions(userId)
-  const filtered = replaceOldHash ? sessions.filter(s => s.refresh_token_hash !== replaceOldHash) : sessions
+  let filtered = replaceOldHash ? sessions.filter(s => s.refresh_token_hash !== replaceOldHash) : sessions
+  if (deviceId) {
+    filtered = filtered.filter(s => s.device_id !== deviceId)
+  } else if (user_agent && ip) {
+    filtered = filtered.filter(s => !(s.user_agent === user_agent && s.ip === ip))
+  }
 
   const newSession: AuthSession = {
     id: crypto.randomBytes(16).toString('hex'),
+    device_id: deviceId,
     refresh_token_hash: hashRefreshToken(refreshToken),
     refresh_expires_at: now + REFRESH_TOKEN_TTL_MS,
     refresh_issued_at: now,
@@ -237,10 +263,6 @@ function userResponse(user: Awaited<ReturnType<typeof prisma.user.findUniqueOrTh
     attendance_threshold: user.attendance_threshold,
     warning_threshold: user.warning_threshold,
     phone_number: user.phone_number,
-    headline: user.headline,
-    linkedin_url: user.linkedin_url,
-    github_url: user.github_url,
-    portfolio_url: user.portfolio_url,
     created_at: user.created_at,
   }
 }
@@ -269,14 +291,14 @@ router.post('/google', async (req, res) => {
     if (user) {
       user = await prisma.user.update({
         where: { email: email! },
-        data: { google_id, name: name!, picture },
+        data: { google_id, name: name!, picture: user.picture || picture },
       })
     } else {
       const existingByGoogle = await prisma.user.findUnique({ where: { google_id } })
       if (existingByGoogle) {
         user = await prisma.user.update({
           where: { google_id },
-          data: { email: email!, name: name!, picture },
+          data: { email: email!, name: name!, picture: existingByGoogle.picture || picture },
         })
       } else {
         user = await prisma.user.create({
@@ -358,6 +380,7 @@ router.get('/sessions', requireAuth, async (req: AuthRequest, res) => {
 
     const payload = sessions.map(s => ({
       id: s.id,
+      device_id: s.device_id || null,
       ip: s.ip || 'Unknown',
       user_agent: s.user_agent || 'Unknown',
       refresh_issued_at: s.refresh_issued_at,

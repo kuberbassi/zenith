@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
-import {
-    Rocket, ShieldCheck, Sparkles, Edit2, Trash, Plus
-} from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { Edit2, Trash } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { useToast } from '@/components/ui/Toast';
 import { skillsService, type Skill } from '@/services/skills.service';
 import api from '@/services/api';
@@ -19,12 +16,40 @@ const SKILL_CATEGORIES = [
 
 const SKILL_LEVELS: Skill['level'][] = ['beginner', 'intermediate', 'advanced', 'expert'];
 
-const LEVEL_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
-    beginner: { color: '#ffffff', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)' },
-    intermediate: { color: '#10b981', bg: 'rgba(16,185,129,0.05)', border: 'rgba(16,185,129,0.1)' },
-    advanced: { color: '#10b981', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.2)' },
-    expert: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.2)' },
-};
+const NOTION_COLORS = [
+    { bgLight: '#f1f1ef', textLight: '#37352f', borderLight: '#e9e9e6', bgDark: '#252525', textDark: '#9b9a97', borderDark: '#2a2a2a' }, // gray
+    { bgLight: '#f8ecdf', textLight: '#c27c38', borderLight: '#f1dfcd', bgDark: '#3f2c1e', textDark: '#e79e50', borderDark: '#4d3826' }, // brown
+    { bgLight: '#faebd9', textLight: '#d9730d', borderLight: '#f6d5b3', bgDark: '#432912', textDark: '#ffa344', borderDark: '#533418' }, // orange
+    { bgLight: '#fbf3db', textLight: '#dfab01', borderLight: '#f7e3a6', bgDark: '#443d1a', textDark: '#ffdc4f', borderDark: '#564d23' }, // yellow
+    { bgLight: '#eddffc', textLight: '#6940a5', borderLight: '#decbf7', bgDark: '#2d2238', textDark: '#b390e6', borderDark: '#3b2d49' }, // purple
+    { bgLight: '#ebdff9', textLight: '#9065b0', borderLight: '#dfccf3', bgDark: '#301c3f', textDark: '#cfa6f3', borderDark: '#3d254f' }, // violet
+    { bgLight: '#dff1eb', textLight: '#1d825c', borderLight: '#cbe7dc', bgDark: '#1a3229', textDark: '#52c49c', borderDark: '#234438' }, // green
+    { bgLight: '#e0ecfc', textLight: '#0b6e99', borderLight: '#cbe0fa', bgDark: '#182f42', textDark: '#529cca', borderDark: '#223f59' }, // blue
+    { bgLight: '#fbe4e4', textLight: '#c41d1d', borderLight: '#f6c7c7', bgDark: '#451a1a', textDark: '#ff7373', borderDark: '#572323' }, // red
+    { bgLight: '#fdecf2', textLight: '#ad1a72', borderLight: '#fad0e2', bgDark: '#40182c', textDark: '#f26fb6', borderDark: '#512239' }, // pink
+];
+
+export function getNotionTagStyles(text: string) {
+    if (!text) return { className: '', style: {} };
+    let hash = 0;
+    const cleanText = text.trim();
+    for (let i = 0; i < cleanText.length; i++) {
+        hash = cleanText.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % NOTION_COLORS.length;
+    const color = NOTION_COLORS[idx];
+    return {
+        style: {
+            '--tag-bg-light': color.bgLight,
+            '--tag-text-light': color.textLight,
+            '--tag-border-light': color.borderLight,
+            '--tag-bg-dark': color.bgDark,
+            '--tag-text-dark': color.textDark,
+            '--tag-border-dark': color.borderDark,
+        } as React.CSSProperties,
+        className: 'bg-[var(--tag-bg-light)] dark:bg-[var(--tag-bg-dark)] text-[var(--tag-text-light)] dark:text-[var(--tag-text-dark)] border border-[var(--tag-border-light)] dark:border-[var(--tag-border-dark)]'
+    };
+}
 
 const SkillTracker: React.FC = () => {
     const { showToast } = useToast();
@@ -60,12 +85,11 @@ const SkillTracker: React.FC = () => {
     };
 
     const handleSave = async () => {
-        if (!formData.name) { showToast('error', 'Identity Required'); return; }
+        if (!formData.name) { showToast('error', 'Skill name is required'); return; }
         
         const tempId = editingSkill?._id || `temp-${Date.now()}`;
         const updatedSkill: Skill = { ...formData, _id: tempId };
         
-        // Optimistic Update
         const previousSkills = [...skills];
         if (editingSkill) {
             setSkills(prev => prev.map(s => s._id === editingSkill._id ? updatedSkill : s));
@@ -79,112 +103,132 @@ const SkillTracker: React.FC = () => {
             setIsSaving(true);
             if (editingSkill?._id) {
                 await skillsService.updateSkill(editingSkill._id, formData);
-                showToast('success', 'Sequence Updated');
+                showToast('success', 'Skill updated successfully');
             } else {
                 await skillsService.addSkill(formData);
-                showToast('success', 'Sequence Initiated');
+                showToast('success', 'Skill added successfully');
             }
-            // Silent sync for truth (debounced for cache propagation)
             setTimeout(() => loadSkills(), 500);
         } catch {
             showToast('error', 'Operation Failed');
-            setSkills(previousSkills); // Rollback
+            setSkills(previousSkills);
         } finally {
             setIsSaving(false);
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Terminate this capability sequence?')) return;
+        if (!confirm('Are you sure you want to delete this skill?')) return;
         
         const previousSkills = [...skills];
-        // Optimistic Update
         setSkills(prev => prev.filter(s => s._id !== id));
 
         try {
             await skillsService.deleteSkill(id);
-            showToast('success', 'Sequence Terminated');
-            // Silent sync for truth
+            showToast('success', 'Skill deleted successfully');
             setTimeout(() => loadSkills(), 500);
         } catch { 
-            showToast('error', 'Termination Failed');
-            setSkills(previousSkills); // Rollback
+            showToast('error', 'Deletion Failed');
+            setSkills(previousSkills);
         }
     };
 
     const filteredSkills = filter === 'all' ? skills : skills.filter(s => s.category === filter);
 
     return (
-        <div className="pb-32 max-w-7xl mx-auto px-4">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12 relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden shadow-2xl" style={{ boxShadow: '0 0 80px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-white/10/[0.02] blur-[150px] pointer-events-none" />
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-10">
-                    <div className="text-center md:text-left">
-                        <div className="flex items-center justify-center md:justify-start gap-5 mb-5">
-                            <div className="w-14 h-14 rounded-3xl bg-white/5 flex items-center justify-center text-white border border-white/10 shadow-lg shadow-white/5">
-                                <Rocket size={28} />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none mb-1">Capability Matrix</h1>
-                                <div className="flex items-center justify-center md:justify-start gap-2 text-white/60 font-mono text-[10px] uppercase tracking-[0.2em] font-black">
-                                    <ShieldCheck size={12} className="animate-pulse" />
-                                    Active Evolution: Node {skills.length}
-                                </div>
-                            </div>
-                        </div>
-                        <p className="text-white/30 font-bold text-xs md:text-sm tracking-[0.15em] uppercase max-w-lg leading-relaxed">Mapping professional aptitude and cognitive skill sets for mission-critical objectives.</p>
+        <div className="max-w-4xl mx-auto pb-24 px-4 select-none">
+            {/* Page Header */}
+            <div className="mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">
+                    Development / Skills
+                </p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-on-surface tracking-tight">Skills</h1>
+                        <p className="text-xs text-on-surface-variant/40 mt-0.5">{skills.length} skills tracked</p>
                     </div>
-
-                    <Button icon={<Plus size={16} />} onClick={() => { setEditingSkill(null); setFormData({ name: '', category: 'Technical', level: 'beginner', progress: 0, notes: '' }); setIsModalOpen(true); }} className="h-14 px-8 rounded-2xl bg-white/10 text-white font-black tracking-widest uppercase text-xs hover:bg-white/20 shadow-xl shadow-white/10">New Capability</Button>
-                </div>
-            </motion.div>
-
-            <div className="mb-10 flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                {['all', ...SKILL_CATEGORIES].map(cat => (
-                    <button key={cat} onClick={() => { setFilter(cat); localStorage.setItem('zenith_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filter === cat ? 'bg-white/10 border-white/20 text-white shadow-lg shadow-white/10' : 'bg-white/5 border-white/[0.04] text-white/30 hover:bg-white/10 hover:text-white/60'}`}>
-                        {cat}
+                    <button
+                        onClick={() => { setEditingSkill(null); setFormData({ name: '', category: 'Technical', level: 'beginner', progress: 0, notes: '' }); setIsModalOpen(true); }}
+                        className="h-8 px-3 text-xs font-bold rounded bg-on-surface text-surface hover:opacity-90 transition-all cursor-pointer"
+                    >
+                        Add Skill
                     </button>
-                ))}
+                </div>
+                {/* Category tab bar */}
+                <div className="flex gap-0 border-b border-outline mt-4 overflow-x-auto no-scrollbar">
+                    {['all', ...SKILL_CATEGORIES].map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => { setFilter(cat); localStorage.setItem('zenith_skills_filter', cat); api.post('/api/profile/preferences', { skills_filter: cat }).catch(() => {}); }}
+                            className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap capitalize cursor-pointer ${
+                                filter === cat
+                                    ? 'border-on-surface text-on-surface'
+                                    : 'border-transparent text-on-surface-variant/40 hover:text-on-surface-variant hover:border-outline'
+                            }`}
+                        >
+                            {cat}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            {loading ? <div className="flex justify-center py-20"><LoadingSpinner /></div> : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {loading ? (
+                /* Non-blocking loader list */
+                <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="animate-pulse h-16 bg-surface-container border border-outline rounded-lg" />
+                    ))}
+                </div>
+            ) : (
+                <div className="border border-outline rounded-lg overflow-hidden bg-surface">
                     <AnimatePresence>
-                        {filteredSkills.map(skill => {
-                            const cfg = LEVEL_CONFIG[skill.level] || LEVEL_CONFIG.beginner;
+                        {filteredSkills.length === 0 ? (
+                            <div className="py-20 text-center">
+                                <p className="text-xs font-bold text-on-surface-variant/30 uppercase tracking-wider">No skills in this category</p>
+                            </div>
+                        ) : filteredSkills.map((skill, idx) => {
+                            const levelTag = getNotionTagStyles(skill.level);
+                            const catTag = getNotionTagStyles(skill.category);
                             return (
-                                <motion.div key={skill._id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}>
-                                    <div className="group relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 h-full flex flex-col transition-all hover:bg-white/[0.01] hover:border-white/[0.12] shadow-xl overflow-hidden" style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.02)' }}>
-                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <motion.div
+                                    key={skill._id}
+                                    layout
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className={`group flex items-center gap-4 px-5 py-4 hover:bg-surface-container transition-all ${idx < filteredSkills.length - 1 ? 'border-b border-outline' : ''}`}
+                                >
+                                    {/* Level badge */}
+                                    <span style={levelTag.style} className={`flex-shrink-0 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded min-w-[70px] text-center ${levelTag.className}`}>
+                                        {skill.level}
+                                    </span>
 
-                                        <div className="flex justify-between items-start mb-6">
-                                            <div className="flex flex-col gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest" style={{ color: cfg.color, backgroundColor: cfg.bg, border: `1px solid ${cfg.border}` }}>{skill.level}</span>
-                                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">{skill.category}</span>
-                                                </div>
-                                                <h3 className="text-xl font-black text-white tracking-tight uppercase group-hover:text-white transition-colors uppercase">{skill.name}</h3>
-                                            </div>
-                                            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all scale-95 group-hover:scale-100">
-                                                <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/20 hover:text-white hover:bg-white/10 transition-all border border-white/5"><Edit2 size={14} /></button>
-                                                <button onClick={() => handleDelete(skill._id!)} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all border border-white/5"><Trash size={14} /></button>
-                                            </div>
+                                    {/* Name + category */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-on-surface truncate">{skill.name}</p>
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                            <span style={catTag.style} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${catTag.className}`}>
+                                                {skill.category}
+                                            </span>
                                         </div>
+                                    </div>
 
-                                        <p className="text-xs font-medium text-white/30 leading-relaxed mb-8 flex-1 italic">"{skill.notes || 'No intelligence data recorded'}"</p>
-
-                                        <div className="mt-auto pt-6 border-t border-white/[0.04]">
-                                            <div className="flex justify-between items-end mb-3">
-                                                <div>
-                                                    <p className="text-[9px] font-black text-white/20 uppercase tracking-widest mb-0.5">Integration</p>
-                                                    <p className="text-xs font-black text-white tracking-widest">{skill.progress}%</p>
-                                                </div>
-                                                <Sparkles size={14} className="text-white/20 group-hover:text-white transition-colors" />
-                                            </div>
-                                            <div className="h-1.5 rounded-full bg-white/5 overflow-hidden border border-white/[0.08]">
-                                                <motion.div initial={{ width: 0 }} animate={{ width: `${skill.progress}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} className="h-full rounded-full bg-gradient-to-r from-white via-white to-white/60 shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
-                                            </div>
+                                    {/* Progress */}
+                                    <div className="hidden sm:flex items-center gap-3 flex-shrink-0 w-36">
+                                        <div className="flex-1 h-1 bg-on-surface/10 rounded-full overflow-hidden">
+                                            <div className="h-full bg-on-surface" style={{ width: `${skill.progress}%` }} />
                                         </div>
+                                        <span className="text-[10px] font-bold text-on-surface-variant/50 w-8 text-right">{skill.progress}%</span>
+                                    </div>
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                        <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
+                                            <Edit2 size={11} />
+                                        </button>
+                                        <button onClick={() => handleDelete(skill._id!)} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer">
+                                            <Trash size={11} />
+                                        </button>
                                     </div>
                                 </motion.div>
                             );
@@ -193,21 +237,28 @@ const SkillTracker: React.FC = () => {
                 </div>
             )}
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingSkill ? 'Recalibrate' : 'Initiate'}>
-                <div className="space-y-6">
-                    <Input label="Capability Identifier" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Neural Networks" />
-                    <div className="grid grid-cols-2 gap-4">
-                        <Select label="Sector" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} options={SKILL_CATEGORIES.map(c => ({ value: c, label: c }))} />
-                        <Select label="Phase" value={formData.level} onChange={e => setFormData({ ...formData, level: e.target.value as Skill['level'] })} options={SKILL_LEVELS.map(l => ({ value: l, label: l.charAt(0).toUpperCase() + l.slice(1) }))} />
-                    </div>
-                    <Input label="Description" value={formData.notes || ''} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Enter capability details..." />
+            {/* Modal */}
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingSkill ? 'Edit Skill' : 'Add Skill'}>
+                <div className="space-y-6 pt-4 text-on-surface select-none">
                     <div>
-                        <div className="flex justify-between mb-3"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Efficiency</span><span className="text-xs font-black text-white">{formData.progress}%</span></div>
-                        <input type="range" min="0" max="100" step="5" value={formData.progress} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) })} className="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-white" />
+                        <label className="block text-[10px] font-bold text-on-surface-variant/40 uppercase mb-3 ml-1">Skill Name</label>
+                        <Input type="text" placeholder="e.g., UI/UX Design" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                     </div>
-                    <div className="flex gap-3 pt-4">
-                        <Button variant="outlined" onClick={() => setIsModalOpen(false)} className="flex-1 uppercase tracking-widest text-[10px] font-black h-12">Abort</Button>
-                        <Button onClick={handleSave} isLoading={isSaving} className="flex-1 uppercase tracking-widest text-[10px] font-black h-12 bg-white/10 text-white shadow-xl shadow-white/10">{editingSkill ? 'Commit' : 'Start'}</Button>
+                    <div className="grid grid-cols-2 gap-6">
+                        <Select label="Category" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} options={SKILL_CATEGORIES.map(c => ({ value: c, label: c }))} />
+                        <Select label="Current Level" value={formData.level} onChange={e => setFormData({ ...formData, level: e.target.value as any })} options={SKILL_LEVELS.map(l => ({ value: l, label: l.toUpperCase() }))} />
+                    </div>
+                    <div>
+                        <div className="flex justify-between mb-3"><span className="text-[10px] font-bold text-on-surface-variant/40 uppercase">Progress</span><span className="text-xs font-bold text-on-surface">{formData.progress}%</span></div>
+                        <input type="range" min="0" max="100" value={formData.progress} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) || 0 })} className="w-full accent-primary h-1 bg-on-surface/15 rounded-full appearance-none cursor-pointer" />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-on-surface-variant/40 uppercase mb-3 ml-1">Additional Notes</label>
+                        <textarea placeholder="Write brief notes or milestones..." value={formData.notes || ''} onChange={e => setFormData({ ...formData, notes: e.target.value })} className="w-full min-h-[100px] p-4 text-sm bg-surface border border-outline rounded-lg focus:outline-none focus:border-on-surface transition-all text-on-surface placeholder-on-surface-variant/30" />
+                    </div>
+                    <div className="flex gap-4 pt-4">
+                        <Button variant="outlined" onClick={() => setIsModalOpen(false)} className="flex-1 uppercase tracking-wider text-xs font-bold h-12">Cancel</Button>
+                        <Button onClick={handleSave} isLoading={isSaving} className="flex-1 uppercase tracking-wider text-xs font-bold h-12 bg-on-surface text-surface hover:opacity-90">{editingSkill ? 'Save' : 'Add'}</Button>
                     </div>
                 </div>
             </Modal>

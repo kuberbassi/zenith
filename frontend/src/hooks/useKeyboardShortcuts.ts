@@ -29,8 +29,8 @@ export const useKeyboardShortcuts = () => {
     {
       key: 'n',
       ctrl: true,
-      action: () => navigate('/notifications'),
-      description: 'Open Notifications'
+      action: () => navigate('/notes'),
+      description: 'Open Notes'
     },
     {
       key: 'd',

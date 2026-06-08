@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Bell, ExternalLink, RefreshCw } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { useNotices } from '@/hooks/useNotices';
+import Modal from '@/components/ui/Modal';
 
 interface Notice {
     title: string;
@@ -100,54 +101,36 @@ const NoticesWidget: React.FC = () => {
             </GlassCard>
 
             {/* View All Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-surface w-full max-w-2xl max-h-[80vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-outline-variant/20"
-                    >
-                        <div className="p-6 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-low">
-                            <div>
-                                <h2 className="text-2xl font-bold font-display text-on-surface">University Notices</h2>
-                                <p className="text-on-surface-variant text-sm">All latest updates from IPU</p>
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                title="University Notices"
+                size="md"
+            >
+                <div className="space-y-3">
+                    {notices.map((notice, i) => (
+                        <a
+                            key={i}
+                            href={notice.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block p-4 rounded-xl bg-surface-container/30 hover:bg-surface-container transition-colors border border-outline-variant/20 group"
+                        >
+                            <div className="grid grid-cols-[1fr_auto] items-start gap-3">
+                                <p className="text-sm font-medium text-on-surface font-sans group-hover:text-primary transition-colors">
+                                    {notice.title}
+                                </p>
+                                <ExternalLink size={16} className="text-on-surface-variant mt-1 opacity-50 group-hover:opacity-100 transition-opacity" />
                             </div>
-                            <button
-                                onClick={() => setIsModalOpen(false)}
-                                className="p-2 hover:bg-surface-container rounded-full transition-colors"
-                            >
-                                <span className="sr-only">Close</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-on-surface-variant"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
-                            {notices.map((notice, i) => (
-                                <a
-                                    key={i}
-                                    href={notice.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="block p-4 rounded-xl bg-surface-container/30 hover:bg-surface-container transition-colors border border-outline-variant/20 group"
-                                >
-                                    <div className="grid grid-cols-[1fr_auto] items-start gap-3">
-                                        <p className="text-sm font-medium text-on-surface font-sans group-hover:text-primary transition-colors">
-                                            {notice.title}
-                                        </p>
-                                        <ExternalLink size={16} className="text-on-surface-variant mt-1 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
-                                            {formatNoticeDate(notice.date)}
-                                        </span>
-                                    </div>
-                                </a>
-                            ))}
-                        </div>
-                    </motion.div>
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="text-xs font-mono px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant">
+                                    {formatNoticeDate(notice.date)}
+                                </span>
+                            </div>
+                        </a>
+                    ))}
                 </div>
-            )}
+            </Modal>
         </>
     );
 };

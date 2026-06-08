@@ -1,8 +1,9 @@
 import { Router } from 'express'
-import { randomUUID } from 'crypto'
+import crypto, { randomUUID } from 'crypto'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
+import { getClientIp } from '../utils/ip.js'
 import { normalizeAttendanceStatus } from '../utils/attendanceStatus.js'
 
 const router = Router()
@@ -32,6 +33,33 @@ function checkDeleteRateLimit(userId: string): { ok: boolean; waitMinutes: numbe
   return { ok: true, waitMinutes: 0 }
 }
 
+// ─── Cryptography Helpers for Secure Backups ──────────────────────────────────
+function getEncryptionKey(): Buffer {
+  const secret = process.env.JWT_SECRET || 'zenith-backup-encryption-key-fallback-secret-2026'
+  return crypto.createHash('sha256').update(secret).digest()
+}
+
+function encrypt(text: string): string {
+  const key = getEncryptionKey()
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
+  let encrypted = cipher.update(text, 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  return iv.toString('hex') + ':' + encrypted
+}
+
+function decrypt(encryptedText: string): string {
+  const key = getEncryptionKey()
+  const parts = encryptedText.split(':')
+  if (parts.length !== 2) throw new Error('Invalid encrypted format')
+  const iv = Buffer.from(parts[0], 'hex')
+  const encrypted = parts[1]
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+  let decrypted = decipher.update(encrypted, 'hex', 'utf8')
+  decrypted += decipher.final('utf8')
+  return decrypted
+}
+
 type UserData = {
   subjects: unknown[]
   attendance_logs: unknown[]
@@ -43,11 +71,12 @@ type UserData = {
   user_preference?: unknown[]
   skills: unknown[]
   system_logs: unknown[]
+  notes?: unknown[]
   user_profile?: unknown
 }
 
 async function collectUserData(userId: string): Promise<UserData> {
-  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs] = await Promise.all([
+  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs, notes] = await Promise.all([
     prisma.subject.findMany({ where: { user_id: userId } }),
     prisma.attendanceLog.findMany({ where: { user_id: userId } }),
     prisma.timetable.findMany({ where: { user_id: userId } }),
@@ -56,8 +85,9 @@ async function collectUserData(userId: string): Promise<UserData> {
     prisma.userPreference.findMany({ where: { user_id: userId } }),
     prisma.skill.findMany({ where: { user_id: userId } }),
     prisma.systemLog.findMany({ where: { user_id: userId }, orderBy: { timestamp: 'desc' }, take: 500 }),
+    prisma.note.findMany({ where: { user_id: userId } }),
   ])
-  return { subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs }
+  return { subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs, notes }
 }
 
 async function createInBatches<T>(items: T[], worker: (item: T) => Promise<unknown>, batchSize: number = 25) {
@@ -89,13 +119,14 @@ async function clearUserData(userId: string) {
   await prisma.userPreference.deleteMany({ where: { user_id: userId } })
   await prisma.skill.deleteMany({ where: { user_id: userId } })
   await prisma.systemLog.deleteMany({ where: { user_id: userId } })
+  await prisma.note.deleteMany({ where: { user_id: userId } })
 }
 
 function getSafeProfileUpdate(profile: any) {
   const allowedProfileFields = [
     'name', 'course', 'branch', 'college', 'batch', 'current_semester',
     'enrollment_number', 'target_attendance', 'attendance_threshold', 'warning_threshold',
-    'phone_number', 'headline', 'linkedin_url', 'github_url', 'portfolio_url', 'admission_year',
+    'phone_number', 'admission_year',
   ]
 
   const filteredProfile = Object.fromEntries(
@@ -275,6 +306,24 @@ async function restoreUserData(userId: string, rawData: UserData) {
     await createInBatches(systemLogsData as any[], (row) => prisma.systemLog.create({ data: row as any }))
   }
 
+  if (rawData.notes?.length) {
+    const notesData = (rawData.notes as any[]).map((n) => ({
+      id: randomUUID(),
+      user_id: userId,
+      title: String(n.title ?? ''),
+      content: String(n.content ?? ''),
+      is_todo: Boolean(n.is_todo ?? false),
+      todos: n.todos ?? [],
+      category: String(n.category ?? 'General'),
+      color: String(n.color ?? ''),
+      is_pinned: Boolean(n.is_pinned ?? false),
+      is_archived: Boolean(n.is_archived ?? false),
+      created_at: n.created_at ? new Date(normalizeValue(n.created_at)) : new Date(),
+      updated_at: n.updated_at ? new Date(normalizeValue(n.updated_at)) : new Date(),
+    }))
+    await createInBatches(notesData as any[], (row) => prisma.note.create({ data: row as any }))
+  }
+
   if (rawData.user_profile) {
     const filteredProfile = getSafeProfileUpdate(rawData.user_profile)
     if (Object.keys(filteredProfile).length) {
@@ -303,12 +352,21 @@ router.get('/export_data', async (req: AuthRequest, res) => {
     }
 
     const json = JSON.stringify(payload)
+    const encryptedJson = encrypt(json)
+
+    const securePayload = {
+      secure: true,
+      payload: encryptedJson,
+      checksum: crypto.createHash('sha256').update(encryptedJson).digest('hex')
+    }
+
+    const finalJson = JSON.stringify(securePayload)
     const email = (user?.email ?? 'user').replace(/@/g, '_at_').replace(/\./g, '_')
     const filename = `zenith_export_${email}_${new Date().toISOString().slice(0, 10)}.json`
 
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
     res.setHeader('Content-Type', 'application/json')
-    res.send(json)
+    res.send(finalJson)
   } catch (err) {
     console.error('[data/export]', err)
     fail(res, 'Export failed', 'EXPORT_FAILED', 500)
@@ -320,8 +378,29 @@ router.get('/export_data', async (req: AuthRequest, res) => {
 router.post('/import_data', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const body = req.body as { data?: UserData; metadata?: Record<string, unknown> } | UserData
-    const importData = ((body as { data?: UserData })?.data ?? body) as UserData
+    const body = req.body as any
+    let importData: UserData
+
+    if (body && body.secure === true && typeof body.payload === 'string') {
+      if (body.checksum) {
+        const check = crypto.createHash('sha256').update(body.payload).digest('hex')
+        if (check !== body.checksum) {
+          fail(res, 'Backup file integrity verification failed. File may be corrupted or altered.', 'INTEGRITY_FAILED', 400)
+          return
+        }
+      }
+      try {
+        const decryptedText = decrypt(body.payload)
+        const decryptedJson = JSON.parse(decryptedText)
+        importData = ((decryptedJson as { data?: UserData })?.data ?? decryptedJson) as UserData
+      } catch (decErr: any) {
+        fail(res, 'Failed to decrypt secure backup file. Key mismatch or corrupted content.', 'DECRYPTION_FAILED', 400)
+        return
+      }
+    } else {
+      importData = ((body as { data?: UserData })?.data ?? body) as UserData
+    }
+
     console.log('[data/import] Received keys:', Object.keys(importData))
     if (!importData || typeof importData !== 'object') { fail(res, 'Invalid import file format', 'INVALID_FORMAT'); return }
 
@@ -397,7 +476,7 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
     }
 
     // Wipe all collections
-    const [s, al, t, sr, mc, up, sk, sl] = await Promise.all([
+    const [s, al, t, sr, mc, up, sk, sl, nt] = await Promise.all([
       prisma.subject.deleteMany({ where: { user_id: userId } }),
       // attendance_logs cascade-deleted with subjects — but also delete orphans
       prisma.attendanceLog.deleteMany({ where: { user_id: userId } }),
@@ -407,9 +486,10 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
       prisma.userPreference.deleteMany({ where: { user_id: userId } }),
       prisma.skill.deleteMany({ where: { user_id: userId } }),
       prisma.systemLog.deleteMany({ where: { user_id: userId } }),
+      prisma.note.deleteMany({ where: { user_id: userId } }),
     ])
 
-    const summary = { subjects: s.count, attendance_logs: al.count, timetable: t.count, semester_results: sr.count, manual_courses: mc.count, user_preferences: up.count, skills: sk.count, system_logs: sl.count }
+    const summary = { subjects: s.count, attendance_logs: al.count, timetable: t.count, semester_results: sr.count, manual_courses: mc.count, user_preferences: up.count, skills: sk.count, system_logs: sl.count, notes: nt.count }
 
     await prisma.user.update({
       where: { id: userId },
@@ -424,10 +504,6 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
         gender: null,
         phone_number: null,
         admission_year: null,
-        headline: null,
-        linkedin_url: null,
-        github_url: null,
-        portfolio_url: null,
         current_semester: 1,
         target_attendance: 75,
         attendance_threshold: 75,
@@ -437,10 +513,11 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
       }
     })
 
-    console.warn(`🚨 DELETE ALL DATA for user ${userId} from IP: ${req.ip}`)
+    const clientIp = getClientIp(req)
+    console.warn(`🚨 DELETE ALL DATA for user ${userId} from IP: ${clientIp}`)
 
     await prisma.systemLog.create({
-      data: { user_id: userId, action: 'Account Reset', description: `All personal data deleted. Backup ID: ${backup.id}. Summary: ${JSON.stringify(summary)}. IP: ${req.ip}.` },
+      data: { user_id: userId, action: 'Account Reset', description: `All personal data deleted. Backup ID: ${backup.id}. Summary: ${JSON.stringify(summary)}. IP: ${clientIp}.` },
     })
 
     const expires = backup.expires_at || new Date()

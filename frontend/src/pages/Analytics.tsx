@@ -6,11 +6,8 @@ import {
     PointElement, LineElement, Title, Tooltip, Legend,
     RadialLinearScale, ArcElement, Filler
 } from 'chart.js';
-import { motion } from 'framer-motion';
 import { useAnalytics } from '@/hooks/useAnalytics';
-import Loader from '@/components/ui/Loader';
 import { TrendingUp, Activity, Award, AlertTriangle, CalendarDays } from 'lucide-react';
-import Sparkles from '@/components/ui/Sparkles';
 import { useAuth } from '@/contexts/AuthContext';
 
 ChartJS.register(
@@ -28,10 +25,27 @@ const Analytics: React.FC = () => {
         description: 'Deep-dive into your attendance trends, subject performance, and academic analytics.',
     });
 
+    const isDark = document.documentElement.classList.contains('dark');
+
+    // Clean Stark Themes (Monochrome Focus)
+    const accentColor = isDark ? '#ffffff' : '#000000';
+    const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
+    const tickColor = isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)';
+
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-[80vh]">
-                <Loader size={40} />
+            <div className="pb-24 max-w-7xl mx-auto px-4 space-y-6">
+                <div className="animate-pulse h-16 bg-surface-container border border-outline rounded-lg" />
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <div key={i} className="animate-pulse h-24 bg-surface-container border border-outline rounded-lg" />
+                    ))}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="animate-pulse h-20 bg-surface-container border border-outline rounded-lg" />
+                    ))}
+                </div>
             </div>
         );
     }
@@ -44,34 +58,29 @@ const Analytics: React.FC = () => {
     const totalClasses = subjects.reduce((acc: number, s: any) => acc + (s.total || 0), 0);
     const overallAttendance = totalClasses > 0 ? Math.round((totalAttended / totalClasses) * 100) : 0;
 
-    // Theme Colors (Mission Blue)
-    const accentColor = '#ffffff';
-    const gridColor = 'rgba(255, 255, 255, 0.05)';
-    const tickColor = 'rgba(255, 255, 255, 0.3)';
     const levelCopy: Record<string, { label: string; color: string }> = {
-        legend: { label: 'Legend Mode', color: '#f59e0b' },
-        elite: { label: 'Elite Run', color: '#ffffff' },
-        steady: { label: 'Steady Climb', color: '#ffffff' },
+        legend: { label: 'Legend Mode', color: isDark ? '#ffffff' : '#000000' },
+        elite: { label: 'Elite Run', color: isDark ? '#ffffff' : '#000000' },
+        steady: { label: 'Steady Climb', color: isDark ? '#ffffff' : '#000000' },
         recovery: { label: 'Recovery Arc', color: '#f97316' },
         danger: { label: 'Critical Zone', color: '#ef4444' },
     };
     const currentLevel = levelCopy[kpis.achievement_level || 'steady'] || levelCopy.steady;
     const momentumText = Number(kpis.attendance_momentum || 0) >= 0 ? `+${kpis.attendance_momentum || 0}%` : `${kpis.attendance_momentum || 0}%`;
 
-    // --- Chart Data ---
-
     const focusSubjects = [...subjects]
         .filter((s: any) => (s.total || 0) > 0)
         .sort((a: any, b: any) => (a.percentage || 0) - (b.percentage || 0))
         .slice(0, 6);
 
+    // Chart configs
     const focusBarData = {
         labels: focusSubjects.map((s: any) => s.name.substring(0, 14) + (s.name.length > 14 ? '..' : '')),
         datasets: [{
             label: 'Attendance %',
             data: focusSubjects.map((s: any) => s.percentage || 0),
-            backgroundColor: focusSubjects.map((s: any) => (s.percentage || 0) < targetThreshold ? 'rgba(239,68,68,0.8)' : 'rgba(255,255,255,0.75)'),
-            borderRadius: 10,
+            backgroundColor: focusSubjects.map((s: any) => (s.percentage || 0) < targetThreshold ? 'rgba(239,68,68,0.7)' : accentColor),
+            borderRadius: 4,
         }]
     };
 
@@ -81,11 +90,11 @@ const Analytics: React.FC = () => {
         plugins: {
             legend: { display: false },
             tooltip: {
-                backgroundColor: '#0a0a0a',
-                titleFont: { size: 10, weight: 'bold' as const },
-                bodyFont: { size: 12 },
-                padding: 12,
-                borderColor: 'rgba(255,255,255,0.1)',
+                backgroundColor: isDark ? '#111' : '#fff',
+                titleColor: isDark ? '#fff' : '#000',
+                bodyColor: isDark ? '#ccc' : '#444',
+                padding: 10,
+                borderColor: gridColor,
                 borderWidth: 1,
             }
         },
@@ -99,14 +108,13 @@ const Analytics: React.FC = () => {
         labels: ['Attended', 'Missed'],
         datasets: [{
             data: [totalAttended, totalClasses - totalAttended],
-            backgroundColor: [accentColor, 'rgba(255,255,255,0.03)'],
+            backgroundColor: [accentColor, isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'],
             borderWidth: 0,
-            hoverOffset: 4
         }]
     };
 
     const doughnutOptions = {
-        cutout: '85%',
+        cutout: '80%',
         plugins: { legend: { display: false }, tooltip: { enabled: false } },
         responsive: true,
         maintainAspectRatio: false,
@@ -119,15 +127,14 @@ const Analytics: React.FC = () => {
                 label: 'Present',
                 data: days.map((d: any) => d.present),
                 borderColor: accentColor,
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                borderWidth: 3,
-                tension: 0.4,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0, 0, 0, 0.02)',
+                borderWidth: 2,
+                tension: 0.3,
                 fill: true,
-                pointBackgroundColor: '#0a0a0a',
+                pointBackgroundColor: isDark ? '#000000' : '#ffffff',
                 pointBorderColor: accentColor,
-                pointBorderWidth: 2,
+                pointBorderWidth: 1.5,
                 pointRadius: 4,
-                pointHoverRadius: 6,
             }
         ]
     };
@@ -138,11 +145,11 @@ const Analytics: React.FC = () => {
         plugins: {
             legend: { display: false },
             tooltip: {
-                backgroundColor: '#0a0a0a',
-                titleFont: { size: 10, weight: 'bold' as const },
-                bodyFont: { size: 12 },
-                padding: 12,
-                borderColor: 'rgba(255,255,255,0.1)',
+                backgroundColor: isDark ? '#111' : '#fff',
+                titleColor: isDark ? '#fff' : '#000',
+                bodyColor: isDark ? '#ccc' : '#444',
+                padding: 10,
+                borderColor: gridColor,
                 borderWidth: 1,
             }
         },
@@ -153,157 +160,115 @@ const Analytics: React.FC = () => {
     };
 
     return (
-        <div className="pb-32 max-w-7xl mx-auto px-4 lg:px-8">
-            {/* ── Cinematic Analytics Header ── */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-8 mb-8 relative rounded-[3rem] border border-white/[0.06] glass-panel p-10 md:p-14 overflow-hidden shadow-2xl group transition-all duration-700">
-                <div className="absolute inset-0 bg-white/10/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10/[0.05] blur-[100px] pointer-events-none group-hover:bg-white/10/[0.08] transition-all duration-700" />
-
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                    <div className="text-center md:text-left">
-                        <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-                                <Activity size={24} />
-                            </div>
-                            <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter uppercase leading-none">Deep Analytics</h1>
-                        </div>
-                        <p className="text-white/30 font-bold text-xs md:text-sm tracking-[0.2em] uppercase max-w-lg leading-relaxed">
-                            Comprehensive tracking of academic metrics, periodic footprint, and cognitive engagement.
+        <div className="pb-24 max-w-7xl mx-auto px-4">
+            {/* Page Header */}
+            <div className="mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">
+                    Reports / Analytics
+                </p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-on-surface tracking-tight">Analytics</h1>
+                        <p className="text-xs text-on-surface-variant/40 mt-0.5">
+                            {overallAttendance}% overall · <span className="font-bold" style={{ color: currentLevel.color }}>{currentLevel.label}</span>
                         </p>
                     </div>
-
-                    <div className="flex items-center gap-6">
-                        <div className="text-right">
-                            <div className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: currentLevel.color }}>{currentLevel.label}</div>
-                            <div className="text-[10px] font-black text-white/20 uppercase tracking-widest mb-1">Overall Integrity</div>
-                            <div className="text-5xl font-black text-white tracking-tighter">{overallAttendance}%</div>
-                        </div>
-                    </div>
                 </div>
-            </motion.div>
+                <div className="mt-4 h-px bg-outline" />
+            </div>
 
-            {/* ── Last.fm Style KPI Cards ── */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
                 {[
-                    { label: 'Overall Rate', val: `${kpis.overall_percentage ?? overallAttendance}%`, sub: `Target: ${kpis.target_threshold ?? targetThreshold}%`, icon: <Activity size={18} />, color: '#ffffff' },
-                    { label: 'Consistency', val: `${kpis.consistency_score ?? overallAttendance}`, sub: currentLevel.label, icon: <TrendingUp size={18} />, color: '#ffffff' },
-                    { label: 'Subjects at Risk', val: `${kpis.at_risk_count ?? 0}`, sub: `of ${kpis.total_subjects ?? subjects.length} Tracks`, icon: <AlertTriangle size={18} />, color: '#ef4444' },
-                    { label: 'Smart Bunks Left', val: `${kpis.safe_bunks_remaining ?? 0}`, sub: 'Safe margin before dropping below target', icon: <CalendarDays size={18} />, color: '#22c55e' },
-                    { label: 'Academic Standing', val: Number(kpis.academic_standing || kpis.cgpa || 0).toFixed(2), sub: 'Academic integrity and growth', icon: <Award size={18} />, color: currentLevel.color },
+                    { label: 'Attendance', val: `${kpis.overall_percentage ?? overallAttendance}%`, sub: `Goal: ${kpis.target_threshold ?? targetThreshold}%`, icon: <Activity size={12} /> },
+                    { label: 'Consistency', val: `${kpis.consistency_score ?? overallAttendance}`, sub: currentLevel.label, icon: <TrendingUp size={12} /> },
+                    { label: 'At Risk', val: `${kpis.at_risk_count ?? 0}`, sub: `of ${kpis.total_subjects ?? subjects.length} subjects`, icon: <AlertTriangle size={12} />, danger: (kpis.at_risk_count ?? 0) > 0 },
+                    { label: 'Safe Bunks', val: `${kpis.safe_bunks_remaining ?? 0}`, sub: 'before threshold', icon: <CalendarDays size={12} /> },
+                    { label: 'CGPA', val: Number(kpis.academic_standing || kpis.cgpa || 0).toFixed(2), sub: 'Standing score', icon: <Award size={12} /> },
                 ].map((k, i) => (
-                    <div key={i} className="rounded-[2rem] border border-white/[0.04] glass-panel p-8 flex flex-col justify-between group hover:bg-white/[0.01] transition-all duration-500 hover:border-white/10 shadow-xl overflow-hidden relative">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-transparent to-white/[0.02] opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="flex justify-between items-start mb-6 relative z-10">
-                            <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">{k.label}</span>
-                            <div className="w-10 h-10 rounded-2xl flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:rotate-12 group-hover:scale-110 transition-all duration-500" style={{ backgroundColor: `${k.color}10`, color: k.color, border: `1px solid ${k.color}20` }}>
-                                {k.icon}
-                            </div>
+                    <div key={i} className="rounded-lg border border-outline bg-surface p-4 flex flex-col justify-between">
+                        <div className="flex items-center justify-between mb-4">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">{k.label}</span>
+                            <span className={`${k.danger ? 'text-red-500' : 'text-on-surface-variant/30'}`}>{k.icon}</span>
                         </div>
-                        <div className="relative z-10">
-                            <p className="text-3xl font-black text-white tracking-tighter truncate leading-none mb-2">{k.val}</p>
-                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2" style={{ color: k.color }}>
-                                <span className="w-1 h-1 rounded-full" style={{ backgroundColor: k.color }} />
-                                {k.sub}
-                            </p>
+                        <div>
+                            <p className={`text-2xl font-bold tracking-tight ${k.danger ? 'text-red-500' : 'text-on-surface'}`}>{k.val}</p>
+                            <p className="text-[9px] text-on-surface-variant/40 mt-1 font-semibold">{k.sub}</p>
                         </div>
                     </div>
                 ))}
-            </motion.div>
+            </div>
 
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-10">
-                <div className="rounded-[2rem] border border-white/[0.04] glass-panel p-7 shadow-xl">
-                    <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-3">Momentum</div>
-                    <div className="text-4xl font-black tracking-tighter" style={{ color: Number(kpis.attendance_momentum || 0) >= 0 ? '#ffffff' : '#ef4444' }}>{momentumText}</div>
-                    <p className="mt-2 text-xs text-white/35">Recent attendance shift versus the earlier window. Positive means your routine is improving.</p>
+            {/* Insight cards row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+                <div className="rounded-lg border border-outline bg-surface p-5">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-2">Momentum</p>
+                    <p className="text-2xl font-bold tracking-tight text-on-surface">{momentumText}</p>
+                    <p className="mt-1 text-[10px] text-on-surface-variant/40 font-semibold">Shift in attendance logs performance.</p>
                 </div>
-                <div className="rounded-[2rem] border border-white/[0.04] glass-panel p-7 shadow-xl">
-                    <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-3">Strongest Subject</div>
-                    <div className="text-2xl font-black text-white tracking-tight">{kpis.best_subject_name || 'N/A'}</div>
-                    <p className="mt-2 text-xs text-white/35">{kpis.best_subject_percent || '0%'} current attendance. Preserve this as your stability anchor.</p>
+                <div className="rounded-lg border border-outline bg-surface p-5">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-2">Strongest Course</p>
+                    <p className="text-sm font-bold text-on-surface tracking-tight truncate">{kpis.best_subject_name || 'N/A'}</p>
+                    <p className="mt-1 text-[10px] text-on-surface-variant/40 font-semibold">{kpis.best_subject_percent || '0%'} attendance record.</p>
                 </div>
-                <div className="rounded-[2rem] border border-white/[0.04] glass-panel p-7 shadow-xl">
-                    <div className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-3">Focus Mission</div>
-                    <div className="text-xl font-black text-white tracking-tight">{kpis.focus_label || 'Maintain target across subjects'}</div>
-                    <p className="mt-2 text-xs text-white/35">One clear instruction generated from risk count, weakest subject, and safe-bunk margin.</p>
+                <div className="rounded-lg border border-outline bg-surface p-5">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-2">Recommendation</p>
+                    <p className="text-xs font-bold text-on-surface leading-snug">{kpis.focus_label || 'Maintain target across all subjects.'}</p>
                 </div>
-            </motion.div>
+            </div>
 
-            {/* ── Visualizations Row ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-12">
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }} className="lg:col-span-2 rounded-[2.5rem] glass-panel border border-white/[0.04] p-8 flex flex-col items-center justify-center relative shadow-xl hover:border-white/10 group transition-all">
-                    <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-6 absolute top-8 left-8">Attendance Ratio</h3>
-                    <div className="relative w-56 h-56 mt-4">
+            {/* Visualization Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                <div className="lg:col-span-2 rounded-lg bg-surface border border-outline p-5 flex flex-col justify-between min-h-[260px]">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-4">Ratio Analysis</p>
+                    <div className="relative w-40 h-40 mx-auto">
                         <Doughnut data={doughnutData} options={doughnutOptions} />
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-5xl font-black text-white tracking-tighter">{overallAttendance}%</span>
-                            <span className="text-[10px] mt-1 font-black text-white uppercase tracking-widest">Global</span>
+                            <span className="text-3xl font-bold text-on-surface tracking-tight">{overallAttendance}%</span>
+                            <span className="text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Total</span>
                         </div>
                     </div>
-                </motion.div>
+                </div>
 
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }} className="lg:col-span-3 rounded-[2.5rem] glass-panel border border-white/[0.04] p-8 flex flex-col shadow-xl hover:border-white/10 transition-all">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xs font-black text-white/50 uppercase tracking-widest">Weekly Consistency Pattern</h3>
-                        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 text-white text-[10px] font-black uppercase">
-                            <Sparkles size={12} /> Trend
-                        </div>
-                    </div>
-                    <div className="flex-1 w-full relative min-h-[220px]">
+                <div className="lg:col-span-3 rounded-lg bg-surface border border-outline p-5 flex flex-col min-h-[260px]">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-4">Weekly Trend</p>
+                    <div className="flex-1 w-full relative min-h-[180px]">
                         {days.length > 0 ? (
                             <Line data={lineData} options={lineOptions} />
                         ) : (
-                            <div className="absolute inset-0 flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest">No data available</div>
+                            <div className="absolute inset-0 flex items-center justify-center text-on-surface-variant/20 text-xs">No logs registered</div>
                         )}
                     </div>
-                </motion.div>
+                </div>
 
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4 }} className="lg:col-span-2 rounded-[2.5rem] glass-panel border border-white/[0.04] p-8 relative shadow-xl hover:border-white/10 transition-all flex flex-col">
-                    <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-6 w-full text-left">Action Queue</h3>
-                    <div className="h-[260px] w-full mt-2">
+                <div className="lg:col-span-2 rounded-lg bg-surface border border-outline p-5 flex flex-col min-h-[280px]">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-4">Immediate Attention</p>
+                    <div className="flex-1 relative min-h-[200px]">
                         {focusSubjects.length > 0 ? (
                             <Bar data={focusBarData} options={focusBarOptions} />
                         ) : (
-                            <div className="h-full flex items-center justify-center text-white/20 text-xs font-bold uppercase tracking-widest">Not enough subjects</div>
+                            <div className="h-full flex items-center justify-center text-on-surface-variant/20 text-xs">All records look clear</div>
                         )}
                     </div>
-                </motion.div>
+                </div>
 
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="lg:col-span-3 rounded-[2.5rem] glass-panel border border-white/[0.04] p-8 shadow-xl">
-                    <h3 className="text-xs font-black text-white/50 uppercase tracking-widest mb-6">Deep Component Tracking</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="lg:col-span-3 rounded-lg bg-surface border border-outline p-5 min-h-[280px]">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-4">Subject breakdown</p>
+                    <div className="space-y-4 max-h-[200px] overflow-y-auto pr-1">
                         {subjects.map((subject: any, idx: number) => (
-                            <div key={idx} className="rounded-2xl border border-white/[0.03] bg-white/[0.01] p-5 hover:bg-white/[0.02] hover:border-white/5 transition-colors group">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h4 className="font-bold text-sm text-white/90 truncate mr-3 group-hover:text-white transition-colors uppercase">{subject.name}</h4>
-                                    <span className="text-lg font-black text-white tracking-tighter leading-none">{subject.percentage || 0}%</span>
+                            <div key={idx} className="space-y-1">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="font-bold text-on-surface truncate pr-4">{subject.name}</span>
+                                    <span className={`font-bold shrink-0 ${subject.percentage < targetThreshold ? 'text-red-500' : 'text-on-surface'}`}>{subject.percentage || 0}%</span>
                                 </div>
-                                <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden border border-white/[0.02] mb-3">
-                                    <div
-                                        className={`h-full transition-all duration-700 ${subject.percentage < targetThreshold ? 'bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-white/10 shadow-[0_0_8px_rgba(255,255,255,0.4)]'}`}
-                                        style={{ width: `${subject.percentage || 0}%` }}
-                                    />
-                                </div>
-                                <div className="flex justify-between items-center text-[9px] font-black tracking-widest uppercase text-white/30">
-                                    <span>{subject.attended} / {subject.total} Sessions</span>
-                                    <span>Target: {subject.target && subject.target !== 75 ? subject.target : targetThreshold}%</span>
+                                <div className="h-1.5 w-full bg-on-surface/10 rounded overflow-hidden">
+                                    <div className={`h-full transition-all duration-500 ${subject.percentage < targetThreshold ? 'bg-red-500' : accentColor}`} style={{ width: `${subject.percentage || 0}%` }} />
                                 </div>
                             </div>
                         ))}
-                        {subjects.length === 0 && (
-                            <div className="col-span-1 md:col-span-2 text-center py-10 text-white/20 text-xs font-bold tracking-widest uppercase">
-                                No subject data available.
-                            </div>
-                        )}
                     </div>
-                </motion.div>
+                </div>
             </div>
-
-            <style>{`
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
-            `}</style>
         </div>
     );
 };

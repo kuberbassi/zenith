@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Bell, Search, X, ChevronDown,
+    Bell, Search, X, ChevronDown, Menu,
     LayoutDashboard, PieChart, CalendarDays, CalendarClock,
     GraduationCap, Trophy, Beaker, Settings, Target
 } from 'lucide-react';
@@ -10,6 +10,7 @@ import { useSemester } from '@/contexts/SemesterContext';
 
 interface HeaderProps {
     notificationCount?: number;
+    onMenuClick?: () => void;
 }
 
 const routeTitles: Record<string, { title: string; icon: any }> = {
@@ -37,7 +38,7 @@ const quickNavItems = [
     { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
-const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
+const Header: React.FC<HeaderProps> = ({ notificationCount = 0, onMenuClick }) => {
     const location = useLocation();
     const [searchOpen, setSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -72,23 +73,32 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
 
     return (
         <>
-            {/* ── Floating Pill Header — fixed to viewport (all screen sizes) ── */}
-            <div className="flex fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-[calc(100vw-24px)]">
-                <div className="flex items-center h-11 md:h-14 px-2 md:px-3 rounded-full glass-panel/90 backdrop-blur-2xl border border-white/[0.1]" style={{ boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 4px 20px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)' }}>
-                    {/* Page icon + title */}
-                    <div className="flex items-center gap-1.5 md:gap-3 px-2 md:px-4">
-                        <PageIcon size={16} className="text-white/40 shrink-0" />
-                        <span className="text-[13px] md:text-[15px] font-medium text-white/70 truncate max-w-[62px] sm:max-w-[90px] md:max-w-none">{currentPage.title}</span>
+            {/* ── Sticky Top Header Bar ── */}
+            <header className="sticky top-0 z-30 h-16 w-full bg-surface/85 backdrop-blur-md border-b border-outline flex items-center justify-between px-4 md:px-8">
+                {/* Left section: Hamburger (mobile) + Page Title */}
+                <div className="flex items-center gap-2">
+                    {onMenuClick && (
+                        <button
+                            onClick={onMenuClick}
+                            className="lg:hidden p-2 rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+                            aria-label="Toggle navigation menu"
+                        >
+                            <Menu size={20} />
+                        </button>
+                    )}
+                    <div className="flex items-center gap-2.5">
+                        <PageIcon size={18} className="text-primary shrink-0" />
+                        <span className="text-sm font-semibold text-on-surface">{currentPage.title}</span>
                     </div>
+                </div>
 
-                    {/* Divider */}
-                    <div className="w-px h-6 md:h-8 bg-white/[0.08]" />
-
+                {/* Right section: Semester, Search, Notifications, Settings */}
+                <div className="flex items-center gap-3">
                     {/* Semester Selector */}
-                    <div className="relative px-0.5 md:px-2">
+                    <div className="relative">
                         <button
                             onClick={(e) => { e.stopPropagation(); setSemDropOpen(!semDropOpen); }}
-                            className="flex items-center gap-1 md:gap-2 px-2 md:px-4 py-1.5 md:py-2 rounded-full hover:bg-white/[0.06] transition-colors text-xs md:text-sm font-medium text-white/50 hover:text-white/70 whitespace-nowrap"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline hover:bg-surface-container-high transition-colors text-xs font-semibold text-on-surface-variant hover:text-on-surface whitespace-nowrap"
                         >
                             Sem {currentSemester}
                             <ChevronDown size={12} className={`transition-transform ${semDropOpen ? 'rotate-180' : ''}`} />
@@ -100,15 +110,15 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -4 }}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="absolute top-full mt-2 left-1/2 -translate-x-1/2 glass-panel border border-white/[0.08] rounded-2xl p-1.5 shadow-xl shadow-black/50 min-w-[130px]"
+                                    className="absolute top-full mt-2 right-0 bg-surface border border-outline rounded-xl p-1.5 shadow-lg min-w-[130px] z-50"
                                 >
                                     {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                                         <button
                                             key={s}
                                             onClick={() => { setCurrentSemester(s); setSemDropOpen(false); }}
                                             className={`w-full text-left px-3 py-2 rounded-lg text-[12px] font-medium transition-colors ${s === currentSemester
-                                                ? 'bg-white/7 text-white'
-                                                : 'text-white/50 hover:bg-white/[0.05] hover:text-white/70'
+                                                ? 'bg-primary/10 text-primary font-bold'
+                                                : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
                                                 }`}
                                         >
                                             Semester {s}
@@ -119,43 +129,42 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
                         </AnimatePresence>
                     </div>
 
-                    {/* Divider */}
-                    <div className="w-px h-6 md:h-8 bg-white/[0.08]" />
+                    <div className="h-4 w-px bg-outline-variant" />
 
                     {/* Search */}
                     <button
                         onClick={() => setSearchOpen(true)}
-                        className="flex items-center gap-2 md:gap-3 px-2 md:px-4 py-1.5 md:py-2 rounded-full hover:bg-white/[0.06] transition-colors"
+                        className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-container-high text-on-surface-variant/70 hover:text-on-surface transition-colors"
+                        title="Search (Ctrl+K)"
                     >
-                        <Search size={15} className="text-white/35" />
-                        <span className="hidden md:block text-xs text-white/20">⌘K</span>
+                        <Search size={16} />
+                        <kbd className="hidden md:inline-flex h-5 select-none items-center gap-0.5 rounded border border-outline px-1.5 font-mono text-[9px] font-medium text-on-surface-variant/40 bg-surface-container">Ctrl K</kbd>
                     </button>
 
-                    {/* Divider */}
-                    <div className="w-px h-6 md:h-8 bg-white/[0.08]" />
+                    <div className="h-4 w-px bg-outline-variant" />
 
                     {/* Notifications */}
-                    <div className="px-1 md:px-2 flex items-center gap-0.5 md:gap-2">
-                        <Link
-                            to="/notifications"
-                            className="relative flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full hover:bg-white/[0.06] transition-colors text-white/35 hover:text-white/60"
-                        >
-                            <Bell size={16} />
-                            {notificationCount > 0 && (
-                                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-white/10 rounded-full" />
-                            )}
-                        </Link>
+                    <Link
+                        to="/notifications"
+                        className="relative flex items-center justify-center p-2 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface-variant/70 hover:text-on-surface"
+                        title="Notifications"
+                    >
+                        <Bell size={16} />
+                        {notificationCount > 0 && (
+                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-surface" />
+                        )}
+                    </Link>
 
-                        {/* Settings */}
-                        <Link
-                            to="/settings"
-                            className="flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full hover:bg-white/[0.06] transition-colors text-white/35 hover:text-white/60 mr-0.5 md:mr-1"
-                        >
-                            <Settings size={16} />
-                        </Link>
-                    </div>
+                    {/* Settings */}
+                    <Link
+                        to="/settings"
+                        className="flex items-center justify-center p-2 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface-variant/70 hover:text-on-surface"
+                        title="Settings"
+                    >
+                        <Settings size={16} />
+                    </Link>
                 </div>
-            </div>
+            </header>
 
             {/* ── Command Palette ───────────────────────────────────── */}
             <AnimatePresence>
@@ -163,43 +172,43 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0 }) => {
                     <>
                         <motion.div
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
                             onClick={() => setSearchOpen(false)}
                         />
                         <motion.div
                             initial={{ opacity: 0, y: -8, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                            className="fixed top-24 left-1/2 -translate-x-1/2 w-full max-w-md glass-panel rounded-[2rem] border border-white/[0.06] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8),inset_0_1px_0_rgba(255,255,255,0.04)] z-50 overflow-hidden"
+                            className="fixed top-24 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] md:w-full max-w-md bg-surface border border-outline rounded-2xl shadow-2xl z-50 overflow-hidden text-on-surface"
                         >
-                            <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.06]">
-                                <Search size={18} className="text-white/50" />
+                            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-outline bg-surface-container/30">
+                                <Search size={18} className="text-on-surface-variant/50" />
                                 <input
                                     type="text"
                                     placeholder="Search pages..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="flex-1 bg-transparent text-white placeholder:text-white/30 outline-none text-sm font-medium"
+                                    className="flex-1 bg-transparent text-on-surface placeholder:text-on-surface-variant/40 outline-none text-sm font-medium"
                                     autoFocus
                                 />
-                                <button onClick={() => setSearchOpen(false)} className="p-1.5 rounded-xl hover:bg-white/[0.06] text-white/30 hover:text-white/70 transition-colors">
+                                <button onClick={() => setSearchOpen(false)} className="p-1.5 rounded-lg hover:bg-surface-container-high text-on-surface-variant/40 hover:text-on-surface transition-colors">
                                     <X size={16} />
                                 </button>
                             </div>
                             <div className="p-2 max-h-72 overflow-y-auto custom-scrollbar">
                                 {filteredNav.length === 0 ? (
-                                    <p className="text-center text-white/20 py-8 text-sm italic">No results found...</p>
+                                    <p className="text-center text-on-surface-variant/30 py-8 text-sm italic">No results found...</p>
                                 ) : (
                                     filteredNav.map(item => (
                                         <Link
                                             key={item.href} to={item.href}
                                             onClick={() => setSearchOpen(false)}
-                                            className="flex items-center gap-4 px-4 py-3 rounded-2xl hover:bg-white/[0.04] text-white/50 hover:text-white transition-colors group"
+                                            className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors group"
                                         >
-                                            <div className="p-2 rounded-xl bg-white/[0.02] group-hover:bg-white/5 transition-colors">
-                                                <item.icon size={18} className="text-white/40 group-hover:text-white transition-colors" />
+                                            <div className="p-2 rounded-lg bg-surface-container group-hover:bg-surface-container-highest transition-colors">
+                                                <item.icon size={18} className="text-on-surface-variant group-hover:text-on-surface transition-colors" />
                                             </div>
-                                            <span className="text-sm font-bold tracking-wide">{item.name}</span>
+                                            <span className="text-sm font-semibold">{item.name}</span>
                                         </Link>
                                     ))
                                 )}

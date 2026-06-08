@@ -32,13 +32,15 @@ const Calendar = lazy(() => import('./pages/Calendar.tsx'));
 const TimeTable = lazy(() => import('./pages/TimeTable.tsx'));
 const Courses = lazy(() => import('./pages/Courses.tsx'));
 const Practicals = lazy(() => import('./pages/Practicals.tsx'));
-const Notifications = lazy(() => import('./pages/Notifications.tsx'));
+const Notes = lazy(() => import('./pages/Notes.tsx'));
 const Results = lazy(() => import('./pages/Results.tsx'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy.tsx'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService.tsx'));
 const NotFound = lazy(() => import('./pages/NotFound.tsx'));
 
 const SkillTracker = lazy(() => import('./pages/SkillTracker.tsx'));
+const Notifications = lazy(() => import('./pages/Notifications.tsx'));
+
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
@@ -173,11 +175,11 @@ const AppRoutes: React.FC = () => {
         />
 
         <Route
-          path="/notifications"
+          path="/notes"
           element={
             <ProtectedRoute>
               <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <Notifications />
+                <Notes />
               </Suspense>
             </ProtectedRoute>
           }
@@ -199,6 +201,16 @@ const AppRoutes: React.FC = () => {
             <ProtectedRoute>
               <Suspense fallback={<LoadingSpinner fullScreen />}>
                 <SkillTracker />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<LoadingSpinner fullScreen />}>
+                <Notifications />
               </Suspense>
             </ProtectedRoute>
           }

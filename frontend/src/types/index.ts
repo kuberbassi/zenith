@@ -17,10 +17,6 @@ export interface User {
     attendance_threshold?: number;
     warning_threshold?: number;
     phone_number?: string;
-    headline?: string;
-    linkedin_url?: string;
-    github_url?: string;
-    portfolio_url?: string;
 }
 
 export interface SystemLog {

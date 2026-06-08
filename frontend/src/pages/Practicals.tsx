@@ -1,14 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Plus, Minus, Edit2, Target, FlaskConical } from 'lucide-react';
-import Button from '@/components/ui/Button';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { CheckCircle, Plus, Minus, Edit2, Target } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { attendanceService } from '@/services/attendance.service';
 import { useSemester } from '@/contexts/SemesterContext';
 import type { Subject } from '@/types';
 import EditSubjectModal from '@/components/modals/EditSubjectModal';
+
+const NOTION_COLORS = [
+    { bgLight: '#f1f1ef', textLight: '#37352f', borderLight: '#e9e9e6', bgDark: '#252525', textDark: '#9b9a97', borderDark: '#2a2a2a' }, // gray
+    { bgLight: '#f8ecdf', textLight: '#c27c38', borderLight: '#f1dfcd', bgDark: '#3f2c1e', textDark: '#e79e50', borderDark: '#4d3826' }, // brown
+    { bgLight: '#faebd9', textLight: '#d9730d', borderLight: '#f6d5b3', bgDark: '#432912', textDark: '#ffa344', borderDark: '#533418' }, // orange
+    { bgLight: '#fbf3db', textLight: '#dfab01', borderLight: '#f7e3a6', bgDark: '#443d1a', textDark: '#ffdc4f', borderDark: '#564d23' }, // yellow
+    { bgLight: '#eddffc', textLight: '#6940a5', borderLight: '#decbf7', bgDark: '#2d2238', textDark: '#b390e6', borderDark: '#3b2d49' }, // purple
+    { bgLight: '#ebdff9', textLight: '#9065b0', borderLight: '#dfccf3', bgDark: '#301c3f', textDark: '#cfa6f3', borderDark: '#3d254f' }, // violet
+    { bgLight: '#dff1eb', textLight: '#1d825c', borderLight: '#cbe7dc', bgDark: '#1a3229', textDark: '#52c49c', borderDark: '#234438' }, // green
+    { bgLight: '#e0ecfc', textLight: '#0b6e99', borderLight: '#cbe0fa', bgDark: '#182f42', textDark: '#529cca', borderDark: '#223f59' }, // blue
+    { bgLight: '#fbe4e4', textLight: '#c41d1d', borderLight: '#f6c7c7', bgDark: '#451a1a', textDark: '#ff7373', borderDark: '#572323' }, // red
+    { bgLight: '#fdecf2', textLight: '#ad1a72', borderLight: '#fad0e2', bgDark: '#40182c', textDark: '#f26fb6', borderDark: '#512239' }, // pink
+];
+
+export function getNotionTagStyles(text: string) {
+    if (!text) return { className: '', style: {} };
+    let hash = 0;
+    const cleanText = text.trim();
+    for (let i = 0; i < cleanText.length; i++) {
+        hash = cleanText.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % NOTION_COLORS.length;
+    const color = NOTION_COLORS[idx];
+    return {
+        style: {
+            '--tag-bg-light': color.bgLight,
+            '--tag-text-light': color.textLight,
+            '--tag-border-light': color.borderLight,
+            '--tag-bg-dark': color.bgDark,
+            '--tag-text-dark': color.textDark,
+            '--tag-border-dark': color.borderDark,
+        } as React.CSSProperties,
+        className: 'bg-[var(--tag-bg-light)] dark:bg-[var(--tag-bg-dark)] text-[var(--tag-text-light)] dark:text-[var(--tag-text-dark)] border border-[var(--tag-border-light)] dark:border-[var(--tag-border-dark)]'
+    };
+}
 
 const Practicals: React.FC = () => {
     const { showToast } = useToast();
@@ -94,107 +127,145 @@ const Practicals: React.FC = () => {
 
     const filteredSubjects = subjects.filter(sub => {
         const cats = sub.categories || (sub.category ? [sub.category] : ['Theory']);
-        const hasWork = cats.includes('Practical') || cats.includes('Assignment');
-        if (!hasWork) return false;
-        if (selectedCategory === 'All') return true;
+        if (selectedCategory === 'All') {
+            return cats.includes('Practical') || cats.includes('Assignment');
+        }
         return cats.includes(selectedCategory);
     });
 
     const categories = ['All', 'Theory', 'Practical', 'Assignment'];
 
-    if (loading) return <LoadingSpinner fullScreen />;
-
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto pb-32">
-
-            {/* ── Cinematic Hero ────────────────────────────────────────── */}
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-12 relative rounded-[2rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden shadow-2xl group transition-all duration-700">
-                <div className="absolute inset-0 bg-white/10/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/10/[0.03] blur-[150px] pointer-events-none" />
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
-                    <div>
-                        <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shadow-lg shadow-white/5">
-                                <FlaskConical size={24} />
-                            </div>
-                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Mission Execution</h1>
-                        </div>
-                        <p className="text-white/40 font-medium max-w-md">Track your practical records and assignment milestones in ultra-stealth mode.</p>
-                    </div>
-                    <div className="flex gap-1.5 md:gap-4 p-1.5 rounded-2xl bg-white/[0.02] border border-white/[0.04] overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
-                        {categories.map(cat => (
-                            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 md:px-5 py-2 md:py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex-shrink-0 ${selectedCategory === cat ? 'bg-white/10 text-white shadow-xl shadow-white/10' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{cat}</button>
-                        ))}
-                    </div>
+        <div className="max-w-6xl mx-auto pb-24 px-4 select-none">
+            {/* Page Header */}
+            <div className="mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">
+                    Tracking / Practicals
+                </p>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-bold text-on-surface tracking-tight">Practicals &amp; Assignments</h1>
                 </div>
-            </motion.div>
-
-            {/* ── Subject Grid ──────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <AnimatePresence mode="popLayout">
-                    {filteredSubjects.map((subject, index) => {
-                        const cats = subject.categories || (subject.category ? [subject.category] : ['Theory']);
-                        const hasPracticals = cats.includes('Practical');
-                        const hasAssignments = cats.includes('Assignment');
-                        const p = subject.practicals || { total: 10, completed: 0, hardcopy: false };
-                        const a = subject.assignments || { total: 4, completed: 0, hardcopy: false };
-
-                        let total = 0; let done = 0;
-                        if (hasPracticals) { total += p.total; done += p.completed; }
-                        if (hasAssignments) { total += a.total; done += a.completed; }
-                        const progress = total > 0 ? (done / total) * 100 : 0;
-
-                        return (
-                            <motion.div key={subject._id as any} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1 }} transition={{ delay: index * 0.05 }} className="group">
-                                <div className="h-full rounded-3xl border border-white/[0.06] glass-panel p-6 relative overflow-hidden transition-all hover:bg-[#0c0c0c] hover:border-white/[0.1] shadow-xl" style={{ boxShadow: '0 20px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                                    <div className="absolute top-0 left-0 h-1 bg-white/[0.03] w-full"><motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} className="h-full bg-white/10 shadow-[0_0_10px_rgba(255,255,255,0.4)]" /></div>
-
-                                    <div className="flex justify-between items-start mb-6 pt-4">
-                                        <div className="min-w-0">
-                                            <h3 className="text-lg font-black text-white/90 truncate pr-2 group-hover:text-white transition-colors uppercase tracking-tight">{subject.name}</h3>
-                                            <div className="flex gap-2 mt-2">
-                                                {cats.filter(c => c !== 'Theory' && c !== 'Project').map(c => (
-                                                    <span key={c} className="px-2 py-0.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-black text-white uppercase tracking-widest">{c}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <button onClick={() => setEditingSubject(subject)} className="w-8 h-8 rounded-xl bg-white/[0.02] border border-white/[0.04] flex items-center justify-center text-white/20 hover:text-white hover:bg-white/5 transition-all"><Edit2 size={14} /></button>
-                                    </div>
-
-                                    <div className="space-y-6">
-                                        {hasPracticals && (
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Practicals</span><span className="text-[10px] font-black text-white font-mono tracking-widest">{p.completed}/{p.total}</span></div>
-                                                <div className="flex gap-2">
-                                                    <Button variant="secondary" className="flex-1 h-9 rounded-xl border-white/[0.04]" disabled={p.completed <= 0} onClick={() => handleUpdate(subject._id, { completed: p.completed - 1 })}><Minus size={14} /></Button>
-                                                    <Button variant="primary" className="flex-1 h-9 rounded-xl bg-white/10 shadow-lg shadow-white/10" disabled={p.completed >= p.total} onClick={() => handleUpdate(subject._id, { completed: p.completed + 1 })}><Plus size={14} /></Button>
-                                                </div>
-                                                <button onClick={() => handleUpdate(subject._id, { hardcopy: !p.hardcopy })} className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${p.hardcopy ? 'bg-white/5 text-white border border-white/10 shadow-[inset_0_1px_20px_rgba(255,255,255,0.05)]' : 'bg-white/[0.02] border border-white/[0.04] text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{p.hardcopy ? <><CheckCircle size={14} /> Submitted</> : <><Target size={14} /> Mark Submitted</>}</button>
-                                            </div>
-                                        )}
-
-                                        {hasPracticals && hasAssignments && <div className="h-px bg-white/[0.03]" />}
-
-                                        {hasAssignments && (
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between items-center"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Assignments</span><span className="text-[10px] font-black text-white font-mono tracking-widest">{a.completed}/{a.total}</span></div>
-                                                <div className="flex gap-2">
-                                                    <Button variant="secondary" className="flex-1 h-9 rounded-xl border-white/[0.04]" disabled={a.completed <= 0} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed - 1 })}><Minus size={14} /></Button>
-                                                    <Button variant="primary" className="flex-1 h-9 rounded-xl bg-white/10 shadow-lg shadow-white/10" disabled={a.completed >= a.total} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed + 1 })}><Plus size={14} /></Button>
-                                                </div>
-                                                <button onClick={() => handleAssignmentUpdate(subject._id, { hardcopy: !a.hardcopy })} className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${a.hardcopy ? 'bg-white/5 text-white border border-white/10 shadow-[inset_0_1px_20px_rgba(255,255,255,0.05)]' : 'bg-white/[0.02] border border-white/[0.04] text-white/30 hover:text-white/60 hover:bg-white/5'}`}>{a.hardcopy ? <><CheckCircle size={14} /> Submitted</> : <><Target size={14} /> Mark Submitted</>}</button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </motion.div>
-                        );
-                    })}
-                </AnimatePresence>
+                {/* Category tabs */}
+                <div className="flex gap-0 border-b border-outline mt-4 overflow-x-auto no-scrollbar">
+                    {categories.map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => setSelectedCategory(cat)}
+                            className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                                selectedCategory === cat
+                                    ? 'border-on-surface text-on-surface'
+                                    : 'border-transparent text-on-surface-variant/40 hover:text-on-surface-variant hover:border-outline'
+                            }`}
+                        >
+                            {cat}
+                        </button>
+                    ))}
+                </div>
             </div>
 
+            {loading ? (
+                /* Non-blocking skeletons */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="animate-pulse h-48 bg-surface-container border border-outline rounded-lg" />
+                    ))}
+                </div>
+            ) : (
+                /* Subject Grid */
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <AnimatePresence mode="popLayout">
+                        {filteredSubjects.map((subject, index) => {
+                            const cats = subject.categories || (subject.category ? [subject.category] : ['Theory']);
+                            const hasPracticals = cats.includes('Practical');
+                            const hasAssignments = cats.includes('Assignment');
+                            const p = subject.practicals || { total: 10, completed: 0, hardcopy: false };
+                            const a = subject.assignments || { total: 4, completed: 0, hardcopy: false };
+
+                            let total = 0; let done = 0;
+                            if (hasPracticals) { total += p.total; done += p.completed; }
+                            if (hasAssignments) { total += a.total; done += a.completed; }
+                            const progress = total > 0 ? (done / total) * 100 : 0;
+
+                            return (
+                                <motion.div key={subject._id as any} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: index * 0.04 }}>
+                                    <div className="h-full rounded-lg border border-outline bg-surface p-5 relative overflow-hidden hover:border-on-surface transition-all flex flex-col justify-between min-h-[180px]">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-3 pt-1">
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="text-xs font-bold text-on-surface truncate pr-2">{subject.name}</h3>
+                                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                        {cats.filter(c => c !== 'Theory' && c !== 'Project').map(c => {
+                                                            const tag = getNotionTagStyles(c);
+                                                            return (
+                                                                <span key={c} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${tag.className}`} style={tag.style}>{c}</span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => setEditingSubject(subject)} className="w-7 h-7 rounded border border-outline bg-surface flex items-center justify-center text-on-surface-variant/30 hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer flex-shrink-0 ml-2">
+                                                    <Edit2 size={12} />
+                                                </button>
+                                            </div>
+
+                                            <div className="space-y-4 my-4">
+                                                {hasPracticals && (
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">Practicals Progress</span>
+                                                            <span className="text-xs font-bold text-on-surface font-mono">{p.completed}/{p.total}</span>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button disabled={p.completed <= 0} onClick={() => handleUpdate(subject._id, { completed: p.completed - 1 })} className="flex-1 h-7 rounded border border-outline text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
+                                                                <Minus size={11} />
+                                                            </button>
+                                                            <button disabled={p.completed >= p.total} onClick={() => handleUpdate(subject._id, { completed: p.completed + 1 })} className="flex-1 h-7 rounded border border-outline text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
+                                                                <Plus size={11} />
+                                                            </button>
+                                                        </div>
+                                                        <button onClick={() => handleUpdate(subject._id, { hardcopy: !p.hardcopy })} className={`w-full py-1.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${p.hardcopy ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 font-bold' : 'border border-dashed border-outline text-on-surface-variant/40 hover:border-outline hover:text-on-surface-variant'}`}>
+                                                            {p.hardcopy ? <><CheckCircle size={11} /> Submitted</> : <><Target size={11} /> Mark Submitted</>}
+                                                        </button>
+                                                    </div>
+                                                )}
+
+                                                {hasPracticals && hasAssignments && <div className="h-px bg-outline" />}
+
+                                                {hasAssignments && (
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">Assignments Progress</span>
+                                                            <span className="text-xs font-bold text-on-surface font-mono">{a.completed}/{a.total}</span>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button disabled={a.completed <= 0} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed - 1 })} className="flex-1 h-7 rounded border border-outline text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
+                                                                <Minus size={11} />
+                                                            </button>
+                                                            <button disabled={a.completed >= a.total} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed + 1 })} className="flex-1 h-7 rounded border border-outline text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
+                                                                <Plus size={11} />
+                                                            </button>
+                                                        </div>
+                                                        <button onClick={() => handleAssignmentUpdate(subject._id, { hardcopy: !a.hardcopy })} className={`w-full py-1.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${a.hardcopy ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 font-bold' : 'border border-dashed border-outline text-on-surface-variant/40 hover:border-outline hover:text-on-surface-variant'}`}>
+                                                            {a.hardcopy ? <><CheckCircle size={11} /> Submitted</> : <><Target size={11} /> Mark Submitted</>}
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* bottom progress line */}
+                                        <div className="h-1 w-full bg-on-surface/10 rounded-full overflow-hidden mt-3">
+                                            <div className="h-full bg-on-surface" style={{ width: `${progress}%` }} />
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                    </AnimatePresence>
+                </div>
+            )}
+
             {editingSubject && <EditSubjectModal isOpen={!!editingSubject} onClose={() => setEditingSubject(null)} subject={editingSubject} onSuccess={loadData} />}
-        </motion.div>
+        </div>
     );
 };
 

@@ -47,10 +47,7 @@ model User {
   gender               String?
   phone_number         String?
   admission_year       String?
-  headline             String?
-  linkedin_url         String?
-  github_url           String?
-  portfolio_url        String?
+
   current_semester     Int      @default(1)
   target_attendance    Int      @default(75)
   attendance_threshold Int      @default(75)
@@ -68,6 +65,7 @@ model User {
   user_backups     UserBackup[]
   user_preference  UserPreference?
   skills           Skill[]
+  notes            Note[]
 
 
 
@@ -240,5 +238,27 @@ model Skill {
   @@index([user_id])
   @@map("skills")
 }
+
+model Note {
+  id          String   @id @default(cuid())
+  user_id     String
+  title       String   @default("")
+  content     String   @default("")
+  is_todo     Boolean  @default(false)
+  todos       Json     @default("[]") // array of { id: string, text: string, completed: boolean, priority: string }
+  category    String   @default("General")
+  color       String   @default("") // monochrome color class
+  is_pinned   Boolean  @default(false)
+  is_archived Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([user_id, is_todo])
+  @@map("notes")
+}
+
 
 

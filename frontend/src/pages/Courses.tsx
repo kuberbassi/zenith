@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
     ExternalLink, Trash, Edit2, Award,
-    TrendingUp, Book, Globe, Video, BookOpen, GraduationCap, Clock
+    Book, Globe, Video
 } from 'lucide-react';
-import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
@@ -39,16 +37,52 @@ function getCourseId(course: Course): string {
     return course._id || '';
 }
 
+const NOTION_COLORS = [
+    { bgLight: '#f1f1ef', textLight: '#37352f', borderLight: '#e9e9e6', bgDark: '#252525', textDark: '#9b9a97', borderDark: '#2a2a2a' }, // gray
+    { bgLight: '#f8ecdf', textLight: '#c27c38', borderLight: '#f1dfcd', bgDark: '#3f2c1e', textDark: '#e79e50', borderDark: '#4d3826' }, // brown
+    { bgLight: '#faebd9', textLight: '#d9730d', borderLight: '#f6d5b3', bgDark: '#432912', textDark: '#ffa344', borderDark: '#533418' }, // orange
+    { bgLight: '#fbf3db', textLight: '#dfab01', borderLight: '#f7e3a6', bgDark: '#443d1a', textDark: '#ffdc4f', borderDark: '#564d23' }, // yellow
+    { bgLight: '#eddffc', textLight: '#6940a5', borderLight: '#decbf7', bgDark: '#2d2238', textDark: '#b390e6', borderDark: '#3b2d49' }, // purple
+    { bgLight: '#ebdff9', textLight: '#9065b0', borderLight: '#dfccf3', bgDark: '#301c3f', textDark: '#cfa6f3', borderDark: '#3d254f' }, // violet
+    { bgLight: '#dff1eb', textLight: '#1d825c', borderLight: '#cbe7dc', bgDark: '#1a3229', textDark: '#52c49c', borderDark: '#234438' }, // green
+    { bgLight: '#e0ecfc', textLight: '#0b6e99', borderLight: '#cbe0fa', bgDark: '#182f42', textDark: '#529cca', borderDark: '#223f59' }, // blue
+    { bgLight: '#fbe4e4', textLight: '#c41d1d', borderLight: '#f6c7c7', bgDark: '#451a1a', textDark: '#ff7373', borderDark: '#572323' }, // red
+    { bgLight: '#fdecf2', textLight: '#ad1a72', borderLight: '#fad0e2', bgDark: '#40182c', textDark: '#f26fb6', borderDark: '#512239' }, // pink
+];
+
+export function getNotionTagStyles(text: string) {
+    if (!text) return { className: '', style: {} };
+    let hash = 0;
+    const cleanText = text.trim();
+    for (let i = 0; i < cleanText.length; i++) {
+        hash = cleanText.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % NOTION_COLORS.length;
+    const color = NOTION_COLORS[idx];
+    return {
+        style: {
+            '--tag-bg-light': color.bgLight,
+            '--tag-text-light': color.textLight,
+            '--tag-border-light': color.borderLight,
+            '--tag-bg-dark': color.bgDark,
+            '--tag-text-dark': color.textDark,
+            '--tag-border-dark': color.borderDark,
+        } as React.CSSProperties,
+        className: 'bg-[var(--tag-bg-light)] dark:bg-[var(--tag-bg-dark)] text-[var(--tag-text-light)] dark:text-[var(--tag-text-dark)] border border-[var(--tag-border-light)] dark:border-[var(--tag-border-dark)]'
+    };
+}
+
 const PLATFORMS = [
-    { value: 'coursera', label: 'Coursera', icon: Globe, color: 'bg-white/20' },
-    { value: 'udemy', label: 'Udemy', icon: Video, color: 'bg-purple-600' },
-    { value: 'youtube', label: 'YouTube', icon: Video, color: 'bg-red-600' },
-    { value: 'custom', label: 'Custom', icon: Globe, color: 'bg-zinc-600' },
+    { value: 'coursera', label: 'Coursera', icon: Globe },
+    { value: 'udemy', label: 'Udemy', icon: Video },
+    { value: 'youtube', label: 'YouTube', icon: Video },
+    { value: 'custom', label: 'Custom', icon: Globe },
 ];
 
 const Courses: React.FC = () => {
     const { showToast } = useToast();
     const [courses, setCourses] = useState<Course[]>([]);
+    const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     usePageMeta({
@@ -66,9 +100,14 @@ const Courses: React.FC = () => {
 
     const loadCourses = async () => {
         try {
+            setLoading(true);
             const data = await attendanceService.getManualCourses();
             setCourses(Array.isArray(data) ? data.map(normalizeCourse).filter((c: Course) => c.title || c.url) : []);
-        } catch { showToast('error', 'Sync Failed'); }
+        } catch { 
+            showToast('error', 'Sync Failed'); 
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleAddCourse = () => {
@@ -84,13 +123,13 @@ const Courses: React.FC = () => {
     };
 
     const handleDeleteCourse = async (id: string) => {
-        if (!confirm('Permanent Erasure: Delete this course?')) return;
+        if (!confirm('Are you sure you want to delete this course?')) return;
         const previous = courses;
         const updated = courses.filter(c => getCourseId(c) !== id);
         setCourses(updated);
         try {
             await attendanceService.deleteManualCourse(id);
-            showToast('success', 'Course Purged');
+            showToast('success', 'Course deleted successfully');
         } catch {
             setCourses(previous);
             showToast('error', 'Save Failed');
@@ -105,7 +144,7 @@ const Courses: React.FC = () => {
             setCourses(updated);
             try {
                 await attendanceService.updateManualCourse(getCourseId(editingCourse), formData);
-                showToast('success', 'Profile Updated');
+                showToast('success', 'Course updated successfully');
             } catch {
                 setCourses(previous);
                 showToast('error', 'Save Failed');
@@ -118,7 +157,7 @@ const Courses: React.FC = () => {
             try {
                 await attendanceService.addManualCourse(formData);
                 await loadCourses();
-                showToast('success', 'Course Initialized');
+                showToast('success', 'Course added successfully');
             } catch {
                 setCourses(previous);
                 showToast('error', 'Save Failed');
@@ -130,142 +169,143 @@ const Courses: React.FC = () => {
     const activeCourses = courses.filter(c => c.progress < 100);
     const completedCourses = courses.filter(c => c.progress === 100);
 
-    const inputCls = "w-full px-5 py-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] text-white text-sm placeholder-white/20 focus:outline-none focus:border-white/20 focus:ring-4 focus:ring-white/10 transition-all";
+    const inputCls = "w-full px-3 py-2.5 rounded border border-outline bg-surface text-on-surface text-xs placeholder-on-surface-variant/30 focus:outline-none focus:border-on-surface transition-all";
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto pb-32">
-
-            {/* ── Cinematic Hero ────────────────────────────────────────── */}
-            <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-12 relative rounded-[2rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden shadow-2xl">
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/10/[0.03] blur-[150px] pointer-events-none" />
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
-                    <div className="flex-1">
-                        <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shadow-lg shadow-white/5"><BookOpen size={24} /></div>
-                            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">Intelligence Archive</h1>
-                        </div>
-                        <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-6">
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                <TrendingUp size={14} className="text-white" />
-                                <span className="text-[11px] font-black text-white/40 uppercase tracking-widest">{activeCourses.length} Active Tracks</span>
-                            </div>
-                            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-                                <Award size={14} className="text-white" />
-                                <span className="text-[11px] font-black text-white/40 uppercase tracking-widest">{completedCourses.length} Completed Tracks</span>
-                            </div>
-                        </div>
+        <div className="max-w-5xl mx-auto pb-24 px-4 select-none">
+            {/* Page Header */}
+            <div className="mb-8">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">Learning / Courses</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-on-surface tracking-tight">Courses</h1>
+                        <p className="text-xs text-on-surface-variant/40 mt-0.5">{activeCourses.length} active · {completedCourses.length} completed</p>
                     </div>
-                    <Button onClick={handleAddCourse} className="h-14 px-8 rounded-2xl bg-white/10 text-white font-black uppercase tracking-widest shadow-2xl shadow-white/10 hover:scale-105 active:scale-95 transition-all">Initialize Track</Button>
+                    <button onClick={handleAddCourse} className="h-8 px-3 text-xs font-bold rounded bg-on-surface text-surface hover:opacity-90 transition-all cursor-pointer">Add Course</button>
                 </div>
-            </motion.div>
+                <div className="mt-4 h-px bg-outline" />
+            </div>
 
-            {/* ── Active Tracks ─────────────────────────────────────────── */}
-            {activeCourses.length > 0 && (
-                <section className="mb-16">
-                    <div className="flex items-center gap-3 mb-8 px-2">
-                        <div className="h-px flex-1 bg-white/[0.04]" />
-                        <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/20">Operational Tracks</h2>
-                        <div className="h-px flex-1 bg-white/[0.04]" />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        <AnimatePresence>
-                            {activeCourses.map((course, idx) => {
-                                const plat = PLATFORMS.find(p => p.value === course.platform) || PLATFORMS[3];
-                                const P_Icon = plat.icon;
-                                return (
-                                    <motion.div key={getCourseId(course)} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }} className="group">
-                                        <div className="h-full rounded-3xl border border-white/[0.06] glass-panel p-6 relative overflow-hidden transition-all hover:bg-[#0c0c0c] hover:border-white/[0.1] shadow-xl flex flex-col" style={{ boxShadow: '0 20px 50px -12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                                            <div className="flex items-center justify-between mb-6">
-                                                <div className={`flex items-center gap-2 px-3 py-1 rounded-lg ${plat.color} text-white text-[9px] font-black uppercase tracking-widest`}><P_Icon size={12} /> {plat.label}</div>
-                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEditCourse(course)} className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] text-white/20 hover:text-white hover:bg-white/5"><Edit2 size={12} /></button>
-                                                    <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] text-white/20 hover:text-red-500 hover:bg-red-500/5"><Trash size={12} /></button>
+            {loading ? (
+                <div className="space-y-4">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="animate-pulse h-16 bg-surface-container border border-outline rounded-lg" />
+                    ))}
+                </div>
+            ) : (
+                <div className="space-y-8">
+                    {/* Active Courses */}
+                    {activeCourses.length > 0 && (
+                        <section>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/30 mb-4 px-1">In Progress</p>
+                            <div className="border border-outline rounded-lg overflow-hidden bg-surface">
+                                {activeCourses.map((course, idx) => {
+                                    const plat = PLATFORMS.find(p => p.value === course.platform) || PLATFORMS[3];
+                                    return (
+                                        <div key={getCourseId(course)} className={`group flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4 transition-all ${idx < activeCourses.length - 1 ? 'border-b border-outline' : ''}`}>
+                                            {(() => {
+                                                const tag = getNotionTagStyles(plat.label);
+                                                return (
+                                                    <span style={tag.style} className={`shrink-0 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded w-16 text-center ${tag.className}`}>
+                                                        {plat.label}
+                                                    </span>
+                                                );
+                                            })()}
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold text-on-surface truncate">{course.title}</p>
+                                                {course.instructor && <p className="text-[10px] text-on-surface-variant/40 mt-0.5 truncate font-semibold">{course.instructor}</p>}
+                                            </div>
+                                            <div className="flex items-center gap-3 shrink-0 w-32">
+                                                <div className="flex-1 h-1 bg-on-surface/10 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-on-surface" style={{ width: `${course.progress}%` }} />
                                                 </div>
+                                                <span className="text-[10px] font-bold text-on-surface-variant/50 w-8 text-right">{course.progress}%</span>
                                             </div>
-                                            <h3 className="text-xl font-black text-white/90 mb-2 truncate group-hover:text-white transition-colors uppercase tracking-tight">{course.title}</h3>
-                                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-6 flex items-center gap-2"><GraduationCap size={12} />{course.instructor || 'Lead Architect'}</p>
-                                            <div className="mb-8">
-                                                <div className="flex justify-between items-center mb-2"><span className="text-[10px] font-black text-white/20 uppercase tracking-widest">Synchronization</span><span className="text-[10px] font-black text-white font-mono tracking-widest">{course.progress}%</span></div>
-                                                <div className="h-1.5 w-full bg-white/[0.02] rounded-full overflow-hidden border border-white/[0.04]"><motion.div initial={{ width: 0 }} animate={{ width: `${course.progress}%` }} className="h-full bg-white/10 shadow-[0_0_10px_rgba(255,255,255,0.3)]" /></div>
-                                            </div>
-                                            {course.targetCompletionDate && <div className="flex items-center gap-2 text-[10px] font-bold text-white/20 uppercase tracking-widest mb-6"><Clock size={12} /> Est. Completion: {new Date(course.targetCompletionDate).toLocaleDateString()}</div>}
-                                            <div className="mt-auto flex gap-3">
-                                                <Button variant="secondary" onClick={() => window.open(course.url, '_blank')} className="flex-1 h-11 rounded-xl border-white/[0.04] text-[10px] font-black uppercase tracking-widest">Open</Button>
-                                                <Button variant="primary" onClick={() => {
-                                                    const previous = courses;
-                                                    const updated = courses.map(c => getCourseId(c) === getCourseId(course) ? { ...c, progress: Math.min(100, c.progress + 10) } : c);
-                                                    setCourses(updated);
-                                                    void attendanceService.updateManualCourse(getCourseId(course), { progress: Math.min(100, course.progress + 10) }).catch(() => {
-                                                        setCourses(previous);
-                                                        showToast('error', 'Save Failed');
-                                                    });
-                                                }} className="flex-1 h-11 rounded-xl shadow-lg shadow-white/10 text-[10px] font-black uppercase tracking-widest">+10% Sync</Button>
+                                            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                                                <button onClick={() => { const previous = courses; const updated = courses.map(c => getCourseId(c) === getCourseId(course) ? { ...c, progress: Math.min(100, c.progress + 10) } : c); setCourses(updated); void attendanceService.updateManualCourse(getCourseId(course), { progress: Math.min(100, course.progress + 10) }).catch(() => { setCourses(previous); showToast('error', 'Save Failed'); }); }} className="h-7 px-2 text-[9px] font-bold rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">+10%</button>
+                                                <button onClick={() => window.open(course.url, '_blank')} className="h-7 px-2 text-[9px] font-bold rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">Open</button>
+                                                <button onClick={() => handleEditCourse(course)} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer"><Edit2 size={11} /></button>
+                                                <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"><Trash size={11} /></button>
                                             </div>
                                         </div>
-                                    </motion.div>
-                                );
-                            })}
-                        </AnimatePresence>
-                    </div>
-                </section>
-            )}
-
-            {/* ── Completed Tracks ──────────────────────────────────────── */}
-            {completedCourses.length > 0 && (
-                <section>
-                    <div className="flex items-center gap-3 mb-8 px-2">
-                        <div className="h-px flex-1 bg-white/[0.04]" />
-                        <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40">Completed Tracks</h2>
-                        <div className="h-px flex-1 bg-white/[0.04]" />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {completedCourses.map(course => (
-                            <div key={getCourseId(course)} className="group p-5 rounded-3xl border border-white/[0.04] glass-panel transition-all hover:glass-panel opacity-60 hover:opacity-100">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center text-white border border-white/10"><Award size={16} /></div>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                                        <button onClick={() => handleEditCourse(course)} className="p-1.5 text-white/20 hover:text-white transition-colors"><Edit2 size={12} /></button>
-                                        <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-1.5 text-white/20 hover:text-red-500 transition-colors"><Trash size={12} /></button>
-                                    </div>
-                                </div>
-                                <h4 className="text-xs font-black text-white/80 line-clamp-2 uppercase tracking-tight mb-4">{course.title}</h4>
-                                <button onClick={() => window.open(course.url, '_blank')} className="w-full py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-white hover:text-white transition-all text-left flex items-center gap-2">Open Course <ExternalLink size={10} /></button>
+                                    );
+                                })}
                             </div>
-                        ))}
-                    </div>
-                </section>
-            )}
+                        </section>
+                    )}
 
-            {/* ── Empty State ───────────────────────────────────────────── */}
-            {courses.length === 0 && (
-                <div className="rounded-[3rem] border-2 border-dashed border-white/[0.04] bg-white/[0.01] p-24 text-center">
-                    <div className="w-20 h-20 rounded-[2rem] bg-white/[0.02] border border-white/[0.04] flex items-center justify-center text-white/10 mx-auto mb-8"><Book size={40} /></div>
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Archive Vacant</h3>
-                    <p className="text-white/20 font-medium mb-12 max-w-sm mx-auto">No intelligence tracks have been initialized. Commencing primary tracking protocols recommended.</p>
-                    <Button onClick={handleAddCourse} className="h-14 px-10 rounded-2xl bg-white/10 text-white font-black uppercase tracking-widest shadow-2xl shadow-white/10">Begin Archive</Button>
+                    {/* Completed Courses */}
+                    {completedCourses.length > 0 && (
+                        <section>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/30 mb-4 px-1">Completed</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {completedCourses.map(course => (
+                                    <div key={getCourseId(course)} className="group p-5 rounded-lg border border-outline bg-surface hover:border-on-surface transition-all flex flex-col justify-between">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="w-8 h-8 rounded border border-outline bg-surface-container-high flex items-center justify-center text-on-surface"><Award size={14} /></div>
+                                            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => handleEditCourse(course)} className="p-1 text-on-surface-variant/40 hover:text-on-surface cursor-pointer"><Edit2 size={11} /></button>
+                                                <button onClick={() => void handleDeleteCourse(getCourseId(course))} className="p-1 text-on-surface-variant/40 hover:text-red-500 cursor-pointer"><Trash size={11} /></button>
+                                            </div>
+                                        </div>
+                                        <h4 className="text-xs font-bold text-on-surface-variant/70 line-clamp-2 mb-4">{course.title}</h4>
+                                        <button onClick={() => window.open(course.url, '_blank')} className="w-full py-1.5 rounded border border-outline bg-surface text-[10px] font-bold hover:bg-surface-container flex items-center justify-center gap-1 cursor-pointer">Open Course <ExternalLink size={10} /></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
                 </div>
             )}
 
-            {/* ── Modal ─────────────────────────────────────────────────── */}
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCourse ? 'Calibrate Track' : 'Initialize New Track'}>
-                <form onSubmit={handleSubmit} className="space-y-6 pt-4">
-                    <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Track Title</label><input type="text" value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} className={inputCls} placeholder="e.g., Cryptography Protocols" required /></div>
-                    <div className="grid grid-cols-2 gap-6">
+            {/* Empty State */}
+            {courses.length === 0 && !loading && (
+                <div className="rounded-lg border border-dashed border-outline py-20 text-center">
+                    <Book size={28} className="mx-auto mb-4 text-on-surface-variant/20" />
+                    <p className="text-xs font-bold text-on-surface-variant/30 uppercase tracking-widest mb-1">No courses tracked</p>
+                    <p className="text-xs text-on-surface-variant/20 mb-6 font-semibold">Add your first course to start tracking progress.</p>
+                    <button onClick={handleAddCourse} className="h-8 px-4 text-xs font-bold rounded bg-on-surface text-surface hover:opacity-90 transition-all cursor-pointer">Add Course</button>
+                </div>
+            )}
+
+            {/* Modal */}
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCourse ? 'Edit Course' : 'Add Course'}>
+                <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+                    <div>
+                        <label className="block text-[10px] font-bold text-on-surface-variant/40 uppercase mb-1.5">Course Title</label>
+                        <input type="text" value={formData.title || ''} onChange={e => setFormData({ ...formData, title: e.target.value })} className={inputCls} placeholder="e.g., Machine Learning" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                         <Select label="Platform" value={formData.platform || 'coursera'} onChange={e => setFormData({ ...formData, platform: e.target.value as any })} options={PLATFORMS.map(p => ({ value: p.value, label: p.label }))} />
-                        <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Archive URL</label><input type="url" value={formData.url || ''} onChange={e => setFormData({ ...formData, url: e.target.value })} className={inputCls} placeholder="https://..." required /></div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-on-surface-variant/40 uppercase mb-1.5">Course URL</label>
+                            <input type="url" value={formData.url || ''} onChange={e => setFormData({ ...formData, url: e.target.value })} className={inputCls} placeholder="https://..." required />
+                        </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-6">
-                        <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Sync Progress (%)</label><input type="range" min="0" max="100" value={formData.progress || 0} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) || 0 })} className="w-full accent-blue-500 h-2 bg-white/5 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white/10 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-white/15" /><div className="text-right text-xs font-bold text-white mt-1">{formData.progress || 0}%</div></div>
-                        <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Target Milestone</label><input type="date" value={formData.targetCompletionDate || ''} onChange={e => setFormData({ ...formData, targetCompletionDate: e.target.value })} className={`${inputCls} dark-date-input`} /></div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <div className="flex justify-between mb-1.5">
+                                <label className="text-[10px] font-bold text-on-surface-variant/40 uppercase">Progress</label>
+                                <span className="text-[10px] font-bold text-on-surface">{formData.progress || 0}%</span>
+                            </div>
+                            <input type="range" min="0" max="100" value={formData.progress || 0} onChange={e => setFormData({ ...formData, progress: parseInt(e.target.value) || 0 })} className="w-full accent-primary h-1 bg-on-surface/15 rounded-full appearance-none cursor-pointer" />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-on-surface-variant/40 uppercase mb-1.5">Target Date</label>
+                            <input type="date" value={formData.targetCompletionDate || ''} onChange={e => setFormData({ ...formData, targetCompletionDate: e.target.value })} className={inputCls} />
+                        </div>
                     </div>
-                    <div><label className="block text-[10px] font-black text-white/20 uppercase tracking-widest mb-3 ml-1">Lead Instructor</label><input type="text" value={formData.instructor || ''} onChange={e => setFormData({ ...formData, instructor: e.target.value })} className={inputCls} placeholder="e.g., Prof. H. Stark" /></div>
-                    <div className="flex gap-4 pt-4">
-                        <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} className="flex-1 rounded-xl h-12 border-white/[0.04]">Abort</Button>
-                        <Button type="submit" className="flex-1 rounded-xl h-12 bg-white/10 shadow-xl shadow-white/10">{editingCourse ? 'Save Changes' : 'Initialize Track'}</Button>
+                    <div>
+                        <label className="block text-[10px] font-bold text-on-surface-variant/40 uppercase mb-1.5">Instructor</label>
+                        <input type="text" value={formData.instructor || ''} onChange={e => setFormData({ ...formData, instructor: e.target.value })} className={inputCls} placeholder="Optional" />
+                    </div>
+                    <div className="flex gap-3 pt-2">
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 h-9 text-xs font-semibold rounded border border-outline bg-surface text-on-surface hover:bg-surface-container transition-all cursor-pointer">Cancel</button>
+                        <button type="submit" className="flex-1 h-9 text-xs font-semibold rounded bg-on-surface text-surface hover:opacity-90 transition-all cursor-pointer">{editingCourse ? 'Save' : 'Add Course'}</button>
                     </div>
                 </form>
             </Modal>
-        </motion.div>
+        </div>
     );
 };
 

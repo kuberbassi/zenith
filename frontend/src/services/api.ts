@@ -31,6 +31,22 @@ const api: AxiosInstance = axios.create({
     withCredentials: true, // Important for session cookies
 });
 
+// ─── Stable device fingerprint ───────────────────────────────────────────────
+// Generates once per browser profile and persists across sessions, so the
+// backend can collapse duplicate logins from the same physical device.
+function getOrCreateDeviceId(): string {
+    const DEVICE_KEY = 'zenith_device_id';
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+        // crypto.randomUUID() is available in all modern browsers
+        id = typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        try { localStorage.setItem(DEVICE_KEY, id); } catch { /* quota */ }
+    }
+    return id;
+}
+
 // Request interceptor
 api.interceptors.request.use(
     (config: InternalAxiosRequestConfig) => {
@@ -41,6 +57,8 @@ api.interceptors.request.use(
             }
             const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             if (timezone) config.headers['X-Timezone'] = timezone;
+            // Send stable device ID for session deduplication
+            config.headers['X-Device-Id'] = getOrCreateDeviceId();
         }
         return config;
     },

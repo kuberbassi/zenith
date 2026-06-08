@@ -33,8 +33,10 @@ export interface ParseResult {
 }
 
 function parseMarks(str: string): { internal: number | null; external: number | null; total: number } {
-  if (str.startsWith('-')) {
-    const rest = str.slice(1);
+  const cleanStr = str.replace(/[A-Za-z]/g, '0');
+
+  if (cleanStr.startsWith('-')) {
+    const rest = cleanStr.slice(1);
     const half = Math.floor(rest.length / 2);
     const externalStr = rest.slice(0, half);
     const totalStr = rest.slice(half);
@@ -46,8 +48,16 @@ function parseMarks(str: string): { internal: number | null; external: number | 
     return { internal: null, external: Number(rest) || 0, total: Number(rest) || 0 };
   }
 
-  if (str.includes('-')) {
-    const parts = str.split('-');
+  if (cleanStr.includes('-')) {
+    const parts = cleanStr.split('-');
+    if (parts.length === 3) {
+      const p1 = Number(parts[0]);
+      const p2 = Number(parts[1]);
+      const p3 = Number(parts[2]);
+      if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3)) {
+        return { internal: p1, external: p2, total: p3 };
+      }
+    }
     if (parts.length === 2) {
       const p1 = Number(parts[0]);
       const p2 = Number(parts[1]);
@@ -57,12 +67,12 @@ function parseMarks(str: string): { internal: number | null; external: number | 
     }
   }
 
-  const len = str.length;
+  const len = cleanStr.length;
   for (let i = 1; i <= len - 2; i++) {
     for (let j = i + 1; j <= len - 1; j++) {
-      const part1 = str.substring(0, i);
-      const part2 = str.substring(i, j);
-      const part3 = str.substring(j);
+      const part1 = cleanStr.substring(0, i);
+      const part2 = cleanStr.substring(i, j);
+      const part3 = cleanStr.substring(j);
       
       const val1 = Number(part1);
       const val2 = Number(part2);
@@ -77,29 +87,49 @@ function parseMarks(str: string): { internal: number | null; external: number | 
   }
 
   if (len >= 6) {
-    const val1 = Number(str.substring(0, 2));
-    const val2 = Number(str.substring(2, 4));
-    const val3 = Number(str.substring(4));
+    const val1 = Number(cleanStr.substring(0, 2));
+    const val2 = Number(cleanStr.substring(2, 4));
+    const val3 = Number(cleanStr.substring(4));
     return { internal: val1, external: val2, total: val3 };
   }
 
-  return { internal: 0, external: 0, total: Number(str) || 0 };
+  return { internal: 0, external: 0, total: Number(cleanStr) || 0 };
 }
 
 function getDefaultCredits(subjectName: string): number {
   const upper = subjectName.toUpperCase();
+  
+  // NUES / special electives (Human Values, Ethics, etc.) → 2 credits
+  if (
+    upper.includes('NUES') ||
+    upper.includes('N.U.E.S.') ||
+    upper.includes('SEMINAR') ||
+    upper.includes('PROJECT') ||
+    upper.includes('TRAINING') ||
+    upper.includes('INTERNSHIP') ||
+    upper.includes('HUMAN VALUE') ||
+    upper.includes('VALUE') ||
+    upper.includes('ETHICS') ||
+    upper.includes('ENVIRONMENTAL') ||
+    upper.includes('SOFT SKILL') ||
+    upper.includes('PERSONALITY') ||
+    upper.includes('TERM PAPER')
+  ) {
+    return 2;
+  }
+
+  // Lab / practical subjects → 1 credit (IPU standard)
   if (
     upper.includes('LAB') ||
     upper.includes('PRACTICAL') ||
     upper.includes('WORKSHOP') ||
-    upper.includes('GRAPHICS') ||
-    upper.includes('PROJECT') ||
-    upper.includes('SEMINAR') ||
     upper.includes('VIVA')
   ) {
-    return 2;
+    return 1;
   }
-  return 4;
+
+  // Standard theory / engineering graphics → 3 credits (IPU standard)
+  return 3;
 }
 
 export async function parseResultPdf(buffer: Buffer): Promise<ParseResult> {
@@ -141,7 +171,7 @@ export async function parseResultPdf(buffer: Buffer): Promise<ParseResult> {
   }
 
   const subjects: ParsedSubject[] = [];
-  const marksDatesRegex = /^([\d\-]+)(\d{2},\d{4})(\d{4}-\d{2}-\d{2})$/;
+  const marksDatesRegex = /^([\d\-A-Za-z]+)(\d{2},\d{4})(\d{4}-\d{2}-\d{2})$/;
 
   let i = 0;
   while (i < lines.length && !lines[i].includes('PAPER CODESUBJECT NAME')) {
@@ -187,7 +217,7 @@ export async function parseResultPdf(buffer: Buffer): Promise<ParseResult> {
             const { internal, external, total } = parseMarks(rawMarks);
             const subject_name = nameLines.join(' ').replace(/\s+/g, ' ');
             
-            const isLab = getDefaultCredits(subject_name) === 2;
+            const isLab = getDefaultCredits(subject_name) === 1;
             const subData = {
               internal_theory: isLab ? 0 : (internal ?? 0),
               external_theory: isLab ? 0 : (external ?? 0),

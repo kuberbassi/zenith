@@ -1,429 +1,380 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    LayoutDashboard, CalendarDays, GraduationCap,
-    PieChart, CalendarClock, Trophy, Beaker, Settings, Bell, X, Target, Plus,
-    BookOpen, Grid3x3, Sparkles, Zap
+    LayoutDashboard, CalendarClock, Trophy, Settings,
+    GraduationCap, Target, StickyNote, Sun, Moon,
+    PieChart, CalendarDays, Beaker, LogOut
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
-// Categorized navigation structure for better organization
-const navCategories = [
-    {
-        id: 'main',
-        label: 'Main',
-        color: 'primary',
-        items: [
-            { name: 'Home', href: '/', icon: LayoutDashboard, showInScroll: true },
-            { name: 'Calendar', href: '/calendar', icon: CalendarDays, showInScroll: true },
-            { name: 'Academics', href: '/courses', icon: GraduationCap, showInScroll: true },
-        ]
-    },
-    {
-        id: 'academic',
-        label: 'Academic',
-        color: 'secondary',
-        items: [
-            { name: 'Schedule', href: '/timetable', icon: CalendarClock, showInScroll: true },
-            { name: 'Results', href: '/results', icon: Trophy, showInScroll: true },
-            { name: 'Assignments', href: '/practicals', icon: Beaker, showInScroll: false },
-        ]
-    },
-    {
-        id: 'tools',
-        label: 'Tools',
-        color: 'tertiary',
-        items: [
-            { name: 'Analytics', href: '/analytics', icon: PieChart, showInScroll: true },
-            { name: 'Skills', href: '/skills', icon: Target, showInScroll: false },
-        ]
-    },
-    {
-        id: 'system',
-        label: 'System',
-        color: 'outline',
-        items: [
-            { name: 'Notifications', href: '/notifications', icon: Bell, showInScroll: false },
-            { name: 'Settings', href: '/settings', icon: Settings, showInScroll: false },
-        ]
-    }
+interface BottomNavProps {}
+
+const radialItems = [
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Notes & Todos', href: '/notes', icon: StickyNote },
+    { name: 'Analytics', href: '/analytics', icon: PieChart },
+    { name: 'Schedule', href: '/timetable', icon: CalendarClock },
+    { name: 'Calendar', href: '/calendar', icon: CalendarDays },
+    { name: 'Courses', href: '/courses', icon: GraduationCap },
+    { name: 'Assignments', href: '/practicals', icon: Beaker },
+    { name: 'Results', href: '/results', icon: Trophy },
+    { name: 'Skills', href: '/skills', icon: Target },
+    { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
-// Get all items for scrollable nav
-const scrollableNavItems = navCategories.flatMap(cat =>
-    cat.items.filter(item => item.showInScroll)
-);
-
-// Quick actions for FAB
-const fabActions = [
-    { name: 'Add Subject', icon: BookOpen, action: 'add-subject' },
-    { name: 'Quick Mark', icon: Zap, action: 'quick-attendance' },
-    { name: 'View All', icon: Grid3x3, action: 'view-all' },
-];
-
-// Scrollable Nav Item Component
-interface ScrollNavItemProps {
-    item: { name: string; href: string; icon: any };
-    isActive: boolean;
-}
-
-const ScrollNavItem: React.FC<ScrollNavItemProps> = ({ item, isActive }) => {
-    return (
-        <Link
-            to={item.href}
-            className="relative flex-shrink-0 flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[72px]"
-        >
-            {/* Active indicator bar */}
-            <AnimatePresence>
-                {isActive && (
-                    <motion.div
-                        layoutId="activeScrollIndicator"
-                        className="absolute top-1 left-1/2 -translate-x-1/2 w-10 h-1 bg-primary rounded-full"
-                        initial={{ opacity: 0, scale: 0.5 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.5 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    />
-                )}
-            </AnimatePresence>
-
-            {/* Icon with fluid scale */}
-            <motion.div
-                className="relative flex items-center justify-center h-7"
-                whileTap={{ scale: 0.9 }}
-                animate={{ scale: isActive ? 1.1 : 1 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-            >
-                <item.icon
-                    size={20}
-                    className={isActive ? 'text-primary' : 'text-on-surface-variant'}
-                    strokeWidth={isActive ? 2.5 : 2}
-                />
-            </motion.div>
-
-            {/* Label */}
-            <motion.span
-                className={`text-[10px] font-medium whitespace-nowrap ${isActive ? 'text-primary' : 'text-on-surface-variant'
-                    }`}
-                animate={{
-                    fontWeight: isActive ? 600 : 500
-                }}
-            >
-                {item.name}
-            </motion.span>
-        </Link>
-    );
-};
-
-const BottomNav: React.FC = () => {
-    const location = useLocation();
+const BottomNav: React.FC<BottomNavProps> = () => {
     const navigate = useNavigate();
-    const [gridMenuOpen, setGridMenuOpen] = useState(false);
-    const [fabExpanded, setFabExpanded] = useState(false);
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(true);
+    const location = useLocation();
+    const { user, logout } = useAuth();
+    const { theme, toggleTheme } = useTheme();
 
-    // Check scroll position
-    const checkScroll = () => {
-        if (scrollContainerRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
-            setCanScrollLeft(scrollLeft > 0);
-            setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-        }
-    };
+    const [isHolding, setIsHolding] = useState(false);
+    const [pointerDownTime, setPointerDownTime] = useState(0);
+    const [center, setCenter] = useState({ x: 0, y: 0 });
+    const [activeIdx, setActiveIdx] = useState<number | null>(null);
+    const [lastTap, setLastTap] = useState(0);
+    const [profileOpen, setProfileOpen] = useState(false);
 
+    const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Haptic vibration on hover change
     useEffect(() => {
-        checkScroll();
-        const container = scrollContainerRef.current;
-        if (container) {
-            container.addEventListener('scroll', checkScroll);
-            return () => container.removeEventListener('scroll', checkScroll);
+        if (activeIdx !== null && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            try { navigator.vibrate(8); } catch {}
         }
-    }, []);
+    }, [activeIdx]);
 
-    // Scroll to active item on route change
-    useEffect(() => {
-        if (scrollContainerRef.current) {
-            const activeIndex = scrollableNavItems.findIndex(item => item.href === location.pathname);
-            if (activeIndex !== -1) {
-                const container = scrollContainerRef.current;
-                const itemWidth = 72; // min-w-[72px]
-                const scrollPosition = activeIndex * itemWidth - (container.clientWidth / 2) + (itemWidth / 2);
-                container.scrollTo({ left: scrollPosition, behavior: 'smooth' });
+    const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+
+        const buttonRect = e.currentTarget.getBoundingClientRect();
+        const centerX = buttonRect.left + buttonRect.width / 2;
+        const centerY = buttonRect.top + buttonRect.height / 2;
+        setCenter({ x: centerX, y: centerY });
+        
+        if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+        
+        holdTimerRef.current = setTimeout(() => {
+            setIsHolding(true);
+            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                try { navigator.vibrate(25); } catch {}
             }
-        }
-    }, [location.pathname]);
-
-    // FAB action handler
-    const handleFabAction = (action: string) => {
-        setFabExpanded(false);
-        switch (action) {
-            case 'add-subject':
-                navigate('/courses');
-                break;
-            case 'quick-attendance':
-                navigate('/');
-                break;
-            case 'view-all':
-                setGridMenuOpen(true);
-                break;
-        }
+        }, 220);
+        
+        setPointerDownTime(Date.now());
     };
+
+    useEffect(() => {
+        if (!pointerDownTime) return;
+
+        const handlePointerMove = (e: PointerEvent) => {
+            if (!isHolding) return;
+            const dX = e.clientX - center.x;
+            const dY = e.clientY - center.y;
+            const distance = Math.sqrt(dX * dX + dY * dY);
+            
+            let angle = Math.atan2(-dY, dX) * 180 / Math.PI;
+            if (angle < 0) angle += 360;
+
+            // Trigger selection when drag distance is sufficient
+            if (distance > 30 && distance < 240) {
+                let closestIdx = 0;
+                let minDiff = Infinity;
+                const startAngle = 180;
+                const endAngle = 0;
+                const angleStep = (startAngle - endAngle) / (radialItems.length - 1);
+                radialItems.forEach((_, idx) => {
+                    const itemAngle = startAngle - idx * angleStep;
+                    let diff = Math.abs(angle - itemAngle);
+                    if (diff > 180) diff = 360 - diff;
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestIdx = idx;
+                    }
+                });
+                setActiveIdx(closestIdx);
+            } else {
+                setActiveIdx(null);
+            }
+        };
+
+        const handlePointerUp = () => {
+            if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+            
+            const duration = Date.now() - pointerDownTime;
+            if (duration < 250) {
+                const now = Date.now();
+                if (now - lastTap < 300) {
+                    setProfileOpen(true);
+                }
+                setLastTap(now);
+            } else if (isHolding && activeIdx !== null) {
+                const target = radialItems[activeIdx];
+                navigate(target.href);
+            }
+            
+            setIsHolding(false);
+            setActiveIdx(null);
+            setPointerDownTime(0);
+        };
+
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
+        };
+    }, [pointerDownTime, isHolding, center, activeIdx, lastTap, navigate]);
+
+    // Center button icon determination
+    const getCenterIcon = () => {
+        if (activeIdx !== null) {
+            return { type: 'icon', element: radialItems[activeIdx].icon, key: `hovered-${activeIdx}` };
+        }
+        if (isHolding) {
+            return { type: 'logo', element: '/zenith-logo.png', key: 'logo' };
+        }
+        const currentItem = radialItems.find(item => item.href === location.pathname);
+        if (currentItem) {
+            return { type: 'icon', element: currentItem.icon, key: `current-${location.pathname}` };
+        }
+        return { type: 'logo', element: '/zenith-logo.png', key: 'logo' };
+    };
+
+    const centerIconInfo = getCenterIcon();
+    const startAngle = 180;
+    const endAngle = 0;
+    const angleStep = (startAngle - endAngle) / (radialItems.length - 1);
 
     return (
         <>
-            {/* Advanced Fluid Bottom Navigation */}
-            <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-xl border-t border-outline-variant/10">
-                <div className="relative h-16">
-                    {/* Horizontal Scrollable Nav */}
-                    <div className="absolute inset-0 flex items-center">
-                        {/* Scroll gradient indicators */}
-                        {canScrollLeft && (
-                            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-surface/95 to-transparent z-10 pointer-events-none" />
+            {/* SVG Connecting Line */}
+            {isHolding && activeIdx !== null && (
+                <svg className="fixed inset-0 w-full h-full pointer-events-none z-[997]">
+                    <defs>
+                        <linearGradient id="glow-line" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.1" />
+                            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.8" />
+                        </linearGradient>
+                    </defs>
+                    {(() => {
+                        const itemAngle = startAngle - activeIdx * angleStep;
+                        const rad = itemAngle * Math.PI / 180;
+                        const radius = 100;
+                        const tx = Math.cos(rad) * radius;
+                        const ty = -Math.sin(rad) * radius;
+                        
+                        return (
+                            <motion.line
+                                initial={{ x2: center.x, y2: center.y }}
+                                animate={{ x2: center.x + tx, y2: center.y + ty }}
+                                transition={{ type: 'spring', damping: 22, stiffness: 280 }}
+                                x1={center.x}
+                                y1={center.y}
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeDasharray="5 4"
+                                className="text-primary stroke-current opacity-70"
+                            />
+                        );
+                    })()}
+                </svg>
+            )}
+
+            {/* Floating Fingerprint Radial Nav Button (Mobile Only) */}
+            <div className="lg:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-[999]">
+                <button
+                    onPointerDown={handlePointerDown}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center border transition-all select-none cursor-pointer touch-none ${
+                        isHolding
+                            ? 'bg-primary border-primary text-on-primary scale-95 shadow-inner'
+                            : 'bg-surface/85 border-outline text-on-surface backdrop-blur-md shadow-2xl hover:scale-105 active:scale-95'
+                    }`}
+                >
+                    {isHolding && (
+                        <span className="absolute inset-0 rounded-full border-2 border-primary animate-ping opacity-60 pointer-events-none" />
+                    )}
+                    <AnimatePresence mode="wait">
+                        {centerIconInfo.type === 'logo' ? (
+                            <motion.img
+                                key={centerIconInfo.key}
+                                initial={{ scale: 0.7, opacity: 0, rotate: -30 }}
+                                animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                                exit={{ scale: 0.7, opacity: 0, rotate: 30 }}
+                                transition={{ duration: 0.12 }}
+                                src={centerIconInfo.element as string}
+                                alt="Zenith"
+                                className="w-6.5 h-6.5 object-contain"
+                            />
+                        ) : (
+                            (() => {
+                                const IconComp = centerIconInfo.element as React.ComponentType<any>;
+                                return (
+                                    <motion.div
+                                        key={centerIconInfo.key}
+                                        initial={{ scale: 0.7, opacity: 0, rotate: -30 }}
+                                        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                                        exit={{ scale: 0.7, opacity: 0, rotate: 30 }}
+                                        transition={{ duration: 0.12 }}
+                                    >
+                                        <IconComp className="w-6 h-6 text-current" />
+                                    </motion.div>
+                                );
+                            })()
                         )}
-                        {canScrollRight && (
-                            <div className="absolute right-16 top-0 bottom-0 w-8 bg-gradient-to-l from-surface/95 to-transparent z-10 pointer-events-none" />
-                        )}
+                    </AnimatePresence>
+                </button>
+            </div>
 
-                        {/* Scrollable container */}
-                        <div
-                            ref={scrollContainerRef}
-                            className="flex-1 flex items-center overflow-x-auto scrollbar-hide scroll-smooth"
-                            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                        >
-                            <div className="flex items-center px-1">
-                                {scrollableNavItems.map(item => {
-                                    const isActive = location.pathname === item.href;
-                                    return <ScrollNavItem key={item.href} item={item} isActive={isActive} />;
-                                })}
-                                {/* Spacer for center FAB clearance */}
-                                <div className="w-16 flex-shrink-0" />
-                            </div>
-                        </div>
-
-                        {/* Grid Menu Button (Fixed right) */}
-                        <motion.button
-                            onClick={() => setGridMenuOpen(true)}
-                            whileTap={{ scale: 0.95 }}
-                            className="flex-shrink-0 flex flex-col items-center justify-center gap-0.5 px-4 h-full border-l border-outline-variant/10 bg-surface/98 backdrop-blur-xl"
-                        >
-                            <div className="flex items-center justify-center h-7">
-                                <Grid3x3
-                                    size={20}
-                                    className="text-on-surface-variant"
-                                    strokeWidth={2}
-                                />
-                            </div>
-                            <span className="text-[10px] font-medium text-on-surface-variant whitespace-nowrap">
-                                All
-                            </span>
-                        </motion.button>
-                    </div>
-                </div>
-
-                {/* Floating Action Button (FAB) - Centered and elevated */}
-                <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-                    <div className="pointer-events-auto">
-                        <AnimatePresence>
-                            {fabExpanded && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.8, y: 20 }}
-                                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                    className="absolute bottom-14 left-1/2 -translate-x-1/2 flex flex-col-reverse gap-2 items-center"
-                                >
-                                    {fabActions.map((action, index) => (
-                                        <motion.button
-                                            key={action.action}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0, y: 10 }}
-                                            transition={{ delay: index * 0.04 }}
-                                            onClick={() => handleFabAction(action.action)}
-                                            whileTap={{ scale: 0.95 }}
-                                            className="flex items-center gap-2 px-3 py-2 bg-surface-container-highest rounded-full shadow-md border border-outline-variant/10"
-                                        >
-                                            <action.icon size={16} className="text-primary" strokeWidth={2.5} />
-                                            <span className="text-xs font-medium text-on-surface pr-1">{action.name}</span>
-                                        </motion.button>
-                                    ))}
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        {/* Main FAB */}
-                        <motion.button
-                            onClick={() => setFabExpanded(!fabExpanded)}
-                            whileTap={{ scale: 0.92 }}
-                            whileHover={{ scale: 1.05 }}
-                            animate={{ rotate: fabExpanded ? 45 : 0 }}
-                            className="relative flex items-center justify-center w-12 h-12 rounded-full bg-primary text-on-primary shadow-lg overflow-hidden"
-                            style={{
-                                boxShadow: '0 8px 16px rgba(103, 80, 164, 0.35), 0 4px 8px rgba(0, 0, 0, 0.15)',
-                            }}
-                        >
-                            {/* Simple subtle pulse - no overflow */}
-                            {!fabExpanded && (
-                                <motion.div
-                                    className="absolute inset-0 rounded-full bg-primary"
-                                    animate={{
-                                        scale: [1, 1.15, 1],
-                                        opacity: [0.4, 0, 0.4],
-                                    }}
-                                    transition={{
-                                        duration: 2,
-                                        repeat: Infinity,
-                                        ease: 'easeInOut',
-                                    }}
-                                />
-                            )}
-
-                            <Plus size={24} strokeWidth={2.5} className="relative z-10" />
-                        </motion.button>
-                    </div>
-                </div>
-            </nav>
-
-            {/* Full Grid Menu Sheet */}
+            {/* Radial Menu Fan overlay */}
             <AnimatePresence>
-                {gridMenuOpen && (
+                {isHolding && (
+                    <div className="lg:hidden fixed inset-0 z-[998] pointer-events-none select-none bg-black/15 backdrop-blur-[2px]">
+                        <div 
+                            className="absolute rounded-full bg-primary/5 border border-primary/20 pointer-events-none animate-pulse"
+                            style={{
+                                left: center.x - 30,
+                                top: center.y - 30,
+                                width: 60,
+                                height: 60
+                            }}
+                        />
+                        {radialItems.map((item, idx) => {
+                            const itemAngle = startAngle - idx * angleStep;
+                            const rad = itemAngle * Math.PI / 180;
+                            const radius = 100; // Radius distance from fingerprint center
+                            const tx = Math.cos(rad) * radius;
+                            const ty = -Math.sin(rad) * radius;
+                            const isActive = activeIdx === idx;
+                            const isCurrentRoute = location.pathname === item.href;
+
+                            return (
+                                <motion.div
+                                    key={item.href}
+                                    initial={{ opacity: 0, scale: 0.4, x: 0, y: 0 }}
+                                    animate={{ 
+                                        opacity: 1, 
+                                        scale: isActive ? 1.3 : 1, 
+                                        x: tx, 
+                                        y: ty,
+                                        transition: { type: 'spring', damping: 16, stiffness: 220 }
+                                    }}
+                                    exit={{ opacity: 0, scale: 0.4, x: 0, y: 0 }}
+                                    className="absolute"
+                                    style={{
+                                        left: center.x - 20,
+                                        top: center.y - 20,
+                                    }}
+                                >
+                                    <div 
+                                        className={`w-10 h-10 rounded-full flex flex-col items-center justify-center border transition-all ${
+                                            isActive
+                                                ? 'bg-primary text-on-primary border-primary shadow-lg shadow-primary/30'
+                                                : isCurrentRoute
+                                                    ? 'bg-surface-container-high border-primary text-primary shadow'
+                                                    : 'bg-surface border-outline text-on-surface shadow-md'
+                                        }`}
+                                    >
+                                        <item.icon size={19} />
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Profile popover drawer */}
+            <AnimatePresence>
+                {profileOpen && (
                     <>
-                        {/* Backdrop with blur */}
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="lg:hidden fixed inset-0 bg-black/70 z-50 backdrop-blur-md"
-                            onClick={() => setGridMenuOpen(false)}
+                            className="lg:hidden fixed inset-0 bg-black/60 z-[9998] backdrop-blur-sm"
+                            onClick={() => setProfileOpen(false)}
                         />
 
-                        {/* Sheet */}
                         <motion.div
                             initial={{ y: '100%' }}
                             animate={{ y: 0 }}
                             exit={{ y: '100%' }}
-                            transition={{ type: 'spring', damping: 40, stiffness: 500 }}
-                            className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface rounded-t-3xl z-50 max-h-[85vh] overflow-hidden"
+                            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+                            className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-outline rounded-t-2xl z-[9999] max-h-[60vh] overflow-y-auto text-on-surface p-6 shadow-2xl"
                         >
-                            {/* Floating handle */}
-                            <div className="flex justify-center py-4">
-                                <motion.div
-                                    className="w-12 h-1.5 bg-outline-variant/40 rounded-full"
-                                    whileHover={{ width: 56, backgroundColor: 'var(--md-sys-color-outline-variant)' }}
-                                    transition={{ duration: 0.2 }}
-                                />
-                            </div>
+                            <div className="w-12 h-1 bg-outline-variant/30 rounded-full mx-auto mb-6" />
 
-                            {/* Header */}
-                            <div className="px-6 pb-4 flex items-center justify-between">
-                                <div>
-                                    <h2 className="font-display font-bold text-2xl text-on-surface flex items-center gap-2">
-                                        <Sparkles size={24} className="text-primary" />
-                                        All Pages
-                                    </h2>
-                                    <p className="text-sm text-on-surface-variant mt-1">Navigate anywhere</p>
+                            {/* User Profile Info Card */}
+                            <div className="bg-surface-container/50 border border-outline/10 rounded-2xl p-4 flex items-center gap-4 mb-5">
+                                <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-lg font-bold shrink-0">
+                                    {user?.name?.[0]?.toUpperCase() || 'U'}
                                 </div>
-                                <motion.button
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={() => setGridMenuOpen(false)}
-                                    className="p-2.5 rounded-full bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                                <div className="min-w-0 flex-1">
+                                    <h3 className="text-sm font-bold text-on-surface truncate">{user?.name || 'User'}</h3>
+                                    <p className="text-xs text-on-surface-variant/60 truncate">{user?.email}</p>
+                                </div>
+                            </div>
+
+                            {/* Quick Actions Grid */}
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                {/* Theme Action */}
+                                <button
+                                    onClick={() => { toggleTheme(); }}
+                                    className="flex flex-col items-start justify-between p-4 h-24 rounded-2xl border border-outline/10 bg-surface-container-low hover:bg-surface-container transition-all text-left cursor-pointer"
                                 >
-                                    <X size={20} />
-                                </motion.button>
-                            </div>
+                                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                                        {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-on-surface">Theme</p>
+                                        <span className="text-[10px] text-on-surface-variant/50 capitalize">{theme} Mode</span>
+                                    </div>
+                                </button>
 
-                            {/* Categorized Grid */}
-                            <div className="px-4 pb-6 overflow-y-auto max-h-[calc(85vh-120px)] space-y-6">
-                                {navCategories.map((category, catIndex) => (
-                                    <motion.div
-                                        key={category.id}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: catIndex * 0.1 }}
-                                    >
-                                        {/* Category label */}
-                                        <div className="flex items-center gap-2 mb-3 px-2">
-                                            <div className={`w-1 h-4 rounded-full bg-${category.color}`} />
-                                            <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                                                {category.label}
-                                            </h3>
+                                {/* Settings Action */}
+                                <Link
+                                    to="/settings"
+                                    onClick={() => setProfileOpen(false)}
+                                    className="flex flex-col items-start justify-between p-4 h-24 rounded-2xl border border-outline/10 bg-surface-container-low hover:bg-surface-container transition-all text-left"
+                                >
+                                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                                        <Settings size={16} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-on-surface">Settings</p>
+                                        <span className="text-[10px] text-on-surface-variant/50">Configure App</span>
+                                    </div>
+                                </Link>
+
+                                {/* Logout Action */}
+                                <button
+                                    onClick={() => { setProfileOpen(false); logout(); }}
+                                    className="col-span-2 flex items-center justify-between p-4 rounded-2xl border border-red-500/10 bg-red-500/5 hover:bg-red-500/10 transition-all text-left cursor-pointer animate-fade-in"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 rounded-lg bg-red-500/10 text-red-500">
+                                            <LogOut size={16} />
                                         </div>
-
-                                        {/* Items grid */}
-                                        <div className="grid grid-cols-3 gap-3">
-                                            {category.items.map((item, itemIndex) => {
-                                                const isActive = location.pathname === item.href;
-                                                return (
-                                                    <motion.div
-                                                        key={item.href}
-                                                        initial={{ opacity: 0, scale: 0.8 }}
-                                                        animate={{ opacity: 1, scale: 1 }}
-                                                        transition={{
-                                                            delay: catIndex * 0.1 + itemIndex * 0.03,
-                                                            type: 'spring',
-                                                            stiffness: 400,
-                                                            damping: 25
-                                                        }}
-                                                    >
-                                                        <Link
-                                                            to={item.href}
-                                                            onClick={() => setGridMenuOpen(false)}
-                                                        >
-                                                            <motion.div
-                                                                whileTap={{ scale: 0.95 }}
-                                                                whileHover={{ scale: 1.03 }}
-                                                                className={`relative flex flex-col items-center gap-3 p-5 rounded-2xl transition-all ${isActive
-                                                                    ? 'bg-primary/15 text-primary shadow-lg ring-2 ring-primary/30'
-                                                                    : 'bg-surface-container hover:bg-surface-container-high text-on-surface-variant'
-                                                                    }`}
-                                                            >
-                                                                {/* Active indicator */}
-                                                                {isActive && (
-                                                                    <motion.div
-                                                                        layoutId="activeGridItem"
-                                                                        className="absolute inset-0 bg-primary/10 rounded-2xl"
-                                                                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                                                    />
-                                                                )}
-
-                                                                <motion.div
-                                                                    className="relative z-10"
-                                                                    animate={{ scale: isActive ? 1.15 : 1 }}
-                                                                    transition={{ type: 'spring', stiffness: 400 }}
-                                                                >
-                                                                    <item.icon size={26} strokeWidth={isActive ? 2.5 : 2} />
-                                                                </motion.div>
-                                                                <span className="relative z-10 text-xs font-medium text-center leading-tight">
-                                                                    {item.name}
-                                                                </span>
-                                                            </motion.div>
-                                                        </Link>
-                                                    </motion.div>
-                                                );
-                                            })}
+                                        <div>
+                                            <p className="text-xs font-bold text-red-500">Sign Out</p>
+                                            <span className="text-[10px] text-red-500/50">Disconnect account</span>
                                         </div>
-                                    </motion.div>
-                                ))}
+                                    </div>
+                                    <span className="material-symbols-outlined text-red-500 text-sm">chevron_right</span>
+                                </button>
                             </div>
-
-                            {/* Safe area */}
-                            <div className="h-6" />
                         </motion.div>
                     </>
                 )}
             </AnimatePresence>
-
-            {/* Hidden scrollbar styles */}
-            <style>{`
-                .scrollbar-hide::-webkit-scrollbar {
-                    display: none;
-                }
-            `}</style>
         </>
     );
 };
 
 export default BottomNav;
+

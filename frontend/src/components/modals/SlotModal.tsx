@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Trash2 } from 'lucide-react';
+import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Select from '../ui/Select';
@@ -92,52 +92,48 @@ const SlotModal: React.FC<SlotModalProps> = ({ isOpen, onClose, onSuccess, slot,
     };
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-                    <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-lg glass-panel rounded-[2.5rem] border border-white/[0.06] p-8 md:p-10 shadow-2xl">
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
-
-                        <div className="flex items-center gap-4 mb-8">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10">
-                                <Clock size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black text-white uppercase tracking-tighter">{slot ? 'Recalibrate Sequence' : 'Initiate Sequence'}</h3>
-                                <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">{day} // {period?.startTime || slot?.start_time}</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Select label="Type" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })} options={[
-                                    { value: 'class', label: 'Class' },
-                                    { value: 'break', label: 'Break' },
-                                    { value: 'free', label: 'Free' },
-                                    { value: 'custom', label: 'Custom' }
-                                ]} />
-                                {formData.type === 'class' ? (
-                                    <Select label="Subject" value={formData.subject_id} onChange={e => setFormData({ ...formData, subject_id: e.target.value })} options={subjects.map(s => ({ value: String(s._id || s.id || ''), label: s.name }))} />
-                                ) : (
-                                    <Input label="Label" value={formData.label} onChange={e => setFormData({ ...formData, label: e.target.value })} placeholder="Mission Objective" />
-                                )}
-                            </div>
-
-                            <div className="flex gap-3 pt-6">
-                                {slot && (
-                                    <Button variant="outlined" onClick={handleDelete} className="w-14 h-14 rounded-2xl border-white/[0.06] text-red-500 hover:bg-red-500/10 transition-all">
-                                        <Trash2 size={20} />
-                                    </Button>
-                                )}
-                                <Button variant="outlined" onClick={onClose} className="flex-1 h-14 rounded-2xl border-white/10 text-white font-black uppercase tracking-widest text-[10px]">Abort</Button>
-                                <Button onClick={handleSave} isLoading={loading} className="flex-[2] h-14 rounded-2xl bg-white/10 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-white/10">Commit</Button>
-                            </div>
-                        </div>
-                    </motion.div>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={slot ? 'Edit Class Slot' : 'Add Class Slot'}
+            size="sm"
+        >
+            <div className="space-y-6">
+                <div className="flex items-center gap-4 p-4 bg-surface-container border border-outline rounded-xl">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                        <Clock size={20} />
+                    </div>
+                    <div>
+                        <p className="text-xs font-semibold text-on-surface-variant/70 uppercase tracking-wider">Date & Time</p>
+                        <p className="text-sm font-bold text-on-surface">{day} • {period?.startTime || slot?.start_time}</p>
+                    </div>
                 </div>
-            )}
-        </AnimatePresence>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <Select label="Type" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value as any })} options={[
+                        { value: 'class', label: 'Class' },
+                        { value: 'break', label: 'Break' },
+                        { value: 'free', label: 'Free' },
+                        { value: 'custom', label: 'Custom' }
+                    ]} />
+                    {formData.type === 'class' ? (
+                        <Select label="Subject" value={formData.subject_id} onChange={e => setFormData({ ...formData, subject_id: e.target.value })} options={subjects.map(s => ({ value: String(s._id || s.id || ''), label: s.name }))} />
+                    ) : (
+                        <Input label="Label" value={formData.label} onChange={e => setFormData({ ...formData, label: e.target.value })} placeholder="e.g. Lunch Break, Free Period" />
+                    )}
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-outline">
+                    {slot && (
+                        <Button variant="outlined" onClick={handleDelete} className="text-red-500 hover:bg-red-500/10 hover:text-red-600 px-3">
+                            <Trash2 size={16} />
+                        </Button>
+                    )}
+                    <Button variant="text" onClick={onClose} className="flex-1">Cancel</Button>
+                    <Button onClick={handleSave} isLoading={loading} className="flex-[2] shadow-sm">Save</Button>
+                </div>
+            </div>
+        </Modal>
     );
 };
 

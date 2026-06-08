@@ -343,7 +343,8 @@ router.post('/results/sync', async (req: AuthRequest, res) => {
             const internal = parseFloat(row.minorprint === '-' ? '0' : row.minorprint) || 0
             const external = parseFloat(row.majorprint === '-' ? '0' : row.majorprint) || 0
             const totalMarks = parseFloat(row.moderatedprint) || (internal + external)
-            const sub = { name: row.papername, code: row.papercode, credits: 4, internal_theory: internal, external_theory: external, total_marks: totalMarks, max_marks: 100, grade: '' }
+            const isLabSub = /LAB|PRACTICAL|WORKSHOP|SEMINAR|VIVA/i.test(row.papername || '')
+            const sub = { name: row.papername, code: row.papercode, credits: isLabSub ? 1 : 3, internal_theory: internal, external_theory: external, total_marks: totalMarks, max_marks: 100, grade: '' }
             return { ...sub, ...GradeCalculator.calculateSubjectResult(sub) }
         })
 
@@ -380,12 +381,13 @@ router.post('/results/sync', async (req: AuthRequest, res) => {
 const SaveResultSchema = z.object({
     semester: z.number().int().min(1).max(12),
     subjects: z.array(z.record(z.any())).min(1),
+    student_info: z.record(z.any()).optional(),
 })
 
 router.post('/results', async (req: AuthRequest, res) => {
     try {
         const userId = req.userId!
-        const { semester, subjects: subjectsData } = SaveResultSchema.parse(req.body)
+        const { semester, subjects: subjectsData, student_info: studentInfo } = SaveResultSchema.parse(req.body)
 
         const processedSubjects = subjectsData.map(sub => {
             const calc = GradeCalculator.calculateSubjectResult(sub)
@@ -396,17 +398,45 @@ router.post('/results', async (req: AuthRequest, res) => {
         const totalMarksSum = processedSubjects.reduce((a: number, s: any) => a + (parseFloat(s.total_marks) || 0), 0)
         const maxMarksSum = processedSubjects.reduce((a: number, s: any) => a + (parseFloat(s.max_marks) || 100), 0)
         const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, enrollment_number: true } })
+        
+        const normalizedStudentInfo = studentInfo ? {
+            name: studentInfo.name || studentInfo.student_name || '',
+            roll_no: studentInfo.enrollment_number || studentInfo.roll_no || '',
+            institution: studentInfo.institute || studentInfo.institution || '',
+            programme: studentInfo.program || studentInfo.programme || '',
+            batch: studentInfo.batch || '',
+            admission_year: studentInfo.admission_year || '',
+        } : undefined
+
         const existingResultManual = await prisma.semesterResult.findFirst({
             where: { user_id: userId, semester },
         })
         if (existingResultManual) {
             await prisma.semesterResult.update({
                 where: { id: existingResultManual.id },
-                data: { subjects: processedSubjects, sgpa: sgpaCalc.sgpa, total_credits: sgpaCalc.total_credits, total_marks: totalMarksSum ? String(totalMarksSum) : null, max_marks: maxMarksSum ? String(maxMarksSum) : null, updated_at: new Date() },
+                data: {
+                    subjects: processedSubjects,
+                    sgpa: sgpaCalc.sgpa,
+                    total_credits: sgpaCalc.total_credits,
+                    total_marks: totalMarksSum ? String(totalMarksSum) : null,
+                    max_marks: maxMarksSum ? String(maxMarksSum) : null,
+                    ...(normalizedStudentInfo ? { student_info: normalizedStudentInfo as any } : {}),
+                    updated_at: new Date()
+                },
             })
         } else {
             await prisma.semesterResult.create({
-                data: { user_id: userId, semester, subjects: processedSubjects, sgpa: sgpaCalc.sgpa, total_credits: sgpaCalc.total_credits, total_marks: totalMarksSum ? String(totalMarksSum) : null, max_marks: maxMarksSum ? String(maxMarksSum) : null, enrollment_number: user?.enrollment_number || null },
+                data: {
+                    user_id: userId,
+                    semester,
+                    subjects: processedSubjects,
+                    sgpa: sgpaCalc.sgpa,
+                    total_credits: sgpaCalc.total_credits,
+                    total_marks: totalMarksSum ? String(totalMarksSum) : null,
+                    max_marks: maxMarksSum ? String(maxMarksSum) : null,
+                    enrollment_number: normalizedStudentInfo?.roll_no || user?.enrollment_number || null,
+                    student_info: (normalizedStudentInfo || null) as any,
+                },
             })
         }
 

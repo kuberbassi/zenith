@@ -3,17 +3,35 @@ import autoTable from 'jspdf-autotable';
 
 type RGB = [number, number, number];
 
-const NAVY: RGB = [15, 23, 42];
-const BLUE: RGB = [37, 99, 235];
-const BLUE_LIGHT: RGB = [239, 246, 255];
-const BLUE_MID: RGB = [191, 219, 254];
-const GRAY_DARK: RGB = [51, 65, 85];
-const GRAY_MID: RGB = [148, 163, 184];
-const GRAY_LIGHT: RGB = [248, 250, 252];
+const CHARCOAL: RGB = [24, 24, 27]; // zinc-900
+const ACCENT: RGB = [9, 9, 11]; // zinc-950
+const BG_LIGHT: RGB = [250, 250, 250]; // zinc-50
+const BORDER: RGB = [228, 228, 231]; // zinc-200
+const TEXT_MUTED: RGB = [113, 113, 122]; // zinc-500
 const WHITE: RGB = [255, 255, 255];
-const DARK: RGB = [15, 23, 42];
-const RED: RGB = [220, 38, 38];
-const GREEN: RGB = [21, 128, 61];
+const RED: RGB = [239, 68, 68]; // red-500
+const GREEN: RGB = [16, 185, 129]; // emerald-500
+
+function parseNumeric(val: unknown): number | null {
+    if (val === null || val === undefined || val === '') return null;
+    const num = Number(val);
+    return Number.isNaN(num) ? null : num;
+}
+
+function getSubjectMarks(subject: any) {
+    const internal = parseNumeric(subject.internal ?? subject.internal_theory ?? subject.internal_practical);
+    const external = parseNumeric(subject.external ?? subject.external_theory ?? subject.external_practical);
+    const total = parseNumeric(subject.total_marks ?? subject.marks);
+    const maxMarks = parseNumeric(subject.max_marks) ?? 100;
+    
+    const calculatedTotal = (internal ?? 0) + (external ?? 0);
+    return {
+        internal: internal !== null ? String(internal) : '-',
+        external: external !== null ? String(external) : '-',
+        total: total !== null ? String(total) : String(calculatedTotal),
+        maxMarks,
+    };
+}
 
 function normalizeProfileInfo(info: any) {
     return {
@@ -33,8 +51,8 @@ function normalizeProfileInfo(info: any) {
 
 function shortenProgramme(value: string): string {
     return value
-        .replace(/BACHELOR OF TECHNOLOGY/i, 'B.TECH')
-        .replace(/MASTER OF TECHNOLOGY/i, 'M.TECH')
+        .replace(/BACHELOR OF TECHNOLOGY/i, 'B.Tech')
+        .replace(/MASTER OF TECHNOLOGY/i, 'M.Tech')
         .replace(/BACHELOR OF/i, 'B.')
         .replace(/MASTER OF/i, 'M.')
         .slice(0, 46);
@@ -42,10 +60,6 @@ function shortenProgramme(value: string): string {
 
 function shortenInst(value: string): string {
     return value.slice(0, 42);
-}
-
-function truncateText(value: string, limit: number): string {
-    return value.length > limit ? `${value.slice(0, limit - 2)}..` : value;
 }
 
 function formatDeclaredDate(value: unknown): string | null {
@@ -89,9 +103,9 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
     });
     const semesters = getSemestersToRender(results, selectedSem);
 
-    doc.setFillColor(...NAVY);
+    doc.setFillColor(...CHARCOAL);
     doc.rect(0, 0, pageW, 40, 'F');
-    doc.setFillColor(...BLUE);
+    doc.setFillColor(...ACCENT);
     doc.rect(0, 36, pageW, 4, 'F');
 
     doc.setTextColor(...WHITE);
@@ -109,16 +123,16 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
-    doc.setTextColor(191, 219, 254);
+    doc.setTextColor(212, 212, 216); // zinc-300
     doc.text(`Generated: ${dateStr}`, pageW - margin, 35, { align: 'right' });
 
     let y = 48;
 
-    doc.setFillColor(...BLUE_LIGHT);
-    doc.setDrawColor(...BLUE_MID);
-    doc.roundedRect(margin, y, contentW, 48, 2, 2, 'FD');
+    doc.setFillColor(...BG_LIGHT);
+    doc.setDrawColor(...BORDER);
+    doc.roundedRect(margin, y, contentW, 34, 2, 2, 'FD');
 
-    doc.setTextColor(...BLUE);
+    doc.setTextColor(...CHARCOAL);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.text('STUDENT INFORMATION', margin + 4, y + 6);
@@ -131,30 +145,27 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
 
     const infoRows: [string, string, string, string][] = [
         ['Name', info.name || '---', 'Enrollment No.', results?.enrollment_number || info.roll_no || '---'],
-        ['Programme', shortenProgramme(info.programme || '---'), 'Batch', info.batch || '---'],
+        ['Programme', shortenProgramme(info.programme || '---'), 'Batch', info.batch ? `${info.batch} (Adm: ${info.admission_year || '---'})` : (info.admission_year || '---')],
         ['Institution', shortenInst(info.institution || '---'), 'CGPA', results?.cgpa ? Number(results.cgpa).toFixed(2) : '---'],
-        ["Father's Name", info.father || '---', "Mother's Name", info.mother || '---'],
-        ['Gender', info.gender || '---', 'Admission Year', info.admission_year || '---'],
-        ['Email', truncateText(info.email || '---', 34), 'Phone', info.phone || '---'],
     ];
 
     let iy = y + 12;
     for (const [l1, v1, l2, v2] of infoRows) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
-        doc.setTextColor(...GRAY_MID);
+        doc.setTextColor(...TEXT_MUTED);
         doc.text(`${l1}:`, c1, iy);
         doc.text(`${l2}:`, c2, iy);
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.5);
-        doc.setTextColor(...DARK);
+        doc.setTextColor(...ACCENT);
         doc.text(String(v1), c1v, iy);
         doc.text(String(v2), c2v, iy);
         iy += lh;
     }
 
-    y += 53;
+    y += 39;
 
     for (const sem of semesters) {
         if (y > pageH - 70) {
@@ -175,7 +186,7 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         const examSession = subjects.find((sub: any) => sub?.exam_session)?.exam_session || null;
         const sgpaVal = sem.sgpa ? parseFloat(sem.sgpa) : 0;
 
-        doc.setFillColor(...GRAY_DARK);
+        doc.setFillColor(...CHARCOAL);
         doc.rect(margin, y, contentW, 8, 'F');
         doc.setTextColor(...WHITE);
         doc.setFont('helvetica', 'bold');
@@ -189,18 +200,18 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         if (examSession || declaredDate) {
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(7);
-            doc.setTextColor(...GRAY_MID);
+            doc.setTextColor(...TEXT_MUTED);
             const meta = [examSession ? `Exam: ${examSession}` : null, declaredDate ? `Declared: ${declaredDate}` : null]
                 .filter(Boolean)
                 .join(' | ');
-            doc.text(meta, margin, y + 2.5); // Adjusted Y to lower the text away from the header
-            y += 5; // Give more space after meta
+            doc.text(meta, margin, y + 2.5);
+            y += 5;
         }
 
-        doc.setFillColor(...GRAY_LIGHT);
-        doc.setDrawColor(...BLUE_MID);
+        doc.setFillColor(...BG_LIGHT);
+        doc.setDrawColor(...BORDER);
         doc.roundedRect(margin, y, contentW, 12, 2, 2, 'FD');
-        doc.setTextColor(...GRAY_DARK);
+        doc.setTextColor(...CHARCOAL);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7);
         doc.text(`Subjects: ${subjects.length}`, margin + 4, y + 7);
@@ -211,15 +222,16 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         y += 15;
 
         const tableBody = subjects.map((sub: any, idx: number) => {
-            const isPending = sub.is_pending || sub.grade === '-' || sub.total_marks === null || sub.total_marks === undefined;
+            const { internal, external, total, maxMarks } = getSubjectMarks(sub);
+            const isPending = sub.is_pending || sub.grade === '-' || (sub.total_marks === null && sub.marks === null && sub.internal === null && sub.external === null && sub.internal_theory === null && sub.external_theory === null && sub.internal_practical === null && sub.external_practical === null);
             return [
                 idx + 1,
                 sub.code || '---',
                 sub.name || '---',
-                sub.internal ?? '-',
-                sub.external ?? '-',
-                isPending ? 'Pending' : (sub.total_marks ?? '-'),
-                isPending ? '---' : (sub.max_marks ?? 100),
+                isPending ? 'Pending' : internal,
+                isPending ? 'Pending' : external,
+                isPending ? 'Pending' : total,
+                isPending ? '---' : maxMarks,
                 sub.grade || '-',
                 sub.credits || sub.status || '-',
             ];
@@ -232,7 +244,7 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
             body: tableBody,
             theme: 'grid',
             headStyles: {
-                fillColor: [55, 65, 81],
+                fillColor: [39, 39, 42], // zinc-800
                 textColor: [255, 255, 255],
                 fontSize: 7.5,
                 fontStyle: 'bold',
@@ -241,7 +253,7 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
             },
             bodyStyles: {
                 fontSize: 7.5,
-                textColor: [30, 30, 30],
+                textColor: [24, 24, 27],
                 cellPadding: 2,
             },
             columnStyles: {
@@ -255,13 +267,13 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
                 7: { halign: 'center' as const, cellWidth: 13 },
                 8: { halign: 'center' as const, cellWidth: 22 },
             },
-            alternateRowStyles: { fillColor: [...GRAY_LIGHT] },
+            alternateRowStyles: { fillColor: [...BG_LIGHT] },
             didParseCell: (data: any) => {
                 if (data.section === 'body' && data.column.index === 7) {
                     const grade = String(data.cell.raw);
                     if (grade === 'F') data.cell.styles.textColor = RED;
                     else if (grade === 'O' || grade === 'A+') data.cell.styles.textColor = GREEN;
-                    else if (grade === '-') data.cell.styles.textColor = GRAY_MID;
+                    else if (grade === '-') data.cell.styles.textColor = TEXT_MUTED;
                 }
             },
         });
@@ -285,7 +297,7 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         if (sgpaRows.length) {
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(8);
-            doc.setTextColor(...GRAY_DARK);
+            doc.setTextColor(...CHARCOAL);
             doc.text('SEMESTER-WISE PERFORMANCE SUMMARY', margin, y + 1);
             y += 5;
 
@@ -297,7 +309,7 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
                 theme: 'striped',
                 tableWidth: contentW / 2.5,
                 headStyles: {
-                    fillColor: GRAY_DARK,
+                    fillColor: CHARCOAL,
                     textColor: WHITE,
                     fontSize: 8,
                     halign: 'center' as const,
@@ -313,16 +325,16 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
         const distinctionCount = completedSubjects.filter((sub: any) => Number(sub.percentage || 0) >= 75).length;
         const latestDeclared = getLatestDeclaredDate(completedSubjects);
 
-        doc.setFillColor(...BLUE_LIGHT);
-        doc.setDrawColor(...BLUE_MID);
+        doc.setFillColor(...BG_LIGHT);
+        doc.setDrawColor(...BORDER);
         doc.roundedRect(margin, y, contentW, 24, 2, 2, 'FD');
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        doc.setTextColor(...BLUE);
+        doc.setTextColor(...ACCENT);
         doc.text(`Cumulative GPA (CGPA): ${results?.cgpa ? Number(results.cgpa).toFixed(2) : '---'}`, pageW / 2, y + 8, { align: 'center' });
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.setTextColor(...GRAY_DARK);
+        doc.setTextColor(...CHARCOAL);
         doc.text(`Overall Percentage (declared subjects only): ${results?.overallPercentage ? Number(results.overallPercentage).toFixed(1) : '0.0'}%`, pageW / 2, y + 14, { align: 'center' });
         doc.text(`Declared Subjects: ${completedSubjects.length} | Distinctions: ${distinctionCount} | Latest Declared Date: ${latestDeclared || '---'}`, pageW / 2, y + 20, { align: 'center' });
     }
@@ -330,17 +342,17 @@ export function downloadResultsPdf(results: any, selectedSem: string) {
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
-        doc.setFillColor(241, 245, 249);
+        doc.setFillColor(244, 244, 245); // zinc-100
         doc.rect(0, pageH - 10, pageW, 10, 'F');
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(6.5);
-        doc.setTextColor(...GRAY_MID);
-        doc.text(`Generated by Zenith | ${dateStr} | Data sourced from GGSIPU examination portal.`, pageW / 2, pageH - 4, { align: 'center' });
+        doc.setTextColor(...TEXT_MUTED);
+        doc.text(`Generated by Zenith Academic Suite | ${dateStr} | Data sourced from GGSIPU examination portal.`, pageW / 2, pageH - 4, { align: 'center' });
         doc.text(`Page ${i} / ${totalPages}`, pageW - margin, pageH - 4, { align: 'right' });
     }
 
     const nameSlug = (info.name || 'Student').replace(/\s+/g, '_').toUpperCase();
     const enroll = results?.enrollment_number || info.roll_no || '';
     const semPart = selectedSem === 'overall' ? 'All_Semesters' : `Sem_${selectedSem}`;
-    doc.save(`${nameSlug}_${enroll}_${semPart}_Results.pdf`);
+    doc.save(`${nameSlug}_${enroll}_${semPart}_Results_Zenith.pdf`);
 }

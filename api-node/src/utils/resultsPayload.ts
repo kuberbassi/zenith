@@ -145,16 +145,17 @@ export async function buildResultsPayload(
   const enrichedStudentInfo = {
     ...(userDoc?.name ? { name: userDoc.name } : {}),
     ...(userDoc?.enrollment_number ? { roll_no: userDoc.enrollment_number } : {}),
-    ...(userDoc?.mother_name ? { mother: userDoc.mother_name } : {}),
-    ...(userDoc?.father_name ? { father: userDoc.father_name } : {}),
-    ...(userDoc?.phone_number ? { phone: userDoc.phone_number } : {}),
-    ...(userDoc?.email ? { email: userDoc.email } : {}),
-    ...(userDoc?.gender ? { gender: userDoc.gender } : {}),
     ...(userDoc?.batch ? { batch: userDoc.batch } : {}),
     ...(userDoc?.course ? { programme: userDoc.course } : {}),
     ...(userDoc?.college ? { institution: userDoc.college } : {}),
     ...(userDoc?.admission_year ? { admission_year: userDoc.admission_year } : {}),
-    ...rawStudentInfo,
+  }
+
+  const allowedKeys = ['name', 'roll_no', 'batch', 'programme', 'institution', 'admission_year']
+  for (const key of allowedKeys) {
+    if (rawStudentInfo[key] !== undefined) {
+      (enrichedStudentInfo as any)[key] = rawStudentInfo[key]
+    }
   }
 
   const normalizedResults = resultRows.map((row) => {

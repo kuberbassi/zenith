@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Compass, Home, LogIn } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Home, LogIn } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePageMeta } from '@/hooks/usePageMeta';
 
@@ -14,32 +15,46 @@ const NotFound: React.FC = () => {
     });
 
     return (
-        <div className="min-h-screen glass-panel text-white flex items-center justify-center px-6">
-            <div className="max-w-xl w-full rounded-[2rem] border border-white/10 bg-white/[0.03] backdrop-blur-xl p-10 text-center shadow-2xl">
-                <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-white/5 text-white">
-                    <Compass size={30} />
+        <div className="min-h-screen bg-background text-on-background flex items-center justify-center px-6 py-12 font-sans">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className="max-w-sm w-full text-center space-y-8 select-none"
+            >
+                {/* Error code */}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-bold tracking-[0.3em] uppercase text-on-surface-variant/30">
+                        Error 404
+                    </p>
+                    <h1 className="text-6xl font-bold tracking-tight text-on-surface">
+                        Lost
+                    </h1>
+                    <p className="text-sm text-on-surface-variant/50 leading-relaxed max-w-xs mx-auto">
+                        This page doesn't exist or has moved somewhere else.
+                    </p>
                 </div>
-                <p className="text-[11px] font-black tracking-[0.35em] uppercase text-white/70 mb-3">404</p>
-                <h1 className="text-4xl font-black tracking-tight mb-4">Route Not Found</h1>
-                <p className="text-sm text-white/55 leading-relaxed mb-8">
-                    This page does not exist, or the route is no longer valid in the current app structure.
-                </p>
+
+                {/* Divider */}
+                <div className="w-12 h-px bg-outline mx-auto" />
+
+                {/* Actions */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Link
                         to={isAuthenticated ? '/' : '/login'}
-                        className="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-white/10 text-white font-black uppercase tracking-wider text-[11px]"
+                        className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg bg-on-surface text-surface text-xs font-semibold hover:opacity-90 transition-all"
                     >
-                        {isAuthenticated ? <Home size={16} /> : <LogIn size={16} />}
-                        {isAuthenticated ? 'Go Home' : 'Go To Login'}
+                        {isAuthenticated ? <Home size={14} /> : <LogIn size={14} />}
+                        {isAuthenticated ? 'Go Home' : 'Sign In'}
                     </Link>
-                    <Link
-                        to="/privacy"
-                        className="inline-flex items-center justify-center h-12 px-6 rounded-2xl border border-white/10 text-white/75 font-black uppercase tracking-wider text-[11px]"
+                    <a
+                        href="/privacy"
+                        className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg border border-outline bg-surface text-on-surface-variant text-xs font-semibold hover:border-on-surface hover:text-on-surface transition-all"
                     >
                         Privacy
-                    </Link>
+                    </a>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 };

@@ -2,15 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageCircle, Send, X, Sparkles, User, ChevronDown, Trash2 } from 'lucide-react';
 import api from '@/services/api';
-import Loader from '@/components/ui/Loader';
 
-// Lightweight markdown → JSX for AI messages
+// Lightweight markdown → JSX for AI messages (Theme aware)
 const renderMarkdown = (text: string) => {
     return text.split('\n').map((line, i) => {
         // Bold **text**
         const parts = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
             if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={j} className="font-bold text-white">{part.slice(2, -2)}</strong>;
+                return <strong key={j} className="font-bold text-on-surface">{part.slice(2, -2)}</strong>;
             }
             return <span key={j}>{part}</span>;
         });
@@ -18,13 +17,26 @@ const renderMarkdown = (text: string) => {
         // Bullet points
         const trimmed = line.trim();
         if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
-            return <div key={i} className="flex gap-1.5 ml-1"><span className="text-white/60 shrink-0">•</span><span>{parts.slice(0)}</span></div>;
+            // Strip the list token from display
+            const contentOnly = line.replace(/^[\s-•]+/, '');
+            const subparts = contentOnly.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                    return <strong key={j} className="font-bold text-on-surface">{part.slice(2, -2)}</strong>;
+                }
+                return <span key={j}>{part}</span>;
+            });
+            return (
+                <div key={i} className="flex gap-2 ml-1 my-1">
+                    <span className="text-primary/70 shrink-0">•</span>
+                    <span>{subparts}</span>
+                </div>
+            );
         }
 
         // Empty lines become spacing
-        if (!trimmed) return <div key={i} className="h-1.5" />;
+        if (!trimmed) return <div key={i} className="h-2" />;
 
-        return <div key={i}>{parts}</div>;
+        return <div key={i} className="my-0.5">{parts}</div>;
     });
 };
 
@@ -59,8 +71,10 @@ const AIChat: React.FC = () => {
     };
 
     useEffect(() => {
-        scrollToBottom();
-    }, [messages, isTyping]);
+        if (isOpen) {
+            scrollToBottom();
+        }
+    }, [messages, isTyping, isOpen]);
 
     const handleScroll = () => {
         if (!scrollContainerRef.current) return;
@@ -143,11 +157,9 @@ const AIChat: React.FC = () => {
                         whileHover={{ scale: 1.05, y: -2 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => setIsOpen(true)}
-                        className="fixed bottom-6 right-6 lg:right-8 z-50 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center overflow-hidden glass-panel group shadow-2xl transition-all"
+                        className="fixed bottom-6 right-6 lg:right-8 z-40 w-14 h-14 rounded-full flex items-center justify-center bg-primary text-on-primary shadow-2xl transition-all cursor-pointer"
                     >
-                        <div className="absolute inset-0 bg-white/[0.05] group-hover:bg-white/[0.1] transition-colors" />
-                        <MessageCircle className="w-5 h-5 md:w-6 md:h-6 text-white relative z-10" />
-                        <div className="absolute -inset-4 bg-white/5 blur-xl group-hover:bg-white/10 transition-all opacity-0 group-hover:opacity-100" />
+                        <MessageCircle className="w-6 h-6" />
                     </motion.button>
                 )}
             </AnimatePresence>
@@ -156,31 +168,31 @@ const AIChat: React.FC = () => {
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                        initial={{ opacity: 0, y: 24, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                        exit={{ opacity: 0, y: 24, scale: 0.95 }}
+                        transition={{ type: "spring", stiffness: 380, damping: 28 }}
                         ref={panelRef}
-                        className="fixed bottom-[80px] right-6 lg:right-8 z-50 w-[calc(100vw-24px)] max-w-[380px] h-[520px] max-h-[calc(100vh-104px)] flex flex-col overflow-hidden rounded-[2rem] glass-glow"
+                        className="fixed bottom-[84px] right-6 lg:right-8 z-[9999] w-[calc(100vw-32px)] max-w-[400px] h-[550px] max-h-[calc(100vh-120px)] flex flex-col overflow-hidden rounded-2xl bg-surface/90 border border-outline/50 backdrop-blur-xl shadow-2xl text-on-surface"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-outline/30 bg-surface-container/30">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/10 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                                    <Sparkles className="w-4 h-4 text-white" />
+                                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-primary/10 border border-primary/20 text-primary">
+                                    <Sparkles className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <h3 className="font-black text-white text-[13px] uppercase tracking-widest leading-none">Zenith AI</h3>
-                                    <span className="text-[10px] text-white/25 font-bold uppercase tracking-tighter">Llama 3.3 · Control Link</span>
+                                    <h3 className="font-bold text-on-surface text-sm leading-none">Zenith AI</h3>
+                                    <span className="text-[10px] text-on-surface-variant/50 font-semibold mt-1 block">Powered by Llama · Assistant</span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-1">
                                 {messages.length > 0 && (
-                                    <button onClick={clearChat} className="p-2 text-white/20 hover:text-white/60 transition-all rounded-xl hover:bg-white/[0.05]" title="Wipe session">
+                                    <button onClick={clearChat} className="p-2 text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container rounded-xl transition-all" title="Wipe session">
                                         <Trash2 className="w-4 h-4" />
                                     </button>
                                 )}
-                                <button onClick={() => setIsOpen(false)} className="p-2 text-white/20 hover:text-white/60 transition-all rounded-xl hover:bg-white/[0.05]">
+                                <button onClick={() => setIsOpen(false)} className="p-2 text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container rounded-xl transition-all">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
@@ -190,24 +202,24 @@ const AIChat: React.FC = () => {
                         <div
                             ref={scrollContainerRef}
                             onScroll={handleScroll}
-                            className="flex-1 overflow-y-auto px-5 py-4 space-y-4 no-scrollbar"
+                            className="flex-1 overflow-y-auto px-5 py-4 space-y-4 custom-scrollbar"
                         >
                             {/* Empty State */}
                             {messages.length === 0 && !isTyping && (
-                                <div className="h-full flex flex-col items-center justify-center gap-6 py-6" style={{ minHeight: '300px' }}>
-                                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-white/[0.03] border border-white/[0.08] shadow-2xl">
-                                        <Sparkles className="w-6 h-6 text-white/40" />
+                                <div className="h-full flex flex-col items-center justify-center gap-5 py-6" style={{ minHeight: '320px' }}>
+                                    <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-surface-container border border-outline/30">
+                                        <Sparkles className="w-5 h-5 text-on-surface-variant/40 animate-pulse" />
                                     </div>
                                     <div className="text-center space-y-2">
-                                        <p className="text-white/70 text-sm font-black uppercase tracking-widest leading-none">Awaiting Protocol</p>
-                                        <p className="text-white/30 text-xs font-medium max-w-[220px]">Synthetic intelligence connected to your academic mainframe</p>
+                                        <p className="text-on-surface text-sm font-bold leading-none">How can I help you today?</p>
+                                        <p className="text-on-surface-variant/40 text-xs font-semibold max-w-[240px]">Ask me about attendance deficit risks, timetable slots, or grades scanning.</p>
                                     </div>
-                                    <div className="grid grid-cols-1 gap-2 w-full max-w-[280px]">
+                                    <div className="grid grid-cols-1 gap-1.5 w-full max-w-[280px]">
                                         {SUGGESTIONS.map((s, i) => (
                                             <button
                                                 key={i}
                                                 onClick={() => handleSend(s)}
-                                                className="px-4 py-2.5 rounded-xl text-[11px] text-white/40 hover:text-white/80 font-bold text-left transition-all bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.1] hover:translate-x-1"
+                                                className="px-4 py-2.5 rounded-xl text-xs text-on-surface-variant hover:text-on-surface font-semibold text-left transition-all bg-surface-container/40 border border-outline/20 hover:bg-surface-container-high hover:translate-x-1"
                                             >
                                                 {s}
                                             </button>
@@ -220,28 +232,28 @@ const AIChat: React.FC = () => {
                             {messages.map((msg) => (
                                 <motion.div
                                     key={msg.id}
-                                    initial={{ opacity: 0, y: 10 }}
+                                    initial={{ opacity: 0, y: 12 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     {msg.role === 'assistant' && (
-                                        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 bg-white/5 border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.3)]">
-                                            <Sparkles className={`w-4 h-4 ${msg.error ? 'text-red-400' : 'text-white/60'}`} />
+                                        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-primary/10 border border-primary/20 text-primary">
+                                            <Sparkles className="w-3.5 h-3.5" />
                                         </div>
                                     )}
                                     <div
                                         className={`max-w-[85%] px-4 py-3 text-[13px] leading-relaxed font-medium ${msg.role === 'user'
-                                            ? 'rounded-2xl rounded-tr-sm bg-white text-black shadow-xl shadow-white/5'
+                                            ? 'rounded-2xl rounded-tr-sm bg-on-surface text-surface shadow-md'
                                             : msg.error
-                                                ? 'rounded-2xl rounded-tl-sm bg-red-500/10 border border-red-500/20 text-red-200/90'
-                                                : 'rounded-2xl rounded-tl-sm bg-white/[0.04] border border-white/[0.06] text-white/80'
+                                                ? 'rounded-2xl rounded-tl-sm bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400'
+                                                : 'rounded-2xl rounded-tl-sm bg-surface-container-high border border-outline/35 text-on-surface shadow-xs'
                                             }`}
                                     >
                                         {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
                                     </div>
                                     {msg.role === 'user' && (
-                                        <div className="w-8 h-8 rounded-xl bg-white/[0.08] flex items-center justify-center shrink-0 mt-0.5 border border-white/[0.1]">
-                                            <User className="w-4 h-4 text-white/60" />
+                                        <div className="w-8 h-8 rounded-full bg-surface-container border border-outline flex items-center justify-center shrink-0 mt-0.5 text-on-surface-variant/60">
+                                            <User className="w-3.5 h-3.5" />
                                         </div>
                                     )}
                                 </motion.div>
@@ -250,11 +262,11 @@ const AIChat: React.FC = () => {
                             {/* Typing Indicator */}
                             {isTyping && (
                                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-start">
-                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-white/5 border border-white/10">
-                                        <Loader size={16} />
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 border border-primary/20 text-primary">
+                                        <Sparkles className="w-3.5 h-3.5 animate-spin" />
                                     </div>
-                                    <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-white/[0.03] border border-white/[0.06] flex items-center gap-1.5">
-                                        <span className="text-[11px] font-black uppercase tracking-widest text-white/20 animate-pulse">Analyzing context...</span>
+                                    <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-surface-container-high border border-outline/35 flex items-center gap-1.5 shadow-xs">
+                                        <span className="text-xs font-semibold text-on-surface-variant/40 animate-pulse">Analyzing schedule...</span>
                                     </div>
                                 </motion.div>
                             )}
@@ -264,28 +276,28 @@ const AIChat: React.FC = () => {
                         </div>
 
                         {showScrollBtn && (
-                            <button onClick={scrollToBottom} className="absolute bottom-[80px] left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center backdrop-blur-xl hover:bg-white/20 transition-all z-10 shadow-2xl">
-                                <ChevronDown className="w-5 h-5 text-white/80" />
+                            <button onClick={scrollToBottom} className="absolute bottom-[84px] left-1/2 -translate-x-1/2 w-9 h-9 rounded-full bg-surface border border-outline flex items-center justify-center shadow-lg hover:bg-surface-container transition-all z-10">
+                                <ChevronDown className="w-5 h-5 text-on-surface-variant" />
                             </button>
                         )}
 
-                        {/* Input */}
-                        <div className="px-4 py-4 border-t border-white/[0.08] bg-white/[0.02]">
+                        {/* Input Area */}
+                        <div className="px-4 py-4 border-t border-outline/30 bg-surface-container/30">
                             <div className="relative flex items-center gap-2">
                                 <input
                                     type="text"
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                                    placeholder="Execute command..."
-                                    className="flex-1 bg-white/[0.04] border border-white/[0.08] rounded-2xl py-3 px-4 text-sm text-white placeholder:text-white/15 focus:outline-none focus:border-white/20 transition-all focus:bg-white/[0.06] font-medium"
+                                    placeholder="Type a message..."
+                                    className="flex-1 bg-surface border border-outline rounded-xl py-3 px-4 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:border-primary transition-all focus:ring-1 focus:ring-primary/25 font-semibold"
                                 />
                                 <button
                                     onClick={() => handleSend()}
                                     disabled={!input.trim() || isTyping}
-                                    className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all shadow-xl ${input.trim() && !isTyping ? 'bg-white text-black hover:scale-105 active:scale-95' : 'bg-white/[0.04] border border-white/[0.06] text-white/20 opacity-40 cursor-not-allowed'}`}
+                                    className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${input.trim() && !isTyping ? 'bg-primary text-on-primary hover:scale-105 active:scale-95 shadow-md shadow-primary/20' : 'bg-surface-container border border-outline/20 text-on-surface-variant/20 opacity-45 cursor-not-allowed'}`}
                                 >
-                                    <Send className="w-5 h-5" />
+                                    <Send className="w-4 h-4" />
                                 </button>
                             </div>
                         </div>

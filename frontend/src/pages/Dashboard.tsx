@@ -1,124 +1,191 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
-import { useDashboard } from '@/hooks/useDashboard';
+import { useDashboard, useMarkAttendance } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
-import { AnimatePresence, motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Chart as ChartJS, CategoryScale, LinearScale, BarElement,
-    PointElement, LineElement, Tooltip, Legend, Filler
-} from 'chart.js';
-import {
-    AlertTriangle, TrendingUp, Trash, Edit2,
-    Plus, Zap, Target,
-    Activity, ShieldCheck, CheckCircle2
+    Plus, Trash2, Edit2, Check, X,
+    Activity, Target, Flame, ChevronRight, Settings as SettingsIcon, FileText
 } from 'lucide-react';
-
 import AddSubjectModal from '@/components/modals/AddSubjectModal';
 import EditSubjectModal from '@/components/modals/EditSubjectModal';
 import AttendanceModal from '@/components/modals/AttendanceModal';
 import { useToast } from '@/components/ui/Toast';
 import { attendanceService } from '@/services/attendance.service';
-import Sparkles from '@/components/ui/Sparkles';
-import { LazyBarChartWrapper, LazyLineChartWrapper } from '@/components/ui/LazyCharts';
+import useLongPress from '@/hooks/useLongPress';
+import { useSemester } from '@/contexts/SemesterContext';
+import { Link } from 'react-router-dom';
+import { formatTeacherName } from '@/utils/formatters';
+import { useNotes } from '@/hooks/useNotes';
+import NoticesWidget from '@/components/dashboard/NoticesWidget';
 
-import Loader from '@/components/ui/Loader';
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend, Filler);
+/* ── Helpers for Timetable slot subject mapping ── */
+const normalizeId = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
 
-const ATTENDED_STATUSES = new Set(['present', 'late', 'approved_medical', 'medical', 'duty', 'substituted']);
+const findSubjectForSlot = (subjects: any[], slot: any) => {
+    const explicitType = String(slot?.type || '').trim().toLowerCase();
+    const hasSubjectRef = Boolean(normalizeId(slot?.subject_id || slot?.subjectId || slot?.subject?._id || slot?.subject?.id));
+    if (explicitType && explicitType !== 'class') return undefined;
+    if (!explicitType && !hasSubjectRef) return undefined;
 
+    const slotSubjectId = normalizeId(slot?.subject_id || slot?.subjectId || slot?.subject?._id || slot?.subject?.id);
+    if (slotSubjectId) {
+        const matchedById = subjects.find((sub: any) => normalizeId(sub._id || sub.id) === slotSubjectId);
+        if (matchedById) return matchedById;
+    }
 
-/* ── Animated Number ────────────────────────────────────────────── */
-const AnimNum: React.FC<{ value: number; decimals?: number; className?: string }> = ({
-    value, decimals = 1, className = ''
-}) => {
-    const mv = useMotionValue(0);
-    const spring = useSpring(mv, { duration: 1200, bounce: 0 });
-    const display = useTransform(spring, (v) => v.toFixed(decimals));
-    const [d, setD] = useState('0');
-    useEffect(() => { mv.set(value); }, [value, mv]);
-    useEffect(() => { const u = display.on('change', setD); return u; }, [display]);
-    return <span className={className}>{d}</span>;
+    const subjectField = slot?.subject;
+    if (typeof subjectField === 'string' && subjectField.trim()) {
+        const needle = subjectField.trim().toLowerCase();
+        const matchedByName = subjects.find((sub: any) => String(sub?.name || '').trim().toLowerCase() === needle);
+        if (matchedByName) return matchedByName;
+    }
+
+    if (subjectField && typeof subjectField === 'object') {
+        const subObj = subjectField as Record<string, unknown>;
+        const objId = normalizeId(subObj._id || subObj.id);
+        if (objId) {
+            const matchedByObjId = subjects.find((sub: any) => normalizeId(sub._id || sub.id) === objId);
+            if (matchedByObjId) return matchedByObjId;
+        }
+        const objName = String(subObj.name || '').trim().toLowerCase();
+        if (objName) {
+            const matchedByObjName = subjects.find((sub: any) => String(sub?.name || '').trim().toLowerCase() === objName);
+            if (matchedByObjName) return matchedByObjName;
+        }
+    }
+
+    const slotLabel = String(
+        slot?.label
+        || slot?.subject_name
+        || slot?.subjectName
+        || slot?.name
+        || slot?.subject?.name
+        || slot?.subject?.code
+        || ''
+    ).trim().toLowerCase();
+    if (!slotLabel) return undefined;
+
+    return subjects.find((sub: any) => {
+        const subName = String(sub?.name || '').trim().toLowerCase();
+        const subCode = String(sub?.code || '').trim().toLowerCase();
+        
+        if (subName === slotLabel || subCode === slotLabel) return true;
+        
+        const acronym = subName.split(/\s+/).map(w => w[0]).join('');
+        if (acronym === slotLabel) return true;
+        
+        if (subName.includes(slotLabel) || subCode.includes(slotLabel) || slotLabel.includes(subCode)) return true;
+
+        return false;
+    });
 };
 
-/* ── Glowing Arc Ring ───────────────────────────────────────────── */
-const GlowRing: React.FC<{ pct: number; size?: number }> = ({ pct, size = 220 }) => {
-    const strokeW = 6;
-    const r = (size - strokeW * 2) / 2;
-    const circ = 2 * Math.PI * r;
-    const offset = circ - (pct / 100) * circ;
-    const gradId = 'ringGrad';
+const SubjectRow: React.FC<{
+    subject: any;
+    targetThreshold: number;
+    classesNeeded: (attended: number, total: number) => number;
+    classesCanSkip: (attended: number, total: number) => number;
+    triggerBubbleMenu: (subjectId: string, e: any) => void;
+    handleQuickMark: (subjectId: string, status: 'present' | 'absent') => void;
+    setEditingSubject: (subject: any) => void;
+    handleDeleteSubject: (subjectId: string, subjectName: string) => void;
+}> = ({
+    subject,
+    targetThreshold,
+    classesNeeded,
+    classesCanSkip,
+    triggerBubbleMenu,
+    handleQuickMark,
+    setEditingSubject,
+    handleDeleteSubject,
+}) => {
+    const pct = subject.attendance_percentage || 0;
+    const isCritical = pct < targetThreshold;
+    const needed = classesNeeded(subject.attended || 0, subject.total || 0);
+    const canSkip = classesCanSkip(subject.attended || 0, subject.total || 0);
+    const longPressHandlers = useLongPress((e) => triggerBubbleMenu(subject._id, e), {
+        threshold: 600,
+        onCancel: () => {}
+    });
 
     return (
-        <div className="relative" style={{ width: size, height: size }}>
-            {/* Outer ambient glow */}
-            <div className="absolute inset-0 rounded-full" style={{
-                boxShadow: `0 0 60px rgba(16,185,129,${0.08 + pct * 0.002}), 0 0 120px rgba(255,255,255,0.03)`
-            }} />
-            <svg width={size} height={size} className="transform -rotate-90">
-                <defs>
-                    <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#ffffff" />
-                        <stop offset="50%" stopColor="#f5f5f5" />
-                        <stop offset="100%" stopColor="#e5e5e5" />
-                    </linearGradient>
-                    <filter id="ringGlow">
-                        <feGaussianBlur stdDeviation="3" result="blur" />
-                        <feMerge>
-                            <feMergeNode in="blur" />
-                            <feMergeNode in="SourceGraphic" />
-                        </feMerge>
-                    </filter>
-                </defs>
-                {/* Track */}
-                <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth={strokeW} />
-                {/* Active arc */}
-                <motion.circle
-                    cx={size / 2} cy={size / 2} r={r} fill="none"
-                    stroke={`url(#${gradId})`}
-                    strokeWidth={strokeW} strokeLinecap="round"
-                    strokeDasharray={circ}
-                    initial={{ strokeDashoffset: circ }}
-                    animate={{ strokeDashoffset: offset }}
-                    transition={{ duration: 1.8, ease: [0.22, 1, 0.36, 1] }}
-                    filter="url(#ringGlow)"
-                />
-            </svg>
-        </div>
+        <tr
+            {...longPressHandlers}
+            className="hover:bg-surface-container/30 transition-colors group cursor-default"
+        >
+            <td className="px-6 py-4 font-mono font-bold text-on-surface-variant/50">{subject.code || 'COURSE'}</td>
+            <td className="px-6 py-4 font-bold text-on-surface">
+                <div>
+                    <p className="truncate max-w-[200px] leading-tight">{subject.name}</p>
+                    <span className="text-[9px] font-bold text-on-surface-variant/30 uppercase mt-1 inline-block">{subject.type || 'Theory'}</span>
+                </div>
+            </td>
+            <td className="px-6 py-4 text-on-surface-variant/60 font-medium">
+                <p className="truncate max-w-[150px] leading-tight">{formatTeacherName(subject.professor)}</p>
+            </td>
+            <td className="px-6 py-4 text-center font-bold text-on-surface">{subject.attended || 0} / {subject.total || 0}</td>
+            <td className="px-6 py-4 text-center">
+                <div className="flex flex-col items-center gap-1.5">
+                    <span className={`font-bold text-xs ${isCritical ? 'text-red-500' : 'text-on-surface'}`}>{Math.round(pct)}%</span>
+                    <div className="w-16 h-1 bg-on-surface/10 border border-outline/50 rounded-full overflow-hidden shrink-0">
+                        <div className={`h-full ${isCritical ? 'bg-red-500' : 'bg-on-surface'}`} style={{ width: `${Math.min(100, pct)}%` }} />
+                    </div>
+                </div>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                    isCritical 
+                        ? 'bg-red-500/10 border-red-500/20 text-red-500' 
+                        : 'bg-primary/5 border-outline text-on-surface'
+                }`}>
+                    {isCritical ? `Need ${needed} cls` : `${canSkip} Bunks`}
+                </span>
+            </td>
+            <td className="px-6 py-4 text-center">
+                <div className="flex justify-center gap-1">
+                    <button
+                        onClick={() => handleQuickMark(subject._id, 'present')}
+                        className="px-2 py-1 rounded border border-outline bg-surface text-[10px] font-bold text-on-surface-variant hover:text-on-surface hover:border-on-surface transition-colors cursor-pointer"
+                    >
+                        P
+                    </button>
+                    <button
+                        onClick={() => handleQuickMark(subject._id, 'absent')}
+                        className="px-2 py-1 rounded border border-outline bg-surface text-[10px] font-bold text-on-surface-variant hover:text-red-500 hover:border-outline transition-colors cursor-pointer"
+                    >
+                        A
+                    </button>
+                </div>
+            </td>
+            <td className="px-6 py-4 text-right">
+                <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                        onClick={() => setEditingSubject(subject)}
+                        className="p-1 rounded hover:bg-surface-container text-on-surface-variant/40 hover:text-on-surface transition-colors cursor-pointer"
+                        title="Edit"
+                    >
+                        <Edit2 size={12} />
+                    </button>
+                    <button
+                        onClick={() => handleDeleteSubject(subject._id, subject.name)}
+                        className="p-1 rounded hover:bg-red-500/5 text-on-surface-variant/40 hover:text-red-500 transition-colors cursor-pointer"
+                        title="Delete"
+                    >
+                        <Trash2 size={12} />
+                    </button>
+                </div>
+            </td>
+        </tr>
     );
 };
 
-/* ── Small Progress Ring ────────────────────────────────────────── */
-const ProgressRing: React.FC<{ pct: number; size?: number; strokeWidth?: number; color: string }> = ({
-    pct, size = 68, strokeWidth = 5, color
-}) => {
-    const r = (size - strokeWidth) / 2;
-    const circ = 2 * Math.PI * r;
-    const offset = circ - (pct / 100) * circ;
-    return (
-        <svg width={size} height={size} className="transform -rotate-90">
-            <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={strokeWidth} />
-            <motion.circle
-                cx={size / 2} cy={size / 2} r={r} fill="none"
-                stroke={color} strokeWidth={strokeWidth} strokeLinecap="round"
-                strokeDasharray={circ}
-                initial={{ strokeDashoffset: circ }}
-                animate={{ strokeDashoffset: offset }}
-                transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            />
-        </svg>
-    );
-};
-
-/* ── Sparkles Component ── */
-
-
-/* ══════════════════════════════════════════════════════════════════
- Dashing Hub Dashboard
- ══════════════════════════════════════════════════════════════════ */
 const Dashboard: React.FC = () => {
     const { showToast } = useToast();
     const { user } = useAuth();
-    const { data: dashboardData, isLoading: loading, refetch: loadDashboard } = useDashboard();
+    const { currentSemester } = useSemester();
+    const { data: dashboardData, isLoading, refetch: loadDashboard } = useDashboard();
+    const markAttendanceMutation = useMarkAttendance();
 
     usePageMeta({
         title: 'Dashboard | Zenith',
@@ -128,9 +195,57 @@ const Dashboard: React.FC = () => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingSubject, setEditingSubject] = useState<any | null>(null);
     const [markingSubjectId, setMarkingSubjectId] = useState<string | null>(null);
+    const [bubbleMenu, setBubbleMenu] = useState<{
+        subjectId: string;
+        x: number;
+        y: number;
+    } | null>(null);
+
+    const [todayClasses, setTodayClasses] = useState<any[]>([]);
+    const [categoryFilter, setCategoryFilter] = useState<'Theory' | 'Practical' | 'All'>('Theory');
+    const { data: notesList } = useNotes();
+    const notesPreview = notesList || [];
+
     const targetThreshold = user?.attendance_threshold || 75;
 
+    useEffect(() => {
+        const fetchTimetable = async () => {
+            try {
+                const data = await attendanceService.getTimetable(currentSemester);
+                const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                const currentDay = dayNames[new Date().getDay()];
+                const daySlots = data?.schedule?.[currentDay] || [];
+                
+                const parseTimeForSort = (time12h: string) => {
+                    if (!time12h) return 0;
+                    try {
+                        const parts = time12h.split(' ');
+                        const time = parts[0];
+                        const modifier = parts[1] || '';
+                        let [hours, minutes] = time.split(':');
+                        let h = parseInt(hours, 10);
+                        if (modifier) {
+                            if (h === 12) h = 0;
+                            if (modifier.toLowerCase() === 'pm') h += 12;
+                        }
+                        return h * 60 + parseInt(minutes, 10);
+                    } catch { return 0; }
+                };
 
+                const sortedSlots = [...daySlots].sort((a: any, b: any) => {
+                    const getSlotStartTime = (slot: any) => String(slot?.start_time || slot?.startTime || '').trim();
+                    return parseTimeForSort(getSlotStartTime(a)) - parseTimeForSort(getSlotStartTime(b));
+                });
+                setTodayClasses(sortedSlots);
+            } catch (err) {
+                console.error("Failed to load timetable for dashboard", err);
+            }
+        };
+
+        if (user) {
+            void fetchTimetable();
+        }
+    }, [currentSemester, user]);
 
     const handleDeleteSubject = async (subjectId: string, subjectName: string) => {
         if (!confirm(`Delete "${subjectName}"?`)) return;
@@ -138,7 +253,21 @@ const Dashboard: React.FC = () => {
             await attendanceService.deleteSubject(subjectId);
             showToast('success', `Deleted ${subjectName}`);
             loadDashboard();
-        } catch { showToast('error', 'Failed'); }
+        } catch {
+            showToast('error', 'Failed to delete');
+        }
+    };
+
+    const handleQuickMark = async (subjectId: string, status: 'present' | 'absent') => {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            navigator.vibrate(15);
+        }
+        try {
+            await markAttendanceMutation.mutateAsync({ subjectId, status });
+            showToast('success', `Marked ${status}`);
+        } catch {
+            showToast('error', 'Failed to mark attendance');
+        }
     };
 
     const classesNeeded = (attended: number, total: number) => {
@@ -152,14 +281,6 @@ const Dashboard: React.FC = () => {
         return Math.max(0, Math.floor((attended * 100 - targetThreshold * total) / targetThreshold));
     };
 
-    const sortSubs = (subs: any[]) => {
-        if (!subs) return [];
-        return [...subs].sort((a, b) => {
-            const p = (s: any) => { const c = s.categories || []; return c.includes('Theory') ? 0 : c.includes('Lab') ? 1 : 2; };
-            return p(a) - p(b);
-        });
-    };
-
     const att = dashboardData?.overall_attendance || 0;
     const subjects = dashboardData?.subjects || [];
     const totalClasses = subjects.reduce((a, c) => a + (c.total || 0), 0) || 0;
@@ -168,305 +289,402 @@ const Dashboard: React.FC = () => {
     const subjectCount = dashboardData?.total_subjects || subjects.length || 0;
     const totalAttended = subjects.reduce((sum, subject) => sum + (subject.attended || 0), 0);
     const safeBunks = dashboardData?.summary?.safe_bunks_remaining ?? 0;
-    const mostCriticalSubject = [...subjects]
-        .filter(subject => (subject.total || 0) > 0)
-        .sort((a, b) => (a.attendance_percentage || 0) - (b.attendance_percentage || 0))[0];
-    const weakestSubjects = [...subjects]
-        .filter(subject => (subject.total || 0) > 0)
-        .sort((a, b) => (a.attendance_percentage || 0) - (b.attendance_percentage || 0))
-        .slice(0, 6);
 
-    const pressureChartData = useMemo(() => ({
-        labels: weakestSubjects.map(subject => subject.code || subject.name?.slice(0, 14) || 'Subject'),
-        datasets: [{
-            label: 'Attendance %',
-            data: weakestSubjects.map(subject => Math.round(subject.attendance_percentage || 0)),
-            backgroundColor: weakestSubjects.map(subject => (subject.attendance_percentage || 0) < targetThreshold ? 'rgba(239,68,68,0.75)' : 'rgba(255,255,255,0.75)'),
-            borderRadius: 10,
-        }],
-    }), [weakestSubjects, targetThreshold]);
+    const sortSubs = (subs: any[]) => {
+        if (!subs) return [];
+        return [...subs].sort((a, b) => {
+            const p = (s: any) => { const c = s.categories || []; return c.includes('Theory') ? 0 : c.includes('Lab') ? 1 : 2; };
+            return p(a) - p(b);
+        });
+    };
 
-    const pressureChartOptions = useMemo(() => ({
-        plugins: { legend: { display: false } },
-        scales: {
-            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10, weight: '700' as const } } },
-            y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.35)', callback: (value: number) => `${value}%` } },
-        },
-    }), []);
+    // Bubble menu trigger
+    const triggerBubbleMenu = (subjectId: string, e: any) => {
+        e.preventDefault();
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+        
+        const menuWidth = 160;
+        const menuHeight = 145;
+        const boundedX = Math.max(12, Math.min(clientX, window.innerWidth - menuWidth - 12));
+        const boundedY = Math.max(12, Math.min(clientY, window.innerHeight - menuHeight - 12));
 
-    const recentTrendData = useMemo(() => {
-        const grouped = (dashboardData?.recent_logs || []).reduce((acc: Record<string, { attended: number; total: number }>, log: any) => {
-            if (!log?.date) return acc;
-            if (!acc[log.date]) acc[log.date] = { attended: 0, total: 0 };
-            acc[log.date].total += 1;
-            if (ATTENDED_STATUSES.has(log.status)) acc[log.date].attended += 1;
-            return acc;
-        }, {});
-        const labels = Object.keys(grouped).sort().slice(-10);
-        return {
-            labels: labels.map(date => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
-            datasets: [{
-                label: 'Daily attendance',
-                data: labels.map(date => {
-                    const entry = grouped[date];
-                    return entry.total > 0 ? Math.round((entry.attended / entry.total) * 100) : 0;
-                }),
-                borderColor: '#ffffff',
-                backgroundColor: 'rgba(255,255,255,0.12)',
-                fill: true,
-                tension: 0.35,
-                pointRadius: 3,
-                pointHoverRadius: 4,
-            }],
-        };
-    }, [dashboardData?.recent_logs]);
-
-    const trendChartOptions = useMemo(() => ({
-        plugins: { legend: { display: false } },
-        scales: {
-            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10, weight: '700' as const } } },
-            y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.35)', callback: (value: number) => `${value}%` } },
-        },
-    }), []);
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-[80vh]">
-                <Loader size={40} />
-            </div>
-        );
-    }
+        setBubbleMenu({
+            subjectId,
+            x: boundedX,
+            y: boundedY
+        });
+    };
 
     return (
-        <motion.div
-            initial="hidden" animate="visible"
-            variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } }}
-            className="pb-28 max-w-[1320px] mx-auto px-3 md:px-5"
-        >
-            {/* ── Beacon Section ── */}
-            <motion.section
-                variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
-                className="relative rounded-[2.5rem] border border-white/[0.06] glass-panel p-8 md:p-12 overflow-hidden mb-6 group transition-all duration-700"
-                style={{ boxShadow: '0 0 100px -20px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.04)' }}
-            >
-                <div className="absolute inset-0 bg-white/10/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10/[0.05] blur-[100px] pointer-events-none group-hover:bg-white/10/[0.08] transition-all duration-700" />
-
-                <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-10">
-                        <div>
-                            <p className="text-xs text-white/20 uppercase tracking-[0.2em] font-black mb-1">Station Status</p>
-                            <h1 className="text-2xl font-black text-white tracking-tight uppercase">Mission Control</h1>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] text-white/10 uppercase tracking-widest font-black">Local Time</p>
-                            <p className="text-sm font-bold text-white/40">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</p>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col lg:flex-row items-center justify-between gap-10 md:gap-14">
-                        {/* Left Cluster */}
-                        <div className="w-full flex-1 grid grid-cols-2 gap-8 md:gap-10">
-                            <div className="transition-transform hover:scale-105 duration-300">
-                                <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 leading-none">Subject Payload</p>
-                                <p className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none">{subjectCount}</p>
-                                <div className="flex items-center gap-1.5 mt-3 text-white/40">
-                                    <Target size={12} className="opacity-50" /> <span className="text-[9px] font-black uppercase tracking-[0.15em]">Active Channels</span>
-                                </div>
-                            </div>
-                            <div className="transition-transform hover:scale-105 duration-300">
-                                <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 leading-none">Critical Sectors</p>
-                                <p className={`text-5xl md:text-6xl font-black tracking-tighter leading-none ${riskCount > 0 ? 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'text-white/20'}`}>{riskCount}</p>
-                                <div className="flex items-center gap-1.5 mt-3 text-red-500/40">
-                                    <AlertTriangle size={12} className="opacity-50" /> <span className="text-[9px] font-black uppercase tracking-[0.15em]">Low Integrity</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Central Hub */}
-                        <div className="relative group/ring cursor-default py-4">
-                            <div className="absolute inset-0 bg-white/2 blur-3xl rounded-full opacity-0 group-hover/ring:opacity-100 transition-opacity duration-700" />
-                            <GlowRing pct={att} />
-                            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <AnimNum value={att} decimals={1} className="text-6xl md:text-7xl font-black text-white tracking-tighter leading-none" />
-                                <span className="text-[10px] font-black text-white uppercase tracking-[0.4em] mt-3 opacity-60">Stability</span>
-                            </div>
-                        </div>
-
-                        {/* Right Cluster */}
-                        <div className="w-full flex-1 grid grid-cols-2 gap-8 md:gap-10 lg:text-right">
-                            <div className="lg:order-2 transition-transform hover:scale-105 duration-300">
-                                <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 leading-none">Safe Zones</p>
-                                <p className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none">{safeCount}</p>
-                                <div className="flex items-center lg:justify-end gap-1.5 mt-3 text-white/40">
-                                    <ShieldCheck size={12} className="opacity-50" /> <span className="text-[9px] font-black uppercase tracking-[0.15em]">Optimal</span>
-                                </div>
-                            </div>
-                            <div className="lg:order-1 transition-transform hover:scale-105 duration-300">
-                                <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] mb-2 leading-none">Engagements</p>
-                                <p className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none">{totalClasses}</p>
-                                <div className="flex items-center lg:justify-end gap-1.5 mt-3 text-white/10">
-                                    <Activity size={12} className="opacity-50" /> <span className="text-[9px] font-black uppercase tracking-[0.15em]">Logged</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+        <div className="pb-24 w-full select-none">
+            {/* Header Section */}
+            <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-1">
+                        System / Overview
+                    </p>
+                    <h1 className="text-2xl font-bold text-on-surface tracking-tight">Dashboard</h1>
+                    <p className="text-xs text-on-surface-variant/40 mt-0.5">
+                        Manage and track subject attendance.
+                    </p>
                 </div>
-            </motion.section>
-
-            {/* ── Charts Section ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-6">
-                {[
-                    {
-                        label: 'Overall Attendance',
-                        value: `${att.toFixed(1)}%`,
-                        detail: `${totalAttended}/${totalClasses} classes attended`,
-                        tone: 'text-white',
-                        icon: <Activity size={15} />
-                    },
-                    {
-                        label: 'Immediate Risk',
-                        value: String(riskCount),
-                        detail: mostCriticalSubject ? `Focus ${mostCriticalSubject.name}` : 'No critical subject right now',
-                        tone: riskCount > 0 ? 'text-red-400' : 'text-white/70',
-                        icon: <AlertTriangle size={15} />
-                    },
-                    {
-                        label: 'Safe Bunks',
-                        value: String(safeBunks),
-                        detail: 'Miss only these without falling under target',
-                        tone: 'text-white',
-                        icon: <CheckCircle2 size={15} />
-                    },
-                    {
-                        label: 'On-Track Subjects',
-                        value: `${safeCount}/${subjectCount}`,
-                        detail: `${Math.round(subjectCount > 0 ? (safeCount / subjectCount) * 100 : 0)}% above threshold`,
-                        tone: 'text-white',
-                        icon: <ShieldCheck size={15} />
-                    },
-                ].map((card) => (
-                    <motion.div key={card.label} variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="rounded-[2.5rem] glass-glow border border-white/[0.08] p-7 transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.6)]">
-                        <div className="flex items-center justify-between mb-5">
-                            <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{card.label}</span>
-                            <span className={`${card.tone} opacity-80`}>{card.icon}</span>
-                        </div>
-                        <p className={`text-4xl font-black tracking-tighter ${card.tone}`}>{card.value}</p>
-                        <p className="mt-3 text-xs text-white/35">{card.detail}</p>
-                    </motion.div>
-                ))}
+                <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="flex items-center justify-center gap-2 px-3 py-1.5 rounded bg-on-surface text-surface text-xs font-bold transition-all hover:bg-on-surface/90 cursor-pointer self-start sm:self-auto"
+                >
+                    <Plus size={14} /> Add Subject
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mb-6">
-                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-2 rounded-[2.5rem] glass-panel border border-white/[0.06] p-8 min-h-[340px] flex flex-col shadow-2xl">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Sparkles size={14} className="text-red-400/50" />
-                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Attention Required</span>
+            {isLoading && !dashboardData ? (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="animate-pulse h-48 bg-surface-container border border-outline rounded-lg md:col-span-2" />
+                        <div className="animate-pulse h-48 bg-surface-container border border-outline rounded-lg" />
                     </div>
-                    <p className="text-sm text-white/45 mb-4">Only the weakest subjects are shown here so you know where to act first.</p>
-                    <div className="flex-1">
-                        <LazyBarChartWrapper height="260px" data={pressureChartData} options={pressureChartOptions} />
-                    </div>
-                </motion.div>
-
-                <motion.div variants={{ hidden: { opacity: 0 }, visible: { opacity: 1 } }} className="lg:col-span-3 rounded-[2.5rem] glass-panel border border-white/[0.06] p-8 min-h-[340px] flex flex-col shadow-2xl">
-                    <div className="flex items-center gap-2 mb-3">
-                        <TrendingUp size={14} className="text-white/40" />
-                        <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Stability Trend</span>
-                    </div>
-                    <p className="text-sm text-white/45 mb-4">Last 10 attendance days. Use this to spot drift early, not to admire charts.</p>
-                    <div className="flex-1">
-                        <LazyLineChartWrapper height="260px" data={recentTrendData} options={trendChartOptions} />
-                    </div>
-                </motion.div>
-            </div>
-
-            {/* ── Subjects Section ── */}
-            <section>
-                <div className="flex items-center justify-between mb-6 px-2">
-                    <h2 className="text-sm font-black text-white/40 uppercase tracking-[0.2em]">Module Inventory</h2>
-                    <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 transition-all">
-                        <Plus size={14} /> Register Module
-                    </button>
+                    <div className="animate-pulse h-64 bg-surface-container border border-outline rounded-lg" />
                 </div>
+            ) : (
+                <div className="space-y-6">
+                    
+                    {/* Bento Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        
+                        {/* Bento Card 1: Academic Health */}
+                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all lg:col-span-2">
+                            <div className="flex items-center justify-between mb-4">
+                                <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Overall Academic Health</span>
+                                <Activity size={13} className="text-on-surface-variant/40" />
+                            </div>
+                            
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 my-2">
+                                <div>
+                                    <p className="text-6xl md:text-7xl font-extrabold tracking-tighter text-on-surface leading-none">{att.toFixed(1)}%</p>
+                                    <p className="text-xs font-semibold text-on-surface-variant/40 mt-2">Overall Conducted Classes</p>
+                                </div>
+                                
+                                <div className="flex-1 w-full md:max-w-xs space-y-4">
+                                    <div>
+                                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 mb-1">
+                                            <span>Conduct Progress</span>
+                                            <span>{totalAttended} / {totalClasses} classes</span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-on-surface/10 border border-outline rounded-full overflow-hidden">
+                                            <div className="h-full bg-on-surface" style={{ width: `${Math.min(100, totalClasses > 0 ? (totalAttended / totalClasses) * 100 : 0)}%` }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                {subjects.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-24 rounded-[3rem] border-2 border-dashed border-white/[0.04] bg-white/[0.01]">
-                        <Zap size={32} className="text-white/20 mb-4" />
-                        <p className="text-xs font-black text-white/20 uppercase tracking-widest">No Active Modules Found</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        <AnimatePresence>
-                            {sortSubs(subjects).map((subject, idx) => {
-                                const pct = subject.attendance_percentage || 0;
-                                const isCritical = pct < targetThreshold;
-                                const accent = isCritical ? '#ef4444' : '#ffffff';
-                                const needed = classesNeeded(subject.attended || 0, subject.total || 0);
-                                const canSkip = classesCanSkip(subject.attended || 0, subject.total || 0);
+                            <div className="grid grid-cols-3 gap-2 border-t border-outline pt-4 mt-6">
+                                <div className="text-left">
+                                    <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Deficit Risk</span>
+                                    <span className={`text-base font-bold ${riskCount > 0 ? 'text-red-500' : 'text-on-surface'}`}>{riskCount} Subjects</span>
+                                </div>
+                                <div className="text-left">
+                                    <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Safe Bunks</span>
+                                    <span className="text-base font-bold text-on-surface">{safeBunks} Remaining</span>
+                                </div>
+                                <div className="text-left">
+                                    <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Total Tracked</span>
+                                    <span className="text-base font-bold text-on-surface">{safeCount}/{subjectCount} Courses</span>
+                                </div>
+                            </div>
+                        </div>
 
-                                return (
-                                    <motion.div
-                                        key={subject._id || idx}
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        exit={{ opacity: 0, scale: 0.95 }}
-                                        className="group relative rounded-[2rem] border border-white/[0.06] glass-panel p-6 hover:border-white/10 transition-all duration-500"
-                                        style={{ boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 20px 40px -20px rgba(0,0,0,0.5)' }}
-                                    >
-                                        <div className="absolute inset-0 rounded-[2rem] bg-white/10/[0.02] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-                                        <div className="flex items-start justify-between mb-5">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className="text-[10px] font-black px-2 py-1 rounded bg-white/5 text-white/45 uppercase tracking-widest">{subject.code || 'CODE'}</span>
+                        {/* Bento Card 2: Student Target */}
+                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all">
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Academic Target</span>
+                                    <Target size={13} className="text-on-surface-variant/40" />
+                                </div>
+                                
+                                <div className="space-y-4 my-2">
+                                    <div>
+                                        <p className="text-xs font-semibold text-on-surface-variant/40">Student Name</p>
+                                        <p className="text-sm font-bold text-on-surface">{user?.name || 'Student'}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-xs font-semibold text-on-surface-variant/40 font-mono">Enrollment</p>
+                                            <p className="text-xs font-bold text-on-surface truncate font-mono">{user?.enrollment_number || '—'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-on-surface-variant/40">Batch</p>
+                                            <p className="text-xs font-bold text-on-surface truncate">{user?.batch || '—'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-xs font-semibold text-on-surface-variant/40">Target Goal</p>
+                                            <p className="text-xs font-bold text-on-surface">{targetThreshold}% Minimum</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-semibold text-on-surface-variant/40">Current Semester</p>
+                                            <p className="text-xs font-bold text-on-surface">Semester {currentSemester}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-outline pt-4 mt-6">
+                                <Link
+                                    to="/settings"
+                                    className="w-full h-8 flex items-center justify-center gap-2 border border-outline hover:border-on-surface hover:bg-surface-container rounded text-xs font-bold text-on-surface transition-all cursor-pointer"
+                                >
+                                    <SettingsIcon size={12} />
+                                    Configure Settings
+                                </Link>
+                            </div>
+                        </div>
+                                          {/* Bento Card 3: Today's Schedule */}
+                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px]">
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Today's Schedule</span>
+                                    <Flame size={13} className="text-on-surface-variant/40" />
+                                </div>
+                                
+                                <div className="space-y-3.5 my-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                                    {todayClasses.length > 0 ? (
+                                        todayClasses.map((cls, idx) => {
+                                            const sub = findSubjectForSlot(subjects, cls);
+                                            return (
+                                                <div key={idx} className="flex items-center gap-3 py-1 border-b border-outline last:border-b-0">
+                                                    <div className="text-center bg-surface-container border border-outline rounded px-2 py-1 shrink-0 min-w-[55px]">
+                                                        <span className="block text-[8px] font-bold text-on-surface-variant/50 leading-none">{cls.start_time || cls.startTime || '—'}</span>
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-xs font-bold text-on-surface truncate leading-tight">{sub?.name || cls.subject_name || cls.subjectName || cls.label || cls.name || 'Break'}</p>
+                                                    </div>
                                                 </div>
-                                                <h3 className="text-lg font-black text-white truncate max-w-[220px] uppercase tracking-tight">{subject.name}</h3>
-                                            </div>
-                                            <div className="relative w-[68px] h-[68px] grid place-items-center">
-                                                <ProgressRing pct={pct} size={68} color={accent} strokeWidth={5} />
-                                                <div className="absolute inset-0 flex items-center justify-center">
-                                                    <span className="text-base font-black text-white leading-none">{Math.round(pct)}%</span>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="py-8 text-center">
+                                            <p className="text-xs font-semibold text-on-surface-variant/30 italic">No classes today. Enjoy your day!</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="border-t border-outline pt-4 mt-6 shrink-0">
+                                <Link
+                                    to="/timetable"
+                                    className="w-full h-8 flex items-center justify-center gap-1 border border-outline hover:border-on-surface hover:bg-surface-container rounded text-xs font-bold text-on-surface transition-all cursor-pointer"
+                                >
+                                    View Full Timetable
+                                    <ChevronRight size={12} />
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Bento Card 4: University Notices */}
+                        <div className="hover:border-on-surface transition-all min-h-[260px]">
+                            <NoticesWidget />
+                        </div>
+
+                        {/* Bento Card 5: Recent Notes */}
+                        <div className="rounded-lg border border-outline bg-surface p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px]">
+                            <div>
+                                <div className="flex items-center justify-between mb-4">
+                                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Recent Notes & Checklists</span>
+                                    <FileText size={13} className="text-on-surface-variant/40" />
+                                </div>
+                                
+                                <div className="grid grid-cols-1 gap-4 my-2">
+                                    {notesPreview.length > 0 ? (
+                                        notesPreview.slice(0, 1).map((note, idx) => (
+                                            <div key={note.id || idx} className="border border-outline bg-surface-container/20 rounded p-4 flex flex-col justify-between min-h-[120px]">
+                                                <div>
+                                                    <h4 className="text-xs font-bold text-on-surface truncate">{note.title || 'Untitled'}</h4>
+                                                    {!note.is_todo ? (
+                                                        <p className="text-[11px] text-on-surface-variant/65 mt-1.5 line-clamp-3 leading-relaxed whitespace-pre-wrap">{note.content ? note.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : 'Empty note'}</p>
+                                                    ) : (
+                                                        <div className="space-y-1 mt-2">
+                                                            {note.todos && note.todos.slice(0, 2).map((todo: any) => (
+                                                                <div key={todo.id} className="flex items-center gap-1.5 text-[11px]">
+                                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${todo.completed ? 'bg-primary/30' : 'bg-primary'}`} />
+                                                                    <span className={`truncate ${todo.completed ? 'line-through opacity-40' : 'opacity-80'}`}>{todo.text}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
+                                                <span className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant/30 mt-2 block">{note.is_todo ? 'Checklist' : 'Note'}</span>
                                             </div>
+                                        ))
+                                    ) : (
+                                        <div className="py-8 text-center border border-dashed border-outline rounded">
+                                            <p className="text-xs font-semibold text-on-surface-variant/30 italic">No notes created yet.</p>
                                         </div>
+                                    )}
+                                </div>
+                            </div>
 
-                                        <div className="grid grid-cols-2 gap-2 mb-4 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.03]">
-                                            <div className="text-center border-r border-white/[0.04]">
-                                                <p className="text-[8px] font-black text-white/20 uppercase tracking-widest mb-1">Attended / Total</p>
-                                                <p className="text-sm font-bold text-white/85">{subject.attended || 0} / {subject.total || 0}</p>
-                                            </div>
-                                            <div className="text-center">
-                                                <p className={`text-[8px] font-black uppercase tracking-widest mb-1 ${isCritical ? 'text-red-500/60' : 'text-white/60'}`}>
-                                                    {isCritical ? 'Need' : 'Can Skip'}
-                                                </p>
-                                                <p className={`text-sm font-bold ${isCritical ? 'text-red-400' : 'text-white'}`}>
-                                                    {isCritical ? needed : canSkip}
-                                                </p>
-                                            </div>
-                                        </div>
+                            <div className="border-t border-outline pt-4 mt-6">
+                                <Link
+                                    to="/notes"
+                                    className="w-full h-8 flex items-center justify-center gap-1 border border-outline hover:border-on-surface hover:bg-surface-container rounded text-xs font-bold text-on-surface transition-all cursor-pointer"
+                                >
+                                    Open Notes &amp; Todos
+                                    <ChevronRight size={12} />
+                                </Link>
+                            </div>
+                        </div>
 
-                                        <div className="flex items-center justify-end">
-                                            <div className="flex gap-1">
-                                                <button onClick={() => setEditingSubject(subject)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/10 hover:text-white/40 transition-colors">
-                                                    <Edit2 size={12} />
-                                                </button>
-                                                <button onClick={() => handleDeleteSubject(subject._id, subject.name)} className="p-1.5 rounded-lg hover:bg-red-500/5 text-white/10 hover:text-red-500/40 transition-colors">
-                                                    <Trash size={12} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
+                        {/* Bento Card 5: Courses Breakdown */}
+                        <div className="rounded-lg border border-outline bg-surface overflow-hidden lg:col-span-3 hover:border-on-surface transition-all">
+                            <div className="px-6 py-4 border-b border-outline bg-surface-container/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Courses Breakdown</span>
+                                {/* Category filter tabs */}
+                                <div className="flex items-center gap-1 p-0.5 bg-surface border border-outline rounded-lg self-start sm:self-auto">
+                                    {(['Theory', 'Practical', 'All'] as const).map(cat => {
+                                        const count = cat === 'All'
+                                            ? subjects.length
+                                            : subjects.filter((s: any) => {
+                                                const isPractical = s.categories?.includes('Practical') || 
+                                                                    s.type?.toLowerCase() === 'practical' || 
+                                                                    s.type?.toLowerCase() === 'lab' || 
+                                                                    s.name?.toLowerCase().includes('lab');
+                                                return cat === 'Theory' ? !isPractical : isPractical;
+                                            }).length;
+                                        return (
+                                            <button
+                                                key={cat}
+                                                onClick={() => setCategoryFilter(cat)}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                                    categoryFilter === cat
+                                                        ? 'bg-on-surface text-surface'
+                                                        : 'text-on-surface-variant/50 hover:text-on-surface'
+                                                }`}
+                                            >
+                                                {cat}
+                                                <span className={`text-[9px] ${categoryFilter === cat ? 'opacity-60' : 'opacity-40'}`}>{count}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            
+                            {(() => {
+                                const filteredSubjects = categoryFilter === 'All'
+                                    ? subjects
+                                    : subjects.filter((s: any) => {
+                                        const isPractical = s.categories?.includes('Practical') || 
+                                                            s.type?.toLowerCase() === 'practical' || 
+                                                            s.type?.toLowerCase() === 'lab' || 
+                                                            s.name?.toLowerCase().includes('lab');
+                                        return categoryFilter === 'Theory' ? !isPractical : isPractical;
+                                    });
+                                return filteredSubjects.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 bg-surface">
+                                    <Target size={24} className="text-on-surface-variant/20 mb-4" />
+                                    <p className="text-xs font-bold text-on-surface-variant/40 uppercase tracking-widest">No subjects tracked yet</p>
+                                </div>
+                                ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-xs select-none min-w-[850px]">
+                                        <thead>
+                                            <tr className="border-b border-outline bg-surface-container/50 text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-wider">
+                                                <th className="px-6 py-3">Code</th>
+                                                <th className="px-6 py-3">Subject Name</th>
+                                                <th className="px-6 py-3">Professor</th>
+                                                <th className="px-6 py-3 text-center">Attended</th>
+                                                <th className="px-6 py-3 text-center">Percentage</th>
+                                                <th className="px-6 py-3 text-center">Can Bunk / Needed</th>
+                                                <th className="px-6 py-3 text-center">Quick Mark</th>
+                                                <th className="px-6 py-3 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-outline">
+                                            {sortSubs(filteredSubjects).map((subject) => (
+                                                <SubjectRow
+                                                    key={subject._id}
+                                                    subject={subject}
+                                                    targetThreshold={targetThreshold}
+                                                    classesNeeded={classesNeeded}
+                                                    classesCanSkip={classesCanSkip}
+                                                    triggerBubbleMenu={triggerBubbleMenu}
+                                                    handleQuickMark={handleQuickMark}
+                                                    setEditingSubject={setEditingSubject}
+                                                    handleDeleteSubject={handleDeleteSubject}
+                                                />
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                                 );
-                            })}
-                        </AnimatePresence>
+                            })()}
+                        </div>
                     </div>
+                </div>
+            )}
+
+
+            {/* Float Hold Bubble Menu */}
+            <AnimatePresence>
+                {bubbleMenu && (
+                    <>
+                        <div
+                            className="fixed inset-0 z-50"
+                            onClick={() => setBubbleMenu(null)}
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            style={{ top: bubbleMenu.y, left: bubbleMenu.x }}
+                            className="fixed z-50 bg-surface border border-outline rounded-lg p-1.5 shadow-xl min-w-[150px] text-on-surface flex flex-col"
+                        >
+                            <button
+                                onClick={() => { handleQuickMark(bubbleMenu.subjectId, 'present'); setBubbleMenu(null); }}
+                                className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-xs font-semibold hover:bg-surface-container rounded-md transition-colors cursor-pointer"
+                            >
+                                <Check size={12} className="text-primary" />
+                                Mark Present
+                            </button>
+                            <button
+                                onClick={() => { handleQuickMark(bubbleMenu.subjectId, 'absent'); setBubbleMenu(null); }}
+                                className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-xs font-semibold hover:bg-surface-container rounded-md transition-colors cursor-pointer"
+                            >
+                                <X size={12} className="text-red-500" />
+                                Mark Absent
+                            </button>
+                            <div className="h-px bg-outline my-1" />
+                            {(() => {
+                                const targetSub = subjects.find(s => s._id === bubbleMenu.subjectId);
+                                if (!targetSub) return null;
+                                return (
+                                    <>
+                                        <button
+                                            onClick={() => { setEditingSubject(targetSub); setBubbleMenu(null); }}
+                                            className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-xs font-semibold hover:bg-surface-container rounded-md transition-colors cursor-pointer"
+                                        >
+                                            <Edit2 size={12} />
+                                            Edit Details
+                                        </button>
+                                        <button
+                                            onClick={() => { handleDeleteSubject(targetSub._id, targetSub.name); setBubbleMenu(null); }}
+                                            className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/5 rounded-md transition-colors cursor-pointer"
+                                        >
+                                            <Trash2 size={12} />
+                                            Delete Course
+                                        </button>
+                                    </>
+                                );
+                            })()}
+                        </motion.div>
+                    </>
                 )}
-            </section>
+            </AnimatePresence>
 
             <AddSubjectModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSuccess={loadDashboard} />
             {editingSubject && <EditSubjectModal isOpen={!!editingSubject} onClose={() => setEditingSubject(null)} subject={editingSubject} onSuccess={loadDashboard} />}
             {markingSubjectId && <AttendanceModal isOpen={!!markingSubjectId} onClose={() => setMarkingSubjectId(null)} onSuccess={loadDashboard} />}
-        </motion.div>
+        </div>
     );
 };
 

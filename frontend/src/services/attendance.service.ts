@@ -683,7 +683,7 @@ export const attendanceService = {
         return response.data.data ?? response.data;
     },
 
-    saveResults: async (payload: { semester: number; subjects: any[] }) => {
+    saveResults: async (payload: { semester: number; subjects: any[]; student_info?: any }) => {
         const response = await api.post('/api/academic/results', payload);
         return response.data.data ?? response.data;
     },

@@ -3,13 +3,14 @@ import { z } from 'zod'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, created, fail } from '../utils/response.js'
+import { getClientIp } from '../utils/ip.js'
 import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
 
 const router = Router()
 router.use(requireAuth)
 
 async function sysLog(req: AuthRequest, user_id: string, action: string, description: string) {
-  const ip = req.ip || (req as any).socket?.remoteAddress || null
+  const ip = getClientIp(req)
   const user_agent = (req.headers['user-agent'] as string) || null
   await prisma.systemLog.create({ data: { user_id, action, description, ip, user_agent } }).catch(() => null)
 }

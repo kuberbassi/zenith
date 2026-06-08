@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, type ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-type Theme = 'dark';
+type Theme = 'light' | 'dark';
 
 interface ThemeContextType {
     theme: Theme;
@@ -12,44 +12,42 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// Generate color palette from accent color
-function generatePalette(accentHex: string) {
-    // Sea Green palette (#ffffff)
-    return {
-        '--md-sys-color-primary': accentHex,
-        '--md-sys-color-on-primary': '#ffffff',
-        '--md-sys-color-primary-container': '#064e3b',
-        '--md-sys-color-on-primary-container': '#d1fae5',
-        '--md-sys-color-secondary': '#e5e5e5',
-        '--md-sys-color-secondary-container': '#064e3b',
-        '--md-sys-color-on-secondary-container': '#d1fae5',
-        '--md-sys-color-tertiary': '#f5f5f5',
-        '--md-sys-color-tertiary-container': '#065f46',
-        '--md-sys-color-on-tertiary-container': '#a7f3d0',
-    };
-}
-
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // Forced values for Sea Green Refinement
-    const theme: Theme = 'dark';
-    const accentColor = '#ffffff';
+    const [theme, setThemeState] = useState<Theme>(() => {
+        const saved = localStorage.getItem('zenith_theme');
+        if (saved === 'light' || saved === 'dark') return saved;
+        return 'light';
+    });
+
+    const [accentColor, setAccentColorState] = useState(() => {
+        return theme === 'dark' ? '#ecece9' : '#1d1c1a';
+    });
 
     useEffect(() => {
         const root = window.document.documentElement;
-        root.classList.remove('light');
-        root.classList.add('dark');
+        if (theme === 'dark') {
+            root.classList.remove('light');
+            root.classList.add('dark');
+            setAccentColorState('#ecece9');
+        } else {
+            root.classList.remove('dark');
+            root.classList.add('light');
+            setAccentColorState('#1d1c1a');
+        }
+        localStorage.setItem('zenith_theme', theme);
+    }, [theme]);
 
-        const palette = generatePalette(accentColor);
-        Object.entries(palette).forEach(([key, value]) => {
-            root.style.setProperty(key, value);
-        });
+    const toggleTheme = () => {
+        setThemeState(prev => prev === 'light' ? 'dark' : 'light');
+    };
 
-    }, []);
+    const setTheme = (t: Theme) => {
+        setThemeState(t);
+    };
 
-    // No-op functions for components that still call them
-    const toggleTheme = () => { };
-    const setTheme = () => { };
-    const setAccentColor = () => { };
+    const setAccentColor = (color: string) => {
+        setAccentColorState(color);
+    };
 
     const value: ThemeContextType = {
         theme,

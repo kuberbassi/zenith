@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion } from 'framer-motion';
 import type { ChartOptions } from 'chart.js';
@@ -10,6 +11,7 @@ import {
 import Loader from '@/components/ui/Loader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
+import { useTheme } from '@/contexts/ThemeContext';
 import { attendanceService } from '@/services/attendance.service';
 import ResultsDashboard from '@/components/results/ResultsDashboard';
 
@@ -41,11 +43,11 @@ function calcCGPA(semesters: any[]): number {
 
 function gradeBgClass(grade: string): string {
     const pt = GRADE_POINTS[grade];
-    if (pt === undefined || pt === 0) return 'bg-red-500/10 text-red-400 border border-red-500/20';
-    if (pt >= 9) return 'bg-white/7 text-white border border-white/15';
-    if (pt >= 7) return 'bg-green-500/10 text-white border border-green-500/20';
-    if (pt >= 5) return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
-    return 'bg-orange-500/10 text-orange-400 border border-orange-500/20';
+    if (pt === undefined || pt === 0) return 'bg-red-500/10 text-red-500 dark:text-red-400 border border-red-500/20';
+    if (pt >= 9) return 'bg-primary/10 text-primary border border-primary/25';
+    if (pt >= 7) return 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20';
+    if (pt >= 5) return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20';
+    return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20';
 }
 
 function formatDate(iso: string | null): string {
@@ -66,8 +68,8 @@ function parseNumeric(value: unknown): number | null {
 }
 
 function getSubjectMarks(subject: any) {
-    const internal = parseNumeric(subject.internal ?? subject.internal_theory) ?? 0;
-    const external = parseNumeric(subject.external ?? subject.external_theory) ?? 0;
+    const internal = parseNumeric(subject.internal ?? subject.internal_theory ?? subject.internal_practical) ?? 0;
+    const external = parseNumeric(subject.external ?? subject.external_theory ?? subject.external_practical) ?? 0;
     const total = parseNumeric(subject.total_marks ?? subject.marks);
     const maxMarks = parseNumeric(subject.max_marks) ?? 100;
     return {
@@ -87,8 +89,21 @@ function getSubjectDisplayMark(value: unknown): string {
 
 function formatDeclaredDate(value: unknown): string | null {
     if (!value) return null;
-    const parsed = new Date(String(value));
-    if (Number.isNaN(parsed.getTime())) return String(value);
+    const str = String(value).trim();
+    
+    // Check if it matches MM,YYYY format
+    const match = str.match(/^(\d{2}),(\d{4})$/);
+    if (match) {
+        const monthNum = parseInt(match[1], 10);
+        const year = match[2];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        if (monthNum >= 1 && monthNum <= 12) {
+            return `${months[monthNum - 1]} ${year}`;
+        }
+    }
+
+    const parsed = new Date(str);
+    if (Number.isNaN(parsed.getTime())) return str;
     return parsed.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -155,14 +170,16 @@ const Results: React.FC = () => {
     // Result editor modal states
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [editorSem, setEditorSem] = useState<number>(1);
+    const [isSemAutoDetected, setIsSemAutoDetected] = useState(false);
     const [editorStudentInfo, setEditorStudentInfo] = useState<any>({
         name: '', enrollment_number: '', institute: '', program: '', batch: ''
     });
     const [editorSubjects, setEditorSubjects] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
-    const accentColor = '#ffffff';
-    const gridColor = 'rgba(255,255,255,0.04)';
+    const { theme } = useTheme();
+    const gridColor = theme === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)';
+    const labelColor = theme === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(29,28,26,0.55)';
 
     useEffect(() => { loadSavedResults(); }, []);
 
@@ -219,16 +236,22 @@ const Results: React.FC = () => {
                 program: data.studentInfo?.program || '',
                 batch: data.studentInfo?.batch || '',
             });
-            const subList = (data.subjects || []).map((s: any, idx: number) => ({
-                id: s.paper_code || `sub_${idx}`,
-                paper_code: s.paper_code || '',
-                subject_name: s.subject_name || '',
-                credits: s.credits || 4,
-                internal_theory: s.internal_theory || s.internal_practical || 0,
-                external_theory: s.external_theory || s.external_practical || 0,
-            }));
+            const subList = (data.subjects || []).map((s: any, idx: number) => {
+                const isLab = isLabSubject(s.subject_name || '', s.credits ?? 3);
+                return {
+                    id: s.paper_code || `sub_${idx}`,
+                    paper_code: s.paper_code || '',
+                    subject_name: s.subject_name || '',
+                    credits: s.credits ?? 3,
+                    internal_theory: isLab ? (s.internal_practical ?? 0) : (s.internal_theory ?? 0),
+                    external_theory: isLab ? (s.external_practical ?? 0) : (s.external_theory ?? 0),
+                    declared_date: s.declared_date || '',
+                    exam_session: s.exam_date || s.exam_session || '',
+                };
+            });
             setEditorSubjects(subList);
             setEditorSem(data.subjects?.[0]?.semester || 1);
+            setIsSemAutoDetected(true);
             setIsEditorOpen(true);
         } catch (err: any) {
             console.error('[pdf upload error]', err);
@@ -241,7 +264,7 @@ const Results: React.FC = () => {
     // Modal helpers
     function isLabSubject(name: string, credits: number) {
         const upper = String(name).toUpperCase();
-        return credits === 2 || upper.includes('LAB') || upper.includes('PRACTICAL') || upper.includes('WORKSHOP') || upper.includes('GRAPHICS') || upper.includes('PROJECT');
+        return credits <= 1 || upper.includes('LAB') || upper.includes('PRACTICAL') || upper.includes('WORKSHOP') || upper.includes('SEMINAR') || upper.includes('VIVA');
     }
 
     function handleSubjectChange(id: string, field: string, value: any) {
@@ -258,7 +281,7 @@ const Results: React.FC = () => {
             id: `new_sub_${Date.now()}`,
             paper_code: '',
             subject_name: '',
-            credits: 4,
+            credits: 3,
             internal_theory: 0,
             external_theory: 0,
         };
@@ -314,7 +337,7 @@ const Results: React.FC = () => {
             const processedSubjects = editorSubjects.map(sub => {
                 const internal = parseFloat(sub.internal_theory) || 0;
                 const external = parseFloat(sub.external_theory) || 0;
-                const isLab = isLabSubject(sub.subject_name, parseInt(sub.credits) || 4);
+                const isLab = isLabSubject(sub.subject_name, parseInt(sub.credits) ?? 3);
 
                 return {
                     name: sub.subject_name,
@@ -324,12 +347,21 @@ const Results: React.FC = () => {
                     external_theory: isLab ? 0 : external,
                     internal_practical: isLab ? internal : 0,
                     external_practical: isLab ? external : 0,
+                    declared_date: sub.declared_date || undefined,
+                    exam_session: sub.exam_session || undefined,
                 };
             });
 
             await attendanceService.saveResults({
                 semester: editorSem,
                 subjects: processedSubjects,
+                student_info: {
+                    name: editorStudentInfo.name,
+                    enrollment_number: editorStudentInfo.enrollment_number,
+                    institute: editorStudentInfo.institute,
+                    program: editorStudentInfo.program,
+                    batch: editorStudentInfo.batch,
+                }
             });
 
             if (editorStudentInfo.enrollment_number && editorStudentInfo.enrollment_number !== user?.enrollment_number) {
@@ -415,7 +447,7 @@ const Results: React.FC = () => {
         if (!declaredDate && !examSession) return null;
         return {
             declaredDate: formatDeclaredDate(declaredDate),
-            examSession: examSession ? String(examSession) : null,
+            examSession: examSession ? (formatDeclaredDate(examSession) || String(examSession)) : null,
         };
     }, [results, selectedSem]);
 
@@ -445,7 +477,7 @@ const Results: React.FC = () => {
                 data: chartSubjects.map((s: any) => getSubjectPercentage(s)),
                 backgroundColor: chartSubjects.map((s: any) => {
                     const pct = getSubjectPercentage(s);
-                    if (pct >= 75) return '#ffffff';
+                    if (pct >= 75) return theme === 'dark' ? '#ffffff' : '#1d1c1a';
                     if (pct >= 60) return '#22c55e';
                     if (pct >= 50) return '#f59e0b';
                     return '#ef4444';
@@ -453,14 +485,14 @@ const Results: React.FC = () => {
                 borderRadius: 8,
             },
         ],
-    }), [chartSubjects]);
+    }), [chartSubjects, theme]);
 
     const barChartOptions: ChartOptions<'bar'> = {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } },
-            y: { min: 0, max: 100, grid: { color: gridColor }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 }, maxTicksLimit: 5 } },
+            x: { grid: { display: false }, ticks: { color: labelColor, font: { size: 9 } } },
+            y: { min: 0, max: 100, grid: { color: gridColor }, ticks: { color: labelColor, font: { size: 9 }, maxTicksLimit: 5 } },
         },
     };
 
@@ -470,31 +502,31 @@ const Results: React.FC = () => {
             {
                 label: 'Internal',
                 data: chartSubjects.map((s: any) => getSubjectMarks(s).internal),
-                backgroundColor: 'rgba(255, 255, 255, 0.4)',
+                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(29, 28, 26, 0.4)',
                 borderRadius: 6,
             },
             {
                 label: 'External',
                 data: chartSubjects.map((s: any) => getSubjectMarks(s).external),
-                backgroundColor: 'rgba(255,255,255,0.18)',
+                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(29, 28, 26, 0.15)',
                 borderRadius: 6,
             },
         ],
-    }), [chartSubjects]);
+    }), [chartSubjects, theme]);
 
     const marksBreakdownOptions: ChartOptions<'bar'> = {
         responsive: true, maintainAspectRatio: false,
         plugins: {
             legend: {
                 labels: {
-                    color: 'rgba(255,255,255,0.45)',
+                    color: labelColor,
                     font: { size: 10 },
                 },
             },
         },
         scales: {
-            x: { stacked: true, grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 } } },
-            y: { stacked: true, grid: { color: gridColor }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 9 }, maxTicksLimit: 5 } },
+            x: { stacked: true, grid: { display: false }, ticks: { color: labelColor, font: { size: 9 } } },
+            y: { stacked: true, grid: { color: gridColor }, ticks: { color: labelColor, font: { size: 9 }, maxTicksLimit: 5 } },
         },
     };
 
@@ -504,16 +536,16 @@ const Results: React.FC = () => {
         const labels = Object.keys(dist).filter(k => dist[k] > 0);
         const data = labels.map(k => dist[k]);
         const colors = labels.map(g => {
-            if (g === 'O') return '#ffffff'; // Blue
-            if (g === 'A+') return '#8b5cf6'; // Purple
-            if (g === 'A') return '#ffffff'; // Green
-            if (g === 'B+') return '#f59e0b'; // Amber
-            if (g === 'B') return '#f97316'; // Orange
-            if (g === 'C+' || g === 'C') return '#ef4444'; // Red
-            return '#64748b'; // Gray for F/A/I
+            if (g === 'O') return theme === 'dark' ? '#ffffff' : '#1d1c1a';
+            if (g === 'A+') return '#8b5cf6';
+            if (g === 'A') return theme === 'dark' ? '#ecece9' : '#4e4d4a';
+            if (g === 'B+') return '#f59e0b';
+            if (g === 'B') return '#f97316';
+            if (g === 'C+' || g === 'C') return '#ef4444';
+            return '#64748b';
         });
         return { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }] };
-    }, [results]);
+    }, [results, theme]);
 
     const doughnutOptions: ChartOptions<'doughnut'> = {
         responsive: true, maintainAspectRatio: false,
@@ -528,7 +560,17 @@ const Results: React.FC = () => {
     };
 
     if (step === 'loading') {
-        return <div className="flex items-center justify-center h-screen"><Loader size={20} /></div>;
+        return (
+            <div className="pb-24 max-w-7xl mx-auto px-4 space-y-6 pt-2">
+                <div className="animate-pulse h-16 bg-surface-container border border-outline rounded-lg" />
+                <div className="animate-pulse h-40 bg-surface-container border border-outline rounded-lg" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="animate-pulse h-24 bg-surface-container border border-outline rounded-lg" />
+                    ))}
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -536,7 +578,7 @@ const Results: React.FC = () => {
             initial="hidden"
             animate="visible"
             variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } }}
-            className="pb-28 max-w-[1320px] mx-auto pt-20 px-3 md:px-5"
+            className="pb-28 max-w-[1320px] mx-auto pt-2 px-3 md:px-5"
         >
             {/*  PDF Uploader Dropzone  */}
             {step === 'form' && (
@@ -544,30 +586,29 @@ const Results: React.FC = () => {
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                     className="max-w-xl mx-auto mt-10"
                 >
-                    <div className="rounded-[2.5rem] border border-white/[0.08] glass-panel p-8 shadow-2xl relative overflow-hidden" style={{ boxShadow: '0 0 40px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-                        <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-white/5 blur-[100px] pointer-events-none" />
+                    <div className="rounded-xl border border-outline bg-surface border border-outline p-8 relative overflow-hidden">
                         
                         <div className="flex items-center gap-4 mb-8">
-                            <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shrink-0">
+                            <div className="w-12 h-12 rounded-xl bg-surface-container flex items-center justify-center text-on-surface border border-outline shrink-0">
                                 <GraduationCap size={24} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-black text-white tracking-tight">Upload Result PDF</h2>
-                                <p className="text-xs text-white/30 font-medium tracking-wider uppercase">Parse & save portal result sheets</p>
+                                <h2 className="text-xl font-bold text-on-surface tracking-tight">Upload Result PDF</h2>
+                                <p className="text-xs text-on-surface-variant/40 font-medium">Parse and save results sheets</p>
                             </div>
                         </div>
 
                         {results && (
                             <button
                                 onClick={() => setStep('results')}
-                                className="w-full mb-6 py-2.5 rounded-xl bg-white/5 border border-white/[0.05] text-xs text-white/40 font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
+                                className="w-full mb-6 py-2.5 rounded-xl bg-surface hover:bg-surface-container border border-outline text-xs text-on-surface font-bold transition-colors"
                             >
                                 Back to Dashboard
                             </button>
                         )}
 
                         {uploadError && (
-                            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400">
+                            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-500">
                                 {uploadError}
                             </div>
                         )}
@@ -579,7 +620,7 @@ const Results: React.FC = () => {
                                 const file = e.dataTransfer.files?.[0];
                                 if (file) void handlePdfUpload(file);
                             }}
-                            className="border-2 border-dashed border-white/10 hover:border-white/20 rounded-3xl p-12 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-white/[0.01] transition-all group"
+                            className="border-2 border-dashed border-outline hover:border-primary rounded-xl p-12 flex flex-col items-center justify-center gap-4 cursor-pointer hover:bg-surface-container transition-all group"
                             onClick={() => {
                                 const input = document.createElement('input');
                                 input.type = 'file';
@@ -594,20 +635,20 @@ const Results: React.FC = () => {
                             {uploadLoading ? (
                                 <Loader size={32} />
                             ) : (
-                                <UploadCloud size={40} className="text-white/20 group-hover:text-white/40 transition-colors" />
+                                <UploadCloud size={40} className="text-on-surface-variant/20 group-hover:text-primary transition-colors" />
                             )}
                             <div className="text-center">
-                                <p className="text-sm font-bold text-white/80 group-hover:text-white transition-colors">
+                                <p className="text-sm font-bold text-on-surface-variant/80 group-hover:text-primary transition-colors">
                                     {uploadLoading ? 'Reading document structure...' : 'Drop your result PDF here'}
                                 </p>
-                                <p className="text-xs text-white/30 font-medium mt-1">
+                                <p className="text-xs text-on-surface-variant/40 font-medium mt-1">
                                     {uploadLoading ? 'Extracting academic marks map' : 'or click to browse from device'}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="mt-8 rounded-2xl bg-white/[0.01] border border-white/[0.03] p-4 text-[11px] leading-relaxed text-white/40">
-                            <span className="font-bold text-white/60 block mb-1">Instruction:</span>
+                        <div className="mt-8 rounded-xl bg-surface-container border border-outline p-4 text-[11px] leading-relaxed text-on-surface-variant/70">
+                            <span className="font-bold text-on-surface block mb-1">Instruction:</span>
                             Upload the PDF results sheet downloaded directly from the IPU portal. The system will extract your program, subjects, grades, and default credits automatically, allowing you to review them before saving.
                         </div>
                     </div>
@@ -641,7 +682,6 @@ const Results: React.FC = () => {
                     currentSemesterMeta={currentSemesterMeta}
                     gradeDistributionData={gradeDistributionData}
                     doughnutOptions={doughnutOptions}
-                    accentColor={accentColor}
                     getSubjectMarks={getSubjectMarks}
                     getSubjectDisplayMark={getSubjectDisplayMark}
                     gradeBgClass={gradeBgClass}
@@ -650,25 +690,25 @@ const Results: React.FC = () => {
             )}
             {/* ── PDF Download Modal ───────────────────────────────────────── */}
             {showPdfModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
+                        initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="w-full max-w-sm rounded-3xl border border-white/[0.08] glass-panel p-8"
+                        className="w-full max-w-sm rounded-xl border border-outline bg-surface border border-outline p-8"
                     >
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                                    <Download size={14} className="text-white" />
+                                    <Download size={14} className="text-emerald-600 dark:text-emerald-400" />
                                 </div>
-                                <h3 className="text-base font-black text-white">Download Results PDF</h3>
+                                <h3 className="text-base font-bold text-on-surface">Download Results PDF</h3>
                             </div>
-                            <button onClick={() => setShowPdfModal(false)} className="text-white/20 hover:text-white/60 transition-colors">
+                            <button onClick={() => setShowPdfModal(false)} className="text-on-surface-variant/30 hover:text-on-surface-variant/70 transition-colors">
                                 <X size={18} />
                             </button>
                         </div>
 
-                        <p className="text-[11px] text-white/30 mb-4">Select which results to include in the PDF:</p>
+                        <p className="text-xs text-on-surface-variant/60 mb-4">Select which results to include in the PDF:</p>
 
                         <div className="flex flex-col gap-2 mb-6">
                             {[{ label: 'All Semesters (Full Transcript)', val: 'overall' },
@@ -685,11 +725,11 @@ const Results: React.FC = () => {
                                     onClick={() => setPdfSem(opt.val)}
                                     className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-xs font-bold text-left transition-all ${
                                         pdfSem === opt.val
-                                            ? 'border-emerald-500/40 bg-emerald-500/10 text-white'
-                                            : 'border-white/[0.06] bg-white/[0.02] text-white/40 hover:bg-white/[0.05]'
+                                            ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                            : 'border-outline bg-surface text-on-surface-variant hover:bg-surface-container'
                                     }`}
                                 >
-                                    <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${pdfSem === opt.val ? 'border-emerald-400 bg-emerald-400' : 'border-white/20'}`} />
+                                    <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${pdfSem === opt.val ? 'border-emerald-400 bg-emerald-400' : 'border-outline'}`} />
                                     {opt.label}
                                 </button>
                             ))}
@@ -698,12 +738,12 @@ const Results: React.FC = () => {
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setShowPdfModal(false)}
-                                className="flex-1 py-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-xs font-black text-white/40 hover:bg-white/[0.06] transition-all"
+                                className="flex-1 py-3 rounded-xl border border-outline bg-surface text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-all"
                             >Cancel</button>
                             <button
                                 onClick={handleDownloadPdf}
                                 disabled={pdfLoading}
-                                className="flex-1 py-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-xs font-black text-white hover:bg-emerald-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                             >
                                 {pdfLoading
                                     ? <><Loader size={20} /> Generating…</>
@@ -715,35 +755,34 @@ const Results: React.FC = () => {
                 </div>
             )}
             {/* ── Interactive Results Editor Modal ──────────────────────── */}
-            {isEditorOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+            {isEditorOpen && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.97 }}
+                        initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="w-full max-w-5xl rounded-3xl border border-white/[0.08] glass-panel shadow-2xl my-8 overflow-hidden flex flex-col max-h-[90vh]"
-                        style={{ boxShadow: '0 50px 100px -20px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06)' }}
+                        className="w-full max-w-4xl rounded-2xl border border-outline bg-surface overflow-hidden flex flex-col max-h-[90vh] shadow-2xl"
                     >
                         {/* Header */}
-                        <div className="p-6 md:p-8 border-b border-white/[0.06] flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0 bg-white/[0.01]">
+                        <div className="p-6 md:p-8 border-b border-outline flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0 bg-surface-container">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-white border border-white/10 shrink-0">
+                                <div className="w-12 h-12 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface border border-outline shrink-0">
                                     <Edit size={22} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black text-white tracking-tight">Confirm Academic Records</h3>
-                                    <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mt-1">Verify extracted grades, marks, and credits</p>
+                                    <h3 className="text-xl font-bold text-on-surface tracking-tight">Confirm Academic Records</h3>
+                                    <p className="text-xs text-on-surface-variant/40 mt-1">Verify extracted grades, marks, and credits</p>
                                 </div>
                             </div>
 
                             {/* SGPA Banner */}
                             <div className="flex gap-4 items-center self-start md:self-auto">
-                                <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[100px]">
-                                    <span className="block text-[9px] font-black text-white/40 uppercase tracking-widest">Calculated SGPA</span>
-                                    <span className="text-2xl font-black text-white">{calculateDynamicSGPA(editorSubjects).toFixed(2)}</span>
+                                <div className="px-5 py-3 rounded-xl bg-surface border border-outline text-center min-w-[100px]">
+                                    <span className="block text-xs font-medium text-on-surface-variant/60">Calculated SGPA</span>
+                                    <span className="text-2xl font-bold text-on-surface">{calculateDynamicSGPA(editorSubjects).toFixed(2)}</span>
                                 </div>
-                                <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[100px]">
-                                    <span className="block text-[9px] font-black text-white/40 uppercase tracking-widest">Total Credits</span>
-                                    <span className="text-2xl font-black text-white">
+                                <div className="px-5 py-3 rounded-xl bg-surface border border-outline text-center min-w-[100px]">
+                                    <span className="block text-xs font-medium text-on-surface-variant/60">Total Credits</span>
+                                    <span className="text-2xl font-bold text-on-surface">
                                         {editorSubjects.reduce((acc, s) => acc + (parseInt(s.credits) || 0), 0)}
                                     </span>
                                 </div>
@@ -753,34 +792,44 @@ const Results: React.FC = () => {
                         {/* Modal Body (Scrollable) */}
                         <div className="p-6 md:p-8 overflow-y-auto space-y-8 flex-1">
                             {/* Student Metadata Form */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 rounded-2xl bg-white/[0.01] border border-white/[0.03] p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 rounded-xl bg-surface-container border border-outline p-6">
                                 <div className="md:col-span-3">
-                                    <h4 className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-4">Extracted Student Information</h4>
+                                    <h4 className="text-xs font-semibold text-on-surface-variant/80">Extracted Student Information</h4>
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Student Name</label>
+                                    <label className="block text-xs font-medium text-on-surface-variant/70 mb-1.5 ml-1">Student Name</label>
                                     <input
                                         type="text"
                                         value={editorStudentInfo.name}
                                         onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, name: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-white"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Enrollment Number</label>
+                                    <label className="block text-xs font-medium text-on-surface-variant/70 mb-1.5 ml-1">Enrollment Number</label>
                                     <input
                                         type="text"
                                         value={editorStudentInfo.enrollment_number}
                                         onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, enrollment_number: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-white"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Target Semester</label>
+                                    <label className="block text-xs font-medium text-on-surface-variant/70 mb-1.5 ml-1 flex items-center justify-between">
+                                        <span>Target Semester</span>
+                                        {isSemAutoDetected && (
+                                            <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                                Auto-detected
+                                            </span>
+                                        )}
+                                    </label>
                                     <select
                                         value={editorSem}
-                                        onChange={(e) => setEditorSem(parseInt(e.target.value) || 1)}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-[#0a0a0c] text-xs text-white"
+                                        onChange={(e) => {
+                                            setEditorSem(parseInt(e.target.value) || 1);
+                                            setIsSemAutoDetected(false);
+                                        }}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
                                     >
                                         {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                                             <option key={s} value={s}>Semester {s}</option>
@@ -788,21 +837,21 @@ const Results: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Institute / College</label>
+                                    <label className="block text-xs font-medium text-on-surface-variant/70 mb-1.5 ml-1">Institute / College</label>
                                     <input
                                         type="text"
                                         value={editorStudentInfo.institute}
                                         onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, institute: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-white"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
                                     />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-[9px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Program / Course</label>
+                                    <label className="block text-xs font-medium text-on-surface-variant/70 mb-1.5 ml-1">Program / Course</label>
                                     <input
                                         type="text"
                                         value={editorStudentInfo.program}
                                         onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, program: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-xs text-white"
+                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
                                     />
                                 </div>
                             </div>
@@ -810,19 +859,19 @@ const Results: React.FC = () => {
                             {/* Subjects Table */}
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <h4 className="text-[10px] font-black text-white/30 uppercase tracking-widest ml-1">Extracted Subjects & Grades</h4>
+                                    <h4 className="text-xs font-semibold text-on-surface-variant/80 ml-1">Extracted Subjects & Grades</h4>
                                     <button
                                         onClick={handleAddSubject}
-                                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-[9px] font-black uppercase tracking-widest text-white/80 transition-all flex items-center gap-1.5"
+                                        className="px-4 py-2 rounded-xl bg-surface border border-outline text-xs font-semibold text-on-surface hover:bg-surface-container transition-all flex items-center gap-1.5"
                                     >
-                                        <Plus size={10} /> Add Subject
+                                        <Plus size={14} /> Add Subject
                                     </button>
                                 </div>
 
-                                <div className="border border-white/[0.06] rounded-2xl overflow-hidden bg-white/[0.01] overflow-x-auto">
+                                <div className="border border-outline rounded-xl overflow-hidden bg-surface overflow-x-auto">
                                     <table className="w-full text-left border-collapse text-xs min-w-[800px]">
                                         <thead>
-                                            <tr className="border-b border-white/[0.06] bg-white/[0.02] text-white/40 text-[9px] font-black uppercase tracking-widest">
+                                            <tr className="border-b border-outline bg-surface-container text-on-surface-variant/60 text-xs font-medium">
                                                 <th className="p-4 w-[15%]">Paper Code</th>
                                                 <th className="p-4 w-[40%]">Subject Name</th>
                                                 <th className="p-4 w-[10%] text-center">Credits</th>
@@ -833,7 +882,7 @@ const Results: React.FC = () => {
                                                 <th className="p-4 w-[5%]"></th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-white/[0.04]">
+                                        <tbody className="divide-y divide-outline-variant">
                                             {editorSubjects.map((sub) => {
                                                 const internal = parseFloat(sub.internal_theory) || 0;
                                                 const external = parseFloat(sub.external_theory) || 0;
@@ -841,14 +890,14 @@ const Results: React.FC = () => {
                                                 const grade = calculateDynamicGrade(total);
 
                                                 return (
-                                                    <tr key={sub.id} className="hover:bg-white/[0.005]">
+                                                    <tr key={sub.id} className="hover:bg-surface-container/50">
                                                         <td className="p-3">
                                                             <input
                                                                 type="text"
                                                                 value={sub.paper_code}
                                                                 onChange={(e) => handleSubjectChange(sub.id, 'paper_code', e.target.value)}
                                                                 placeholder="e.g. BS103"
-                                                                className="w-full px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-white font-mono"
+                                                                className="w-full px-2 py-1.5 rounded-lg border border-outline bg-surface text-on-surface font-mono"
                                                             />
                                                         </td>
                                                         <td className="p-3">
@@ -857,7 +906,7 @@ const Results: React.FC = () => {
                                                                 value={sub.subject_name}
                                                                 onChange={(e) => handleSubjectChange(sub.id, 'subject_name', e.target.value)}
                                                                 placeholder="Subject Title"
-                                                                className="w-full px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-white"
+                                                                className="w-full px-2 py-1.5 rounded-lg border border-outline bg-surface text-on-surface"
                                                             />
                                                         </td>
                                                         <td className="p-3 text-center">
@@ -865,7 +914,7 @@ const Results: React.FC = () => {
                                                                 type="number"
                                                                 value={sub.credits}
                                                                 onChange={(e) => handleSubjectChange(sub.id, 'credits', parseInt(e.target.value) || 0)}
-                                                                className="w-16 px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-center text-white"
+                                                                className="w-16 px-2 py-1.5 rounded-lg border border-outline bg-surface text-center text-on-surface"
                                                                 min="0"
                                                                 max="8"
                                                             />
@@ -875,7 +924,7 @@ const Results: React.FC = () => {
                                                                 type="number"
                                                                 value={sub.internal_theory}
                                                                 onChange={(e) => handleSubjectChange(sub.id, 'internal_theory', parseFloat(e.target.value) || 0)}
-                                                                className="w-16 px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-center text-white"
+                                                                className="w-16 px-2 py-1.5 rounded-lg border border-outline bg-surface text-center text-on-surface"
                                                                 min="0"
                                                                 max="100"
                                                             />
@@ -885,15 +934,15 @@ const Results: React.FC = () => {
                                                                 type="number"
                                                                 value={sub.external_theory}
                                                                 onChange={(e) => handleSubjectChange(sub.id, 'external_theory', parseFloat(e.target.value) || 0)}
-                                                                className="w-16 px-2 py-1.5 rounded-lg border border-white/5 bg-white/[0.02] text-center text-white"
+                                                                className="w-16 px-2 py-1.5 rounded-lg border border-outline bg-surface text-center text-on-surface"
                                                                 min="0"
                                                                 max="100"
                                                             />
                                                         </td>
-                                                        <td className="p-3 text-center font-bold text-white/80">
+                                                        <td className="p-3 text-center font-bold text-on-surface/80">
                                                             {total}
                                                         </td>
-                                                        <td className="p-3 text-center font-black">
+                                                        <td className="p-3 text-center font-bold">
                                                             <span className={`px-2.5 py-1 rounded-full text-[10px] ${gradeBgClass(grade)}`}>
                                                                 {grade}
                                                             </span>
@@ -901,7 +950,7 @@ const Results: React.FC = () => {
                                                         <td className="p-3 text-center">
                                                             <button
                                                                 onClick={() => handleDeleteSubject(sub.id)}
-                                                                className="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-colors"
+                                                                className="p-1.5 rounded-lg bg-surface border border-outline text-on-surface-variant/40 hover:text-red-500 hover:border-red-500/20 transition-colors"
                                                             >
                                                                 <Trash2 size={12} />
                                                             </button>
@@ -916,18 +965,18 @@ const Results: React.FC = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-6 md:p-8 border-t border-white/[0.06] flex items-center justify-end gap-3 shrink-0 bg-white/[0.01]">
+                        <div className="p-6 md:p-8 border-t border-outline flex items-center justify-end gap-3 shrink-0 bg-surface-container">
                             <button
                                 onClick={() => setIsEditorOpen(false)}
                                 disabled={isSaving}
-                                className="px-5 py-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] text-xs font-black text-white/40 hover:bg-white/[0.06] transition-all disabled:opacity-50"
+                                className="px-5 py-3 rounded-xl border border-outline bg-surface text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-all disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSaveEditor}
                                 disabled={isSaving}
-                                className="px-6 py-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-black text-white transition-all shadow-lg shadow-white/5 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-6 py-3 rounded-xl bg-primary hover:opacity-90 border border-primary text-xs font-bold text-on-primary transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isSaving ? (
                                     <><RefreshCw size={12} className="animate-spin" /> Saving...</>
@@ -937,7 +986,8 @@ const Results: React.FC = () => {
                             </button>
                         </div>
                     </motion.div>
-                </div>
+                </div>,
+                document.body
             )}
 
         </motion.div>

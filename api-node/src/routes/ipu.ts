@@ -540,6 +540,12 @@ async function saveResultsToDB(req: AuthRequest, results: {
     return mergePreferredRecord(current, acc)
   }, {} as ResultStudentInfo)
   const mergedStudentInfo = mergePreferredRecord(results.student_info, existingStudentInfo)
+  delete (mergedStudentInfo as any).phone
+  delete (mergedStudentInfo as any).gender
+  delete (mergedStudentInfo as any).father
+  delete (mergedStudentInfo as any).mother
+  delete (mergedStudentInfo as any).email
+
   const normalizedSemesters = mergeSemestersWithExisting(results.semesters, existingResults)
 
   for (const sem of normalizedSemesters) {
@@ -596,10 +602,6 @@ async function saveResultsToDB(req: AuthRequest, results: {
   }
   if (isMeaningfulValue(mergedStudentInfo.batch)) profileUpdate.batch = mergedStudentInfo.batch
   if (isMeaningfulValue(mergedStudentInfo.admission_year)) profileUpdate.admission_year = mergedStudentInfo.admission_year
-  if (isMeaningfulValue(mergedStudentInfo.phone)) profileUpdate.phone_number = mergedStudentInfo.phone
-  if (isMeaningfulValue(mergedStudentInfo.gender)) profileUpdate.gender = mergedStudentInfo.gender
-  if (isMeaningfulValue(mergedStudentInfo.father)) profileUpdate.father_name = mergedStudentInfo.father
-  if (isMeaningfulValue(mergedStudentInfo.mother)) profileUpdate.mother_name = mergedStudentInfo.mother
 
   // Also update current_semester if we found results for a higher semester
   const maxSemInResults = Math.max(...results.semesters.map(s => s.semester_num), 0)
@@ -1046,6 +1048,13 @@ router.post('/sync-results', async (req: AuthRequest, res) => {
       existingResults,
     )
 
+    const cleanStudentInfo = mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any
+    delete cleanStudentInfo.phone
+    delete cleanStudentInfo.gender
+    delete cleanStudentInfo.father
+    delete cleanStudentInfo.mother
+    delete cleanStudentInfo.email
+
     const savedSemesters = []
     for (const sem of normalizedFetched) {
       const existingInternalResult = await prisma.semesterResult.findFirst({
@@ -1063,7 +1072,7 @@ router.post('/sync-results', async (req: AuthRequest, res) => {
             total_credits: sem.total_credits,
             total_marks: sem.total_marks,
             max_marks: sem.max_marks,
-            student_info: mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any,
+            student_info: cleanStudentInfo,
             source: 'ipu_scraper',
             updated_at: new Date(),
           },
@@ -1080,7 +1089,7 @@ router.post('/sync-results', async (req: AuthRequest, res) => {
             total_credits: sem.total_credits,
             total_marks: sem.total_marks,
             max_marks: sem.max_marks,
-            student_info: mergePreferredRecord(fetched[0].student_info as Record<string, unknown>, {}) as any,
+            student_info: cleanStudentInfo,
             source: 'ipu_scraper',
           },
         })

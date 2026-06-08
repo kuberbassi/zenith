@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
+import { getClientIp } from '../utils/ip.js'
 import multer from 'multer'
 import sharp from 'sharp'
 import { buildViewCacheId, clearUserViewCache, readViewCache, writeViewCache } from '../utils/viewCache.js'
@@ -13,9 +14,9 @@ router.use(requireAuth)
 // Multer: memory storage for base64 conversion
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } })
 
-const MAX_PFP_SIZE = 50 * 1024 // 50 KB
+const MAX_PFP_SIZE = 150 * 1024 // 150 KB
 
-// â”€â”€â”€ Zod Schemas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
 const ProfileUpdateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -28,10 +29,6 @@ const ProfileUpdateSchema = z.object({
   warning_threshold: z.number().min(0).max(100).optional(),
   enrollment_number: z.string().max(50).optional(),
   phone_number: z.string().max(20).optional(),
-  headline: z.string().max(200).optional(),
-  linkedin_url: z.string().url().max(500).optional().or(z.literal('')),
-  github_url: z.string().url().max(500).optional().or(z.literal('')),
-  portfolio_url: z.string().url().max(500).optional().or(z.literal('')),
 }).strict()
 
 const ProfilePostSchema = z.object({
@@ -46,10 +43,6 @@ const ProfilePostSchema = z.object({
   warning_threshold: z.number().min(0).max(100).optional(),
   target_attendance: z.number().min(0).max(100).optional(),
   phone_number: z.string().max(20).optional(),
-  headline: z.string().max(200).optional(),
-  linkedin_url: z.string().url().max(500).optional().or(z.literal('')),
-  github_url: z.string().url().max(500).optional().or(z.literal('')),
-  portfolio_url: z.string().url().max(500).optional().or(z.literal('')),
 }).strict()
 
 const DeleteAccountSchema = z.object({
@@ -58,12 +51,10 @@ const DeleteAccountSchema = z.object({
 }).strict()
 
 async function sysLog(req: AuthRequest, user_id: string, action: string, description: string) {
-  const ip = req.ip || (req as any).socket?.remoteAddress || null
+  const ip = getClientIp(req)
   const user_agent = (req.headers['user-agent'] as string) || null
   await prisma.systemLog.create({ data: { user_id, action, description, ip, user_agent } }).catch(() => null)
 }
-
-// â”€â”€â”€ Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 router.get('/', async (req: AuthRequest, res) => {
   try {

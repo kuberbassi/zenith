@@ -52,7 +52,7 @@ const AddSubjectModal: React.FC<AddSubjectModalProps> = ({ isOpen, onClose, onSu
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Add Subject" size="sm">
-            <p className="text-white/50 text-sm mb-6">
+            <p className="text-xs text-on-surface-variant/60 mb-6">
                 Create a new subject to track attendance for.
             </p>
 
@@ -76,7 +76,7 @@ const AddSubjectModal: React.FC<AddSubjectModalProps> = ({ isOpen, onClose, onSu
                     />
 
                     <div className="space-y-2">
-                        <label className="text-xs font-semibold text-white/50 uppercase ml-1">Categories</label>
+                        <label className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest ml-1">Categories</label>
                         <div className="flex flex-wrap gap-2">
                             {['Theory', 'Practical', 'Assignment'].map((cat) => (
                                 <button
@@ -89,10 +89,10 @@ const AddSubjectModal: React.FC<AddSubjectModalProps> = ({ isOpen, onClose, onSu
                                             setCategories([...categories, cat]);
                                         }
                                     }}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all
+                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all
                                         ${categories.includes(cat)
-                                            ? 'bg-white/7 border-white/15 text-white'
-                                            : 'bg-white/[0.02] border-transparent text-white/40 hover:bg-white/[0.06] hover:text-white/70'
+                                            ? 'bg-primary/10 border-primary text-primary'
+                                            : 'bg-surface border-transparent text-on-surface-variant/50 hover:bg-surface-container hover:text-on-surface'
                                         }
                                     `}
                                 >

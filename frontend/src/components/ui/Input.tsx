@@ -19,7 +19,7 @@ const Input: React.FC<InputProps> = ({
     return (
         <div className={`${fullWidth ? 'w-full' : 'w-auto'} flex flex-col gap-1.5`}>
             {label && (
-                <label className="text-sm font-medium text-on-surface-variant ml-1">
+                <label className="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest ml-1">
                     {label}
                 </label>
             )}
@@ -29,7 +29,7 @@ const Input: React.FC<InputProps> = ({
                         w-full px-4 py-3 rounded-xl
                         bg-surface-container-highest
                         border transition-all duration-200
-                        text-on-surface placeholder-on-surface-variant/50
+                        text-on-surface text-sm placeholder-on-surface-variant/50
                         disabled:opacity-50 disabled:cursor-not-allowed
                         focus:outline-none focus:ring-4 focus:ring-primary/10
                         ${error

@@ -1,0 +1,873 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { usePageMeta } from '@/hooks/usePageMeta';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    StickyNote, ListTodo, Plus, Trash2, Pin,
+    CheckCircle2, Circle, X, GripVertical, Pencil,
+    Check, Eye, Bold, Italic, Underline as UnderlineIcon,
+    AlignLeft, AlignCenter, AlignRight, List, ListOrdered,
+    Image as ImageIcon, MoreHorizontal, RotateCcw
+} from 'lucide-react';
+import { useToast } from '@/components/ui/Toast';
+import api from '@/services/api';
+import { useQueryClient } from '@tanstack/react-query';
+
+// ── dnd-kit ──────────────────────────────────────────────────────────────────
+import {
+    DndContext, closestCenter, PointerSensor, TouchSensor,
+    useSensor, useSensors, type DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove, SortableContext, verticalListSortingStrategy, useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// ── Tiptap ───────────────────────────────────────────────────────────────────
+import { useEditor, EditorContent, Editor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import ImageExtension from '@tiptap/extension-image';
+import Placeholder from '@tiptap/extension-placeholder';
+import UnderlineExtension from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TodoItem {
+    id: string;
+    text: string;
+    completed: boolean;
+}
+
+interface Note {
+    id: string;
+    title: string;
+    content: string;
+    is_todo: boolean;
+    todos: TodoItem[];
+    is_pinned: boolean;
+    is_archived: boolean;
+    created_at: string;
+    updated_at: string;
+    color?: string;
+    category?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sortable Todo Row
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SortableTodoProps {
+    todo: TodoItem;
+    editMode: boolean;
+    onToggle: (id: string) => void;
+    onDelete: (id: string) => void;
+    onEdit: (id: string, text: string) => void;
+}
+
+const SortableTodoRow: React.FC<SortableTodoProps> = ({ todo, editMode, onToggle, onDelete, onEdit }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: todo.id });
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState(todo.text);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    const commitEdit = () => {
+        if (draft.trim() && draft.trim() !== todo.text) {
+            onEdit(todo.id, draft.trim());
+        } else {
+            setDraft(todo.text);
+        }
+        setEditing(false);
+    };
+
+    useEffect(() => {
+        if (editing) inputRef.current?.focus();
+    }, [editing]);
+
+    return (
+        <div ref={setNodeRef} style={style} className="flex items-center gap-2 group/row py-1.5 px-1 rounded-lg hover:bg-surface-container/30 transition-colors">
+            {/* Drag handle — only in edit mode */}
+            {editMode && (
+                <span
+                    {...attributes}
+                    {...listeners}
+                    className="text-on-surface-variant/20 hover:text-on-surface-variant/60 cursor-grab active:cursor-grabbing shrink-0 touch-none"
+                >
+                    <GripVertical size={14} />
+                </span>
+            )}
+
+            {/* Checkbox */}
+            <button
+                onClick={() => !editMode && onToggle(todo.id)}
+                className={`shrink-0 transition-colors ${todo.completed ? 'text-primary' : 'text-on-surface-variant/30 hover:text-on-surface-variant/70'} ${editMode ? 'pointer-events-none' : 'cursor-pointer'}`}
+            >
+                {todo.completed
+                    ? <CheckCircle2 size={17} className="fill-primary/10" />
+                    : <Circle size={17} />
+                }
+            </button>
+
+            {/* Text / inline edit */}
+            {editing ? (
+                <input
+                    ref={inputRef}
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    onBlur={commitEdit}
+                    onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') { setDraft(todo.text); setEditing(false); } }}
+                    className="flex-1 text-sm bg-transparent outline-none border-b border-on-surface focus:border-primary transition-colors py-0.5"
+                />
+            ) : (
+                <span
+                    onDoubleClick={() => editMode && setEditing(true)}
+                    className={`flex-1 text-sm leading-snug select-none transition-all ${todo.completed ? 'line-through text-on-surface-variant/30' : 'text-on-surface'}`}
+                >
+                    {todo.text}
+                </span>
+            )}
+
+            {/* Edit-mode actions */}
+            {editMode && !editing && (
+                <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition-opacity shrink-0">
+                    <button onClick={() => setEditing(true)} className="p-1 text-on-surface-variant/40 hover:text-on-surface rounded transition-colors cursor-pointer">
+                        <Pencil size={12} />
+                    </button>
+                    <button onClick={() => onDelete(todo.id)} className="p-1 text-on-surface-variant/40 hover:text-red-500 rounded transition-colors cursor-pointer">
+                        <Trash2 size={12} />
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tiptap Toolbar
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ToolbarBtn: React.FC<{ active?: boolean; onClick: () => void; title?: string; children: React.ReactNode }> = ({ active, onClick, title, children }) => (
+    <button
+        type="button"
+        title={title}
+        onClick={onClick}
+        className={`p-1.5 rounded transition-colors cursor-pointer ${active ? 'bg-on-surface text-surface' : 'text-on-surface-variant/50 hover:text-on-surface hover:bg-surface-container'}`}
+    >
+        {children}
+    </button>
+);
+
+const NoteToolbar: React.FC<{ editor: Editor }> = ({ editor }) => {
+    const imgInputRef = useRef<HTMLInputElement>(null);
+
+    const insertImage = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const src = e.target?.result as string;
+            if (src) editor.chain().focus().setImage({ src }).run();
+        };
+        reader.readAsDataURL(file);
+    };
+
+    return (
+        <div className="flex items-center gap-0.5 flex-wrap border-t border-outline pt-2 mt-2">
+            <ToolbarBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold"><Bold size={13} /></ToolbarBtn>
+            <ToolbarBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic"><Italic size={13} /></ToolbarBtn>
+            <ToolbarBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline"><UnderlineIcon size={13} /></ToolbarBtn>
+            <div className="w-px h-4 bg-outline mx-1" />
+            <ToolbarBtn active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} title="Left"><AlignLeft size={13} /></ToolbarBtn>
+            <ToolbarBtn active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} title="Center"><AlignCenter size={13} /></ToolbarBtn>
+            <ToolbarBtn active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} title="Right"><AlignRight size={13} /></ToolbarBtn>
+            <div className="w-px h-4 bg-outline mx-1" />
+            <ToolbarBtn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list"><List size={13} /></ToolbarBtn>
+            <ToolbarBtn active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list"><ListOrdered size={13} /></ToolbarBtn>
+            <div className="w-px h-4 bg-outline mx-1" />
+            <ToolbarBtn onClick={() => imgInputRef.current?.click()} title="Insert image"><ImageIcon size={13} /></ToolbarBtn>
+            <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) insertImage(f); e.target.value = ''; }} />
+            <div className="w-px h-4 bg-outline mx-1" />
+            <ToolbarBtn onClick={() => editor.chain().focus().undo().run()} title="Undo"><RotateCcw size={13} /></ToolbarBtn>
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rich Note Editor panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface NoteEditorProps {
+    note: Note;
+    onUpdate: (fields: Partial<Note>) => void;
+    onDelete: () => void;
+    onClose: () => void;
+    onTogglePin: () => void;
+}
+
+const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClose, onTogglePin }) => {
+    const [readMode, setReadMode] = useState(false);
+
+    const editor = useEditor({
+        extensions: [
+            StarterKit,
+            UnderlineExtension,
+            TextAlign.configure({ types: ['heading', 'paragraph'] }),
+            ImageExtension.configure({ inline: false, allowBase64: true }),
+            Placeholder.configure({ placeholder: 'Start writing…' }),
+        ],
+        content: note.content || '',
+        editable: !readMode,
+        onUpdate: ({ editor }) => {
+            onUpdate({ content: editor.getHTML() });
+        },
+    });
+
+    // Sync read mode with editor editability
+    useEffect(() => {
+        editor?.setEditable(!readMode);
+    }, [readMode, editor]);
+
+    // Sync content when switching notes
+    useEffect(() => {
+        if (editor && editor.getHTML() !== note.content) {
+            editor.commands.setContent(note.content || '', { emitUpdate: false });
+        }
+    }, [note.id]);
+
+    // Paste / drop images
+    useEffect(() => {
+        if (!editor) return;
+        const el = editor.view.dom as HTMLElement;
+
+        const handlePaste = (e: ClipboardEvent) => {
+            const files = Array.from(e.clipboardData?.files || []).filter(f => f.type.startsWith('image/'));
+            if (!files.length) return;
+            e.preventDefault();
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    const src = ev.target?.result as string;
+                    if (src) editor.chain().focus().setImage({ src }).run();
+                };
+                reader.readAsDataURL(file);
+            });
+        };
+
+        const handleDrop = (e: DragEvent) => {
+            const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'));
+            if (!files.length) return;
+            e.preventDefault();
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    const src = ev.target?.result as string;
+                    if (src) editor.chain().focus().setImage({ src }).run();
+                };
+                reader.readAsDataURL(file);
+            });
+        };
+
+        el.addEventListener('paste', handlePaste as EventListener);
+        el.addEventListener('drop', handleDrop as EventListener);
+        return () => {
+            el.removeEventListener('paste', handlePaste as EventListener);
+            el.removeEventListener('drop', handleDrop as EventListener);
+        };
+    }, [editor]);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="w-full lg:w-[460px] border border-outline bg-surface rounded-xl p-5 shrink-0 flex flex-col self-start min-h-[400px] h-[calc(100vh-160px)] sticky top-20 shadow-sm"
+        >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-outline mb-3">
+                <div className="flex items-center gap-1">
+                    <button onClick={onTogglePin} className={`p-1.5 rounded hover:bg-surface-container transition-colors cursor-pointer ${note.is_pinned ? 'text-primary' : 'text-on-surface-variant/30'}`} title="Pin">
+                        <Pin size={14} className={note.is_pinned ? 'fill-current' : ''} />
+                    </button>
+                    <button onClick={() => setReadMode(m => !m)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${readMode ? 'bg-surface-container text-on-surface' : 'text-on-surface-variant/40 hover:text-on-surface'}`}>
+                        {readMode ? <><Eye size={11} /> Reading</> : <><Pencil size={11} /> Editing</>}
+                    </button>
+                </div>
+                <div className="flex items-center gap-1">
+                    <button onClick={onDelete} className="p-1.5 text-on-surface-variant/30 hover:text-red-500 rounded transition-colors cursor-pointer" title="Delete"><Trash2 size={14} /></button>
+                    <button onClick={onClose} className="p-1.5 text-on-surface-variant/30 hover:text-on-surface rounded transition-colors cursor-pointer" title="Close"><X size={14} /></button>
+                </div>
+            </div>
+
+            {/* Title */}
+            <input
+                type="text"
+                value={note.title}
+                onChange={e => onUpdate({ title: e.target.value })}
+                placeholder="Title"
+                readOnly={readMode}
+                className="w-full text-base font-bold tracking-tight bg-transparent outline-none mb-3 py-1 border-none focus:ring-0"
+            />
+
+            {/* Tiptap Editor area */}
+            <div className="flex-1 overflow-y-auto min-h-0 prose-area">
+                <EditorContent
+                    editor={editor}
+                    className={`h-full tiptap-editor text-sm leading-relaxed ${readMode ? 'read-mode' : ''}`}
+                />
+            </div>
+
+            {/* Toolbar — only in edit mode */}
+            {!readMode && editor && <NoteToolbar editor={editor} />}
+        </motion.div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Todo panel — full dedicated list (not inside a note editor)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TodoPanelProps {
+    note: Note;
+    onUpdate: (fields: Partial<Note>) => void;
+    onDelete: () => void;
+    onClose: () => void;
+    isInline?: boolean;
+}
+
+const TodoPanel: React.FC<TodoPanelProps> = ({ note, onUpdate, onDelete, onClose, isInline = false }) => {
+    const [editMode, setEditMode] = useState(false);
+    const [newText, setNewText] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    );
+
+    const activeTodos = (note.todos || []).filter(t => !t.completed);
+    const doneTodos = (note.todos || []).filter(t => t.completed);
+
+    const addTodo = () => {
+        const text = newText.trim();
+        if (!text) return;
+        const item: TodoItem = { id: 'todo-' + Date.now(), text, completed: false };
+        onUpdate({ todos: [item, ...(note.todos || [])] });
+        setNewText('');
+        inputRef.current?.focus();
+    };
+
+    const toggleTodo = (id: string) => {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(8);
+        onUpdate({ todos: (note.todos || []).map(t => t.id === id ? { ...t, completed: !t.completed } : t) });
+    };
+
+    const deleteTodo = (id: string) => {
+        onUpdate({ todos: (note.todos || []).filter(t => t.id !== id) });
+    };
+
+    const editTodo = (id: string, text: string) => {
+        onUpdate({ todos: (note.todos || []).map(t => t.id === id ? { ...t, text } : t) });
+    };
+
+    const clearDone = () => {
+        onUpdate({ todos: activeTodos });
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const allTodos = note.todos || [];
+        const oldIndex = allTodos.findIndex(t => t.id === active.id);
+        const newIndex = allTodos.findIndex(t => t.id === over.id);
+        if (oldIndex !== -1 && newIndex !== -1) {
+            onUpdate({ todos: arrayMove(allTodos, oldIndex, newIndex) });
+        }
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 15 }}
+            className={`w-full border border-outline bg-surface rounded-xl p-6 shadow-sm flex flex-col min-h-[400px] h-[calc(100vh-220px)] ${isInline ? 'max-w-xl mx-auto' : 'lg:w-[420px] sticky top-20 self-start'}`}
+        >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-outline mb-4">
+                {isInline ? (
+                    <span className="text-xs font-bold text-on-surface-variant/40 uppercase tracking-widest ml-1">My Tasks Checklist</span>
+                ) : (
+                    <input
+                        type="text"
+                        value={note.title}
+                        onChange={e => onUpdate({ title: e.target.value })}
+                        placeholder="List title"
+                        className="text-base font-bold tracking-tight bg-transparent outline-none border-none focus:ring-0 flex-1"
+                    />
+                )}
+                <div className="flex items-center gap-1.5 ml-2">
+                    <button
+                        onClick={() => setEditMode(m => !m)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${editMode ? 'bg-on-surface text-surface' : 'border border-outline text-on-surface-variant/50 hover:text-on-surface'}`}
+                    >
+                        {editMode ? <><Check size={10} /> Done</> : <><Pencil size={10} /> Edit Mode</>}
+                    </button>
+                    {!isInline && (
+                        <>
+                            <button onClick={onDelete} className="p-1.5 text-on-surface-variant/30 hover:text-red-500 rounded transition-colors cursor-pointer"><Trash2 size={14} /></button>
+                            <button onClick={onClose} className="p-1.5 text-on-surface-variant/30 hover:text-on-surface rounded transition-colors cursor-pointer"><X size={14} /></button>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Add task row */}
+            {!editMode && (
+                <div className="flex items-center gap-3 px-2 py-1.5 rounded-xl border border-outline bg-surface-container/20 mb-4 focus-within:border-primary/50 transition-colors">
+                    <button onClick={addTodo} className="text-on-surface-variant/30 hover:text-primary transition-colors shrink-0 cursor-pointer">
+                        <Plus size={18} />
+                    </button>
+                    <input
+                        ref={inputRef}
+                        value={newText}
+                        onChange={e => setNewText(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && addTodo()}
+                        placeholder="Add a task straight up…"
+                        className="flex-1 text-sm bg-transparent outline-none border-none focus:ring-0 placeholder:text-on-surface-variant/25 py-0.5"
+                    />
+                </div>
+            )}
+
+            {/* Task list with DnD */}
+            <div className="flex-1 overflow-y-auto min-h-0 space-y-0.5 pr-1 custom-scrollbar">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={(note.todos || []).map(t => t.id)} strategy={verticalListSortingStrategy}>
+                        {/* Active tasks */}
+                        {activeTodos.length === 0 && doneTodos.length === 0 && (
+                            <p className="text-center text-xs text-on-surface-variant/25 py-16 italic">No tasks. Type above to add one quickly!</p>
+                        )}
+                        {activeTodos.map(todo => (
+                            <SortableTodoRow
+                                key={todo.id}
+                                todo={todo}
+                                editMode={editMode}
+                                onToggle={toggleTodo}
+                                onDelete={deleteTodo}
+                                onEdit={editTodo}
+                            />
+                        ))}
+
+                        {/* Done section */}
+                        {doneTodos.length > 0 && (
+                            <div className="pt-4 border-t border-outline/30 mt-4">
+                                <div className="flex items-center justify-between mb-2 px-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/30">
+                                        Done · {doneTodos.length}
+                                    </span>
+                                    {editMode && (
+                                        <button onClick={clearDone} className="text-[10px] font-semibold text-red-400 hover:text-red-600 cursor-pointer transition-colors">
+                                            Clear all done
+                                        </button>
+                                    )}
+                                </div>
+                                {doneTodos.map(todo => (
+                                    <SortableTodoRow
+                                        key={todo.id}
+                                        todo={todo}
+                                        editMode={editMode}
+                                        onToggle={toggleTodo}
+                                        onDelete={deleteTodo}
+                                        onEdit={editTodo}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </SortableContext>
+                </DndContext>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-3 border-t border-outline mt-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/25">
+                <span>
+                    {activeTodos.length} remaining · {doneTodos.length} done
+                </span>
+                {editMode && (
+                    <span>Hold handle to reorder</span>
+                )}
+            </div>
+        </motion.div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Note Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface NoteCardProps {
+    note: Note;
+    isActive: boolean;
+    onSelect: (note: Note) => void;
+    onDelete: (id: string) => void;
+    onTogglePin: (note: Note) => void;
+}
+
+const NoteCard: React.FC<NoteCardProps> = ({ note, isActive, onSelect, onDelete, onTogglePin }) => {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const completedTodos = (note.todos || []).filter(t => t.completed).length;
+    const totalTodos = (note.todos || []).length;
+
+    // Plain text preview from HTML
+    const plainText = note.content
+        ? note.content.replace(/<img[^>]*>/gi, '[image] ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+        : '';
+
+    useEffect(() => {
+        if (!menuOpen) return;
+        const close = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, [menuOpen]);
+
+    return (
+        <div
+            onClick={() => onSelect(note)}
+            className={`group relative p-4 rounded-xl border transition-all cursor-pointer select-none ${isActive ? 'border-on-surface bg-surface-container/20' : 'border-outline hover:border-on-surface/50 bg-surface'}`}
+        >
+            <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="text-sm font-bold tracking-tight truncate flex-1 leading-snug">{note.title || 'Untitled'}</h3>
+                <div className="flex items-center gap-1 shrink-0" ref={menuRef}>
+                    {note.is_pinned && <Pin size={10} className="text-on-surface/50 fill-current" />}
+                    <button
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={e => { e.stopPropagation(); setMenuOpen(m => !m); }}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface-container transition-all cursor-pointer text-on-surface-variant/40"
+                    >
+                        <MoreHorizontal size={13} />
+                    </button>
+
+                    {/* Context mini-menu */}
+                    <AnimatePresence>
+                        {menuOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                                className="absolute right-0 top-8 z-30 bg-surface border border-outline rounded-lg shadow-lg p-1 min-w-[130px]"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <button onClick={e => { e.stopPropagation(); onTogglePin(note); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-xs font-semibold hover:bg-surface-container rounded-md transition-colors cursor-pointer">
+                                    <Pin size={11} />{note.is_pinned ? 'Unpin' : 'Pin to top'}
+                                </button>
+                                <div className="h-px bg-outline my-1" />
+                                <button onClick={e => { e.stopPropagation(); onDelete(note.id); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-500/5 rounded-md transition-colors cursor-pointer">
+                                    <Trash2 size={11} />Delete
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {note.is_todo ? (
+                <div className="space-y-1 mb-2">
+                    {totalTodos === 0
+                        ? <span className="text-[11px] text-on-surface-variant/30 italic">No tasks</span>
+                        : (note.todos || []).slice(0, 4).map(t => (
+                            <div key={t.id} className="flex items-center gap-1.5 text-xs">
+                                {t.completed
+                                    ? <CheckCircle2 size={11} className="text-on-surface-variant/30 shrink-0" />
+                                    : <Circle size={11} className="text-on-surface-variant/40 shrink-0" />
+                                }
+                                <span className={`truncate ${t.completed ? 'line-through text-on-surface-variant/30' : 'text-on-surface/80'}`}>{t.text}</span>
+                            </div>
+                        ))}
+                    {totalTodos > 4 && <span className="text-[10px] text-on-surface-variant/25 font-semibold">+{totalTodos - 4} more</span>}
+                </div>
+            ) : (
+                <p className="text-xs text-on-surface-variant/60 line-clamp-3 leading-relaxed">{plainText || 'Empty note'}</p>
+            )}
+
+            <div className="flex items-center justify-between pt-2 border-t border-outline/40 mt-2 text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/25">
+                <span>{note.is_todo ? `${completedTodos}/${totalTodos} done` : `${plainText.length} chars`}</span>
+                <span>{new Date(note.updated_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
+            </div>
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Notes Page
+// ─────────────────────────────────────────────────────────────────────────────
+
+const Notes: React.FC = () => {
+    const { showToast } = useToast();
+    const queryClient = useQueryClient();
+    const [notes, setNotes] = useState<Note[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState<'notes' | 'todos'>('notes');
+    const [activeNote, setActiveNote] = useState<Note | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const saveTimer = useRef<NodeJS.Timeout | null>(null);
+
+    usePageMeta({
+        title: 'Notes & Tasks | Zenith',
+        description: 'Write notes with rich formatting and manage tasks with a clean todo list.',
+    });
+
+    useEffect(() => { fetchNotes(); }, []);
+
+    const fetchNotes = async () => {
+        try {
+            setLoading(true);
+            const res = await api.get('/api/notes');
+            setNotes(res.data?.data || []);
+        } catch {
+            showToast('error', 'Failed to load');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const defaultTasksNote = notes.find(n => n.is_todo);
+
+    // If viewMode === 'todos' and we have loaded notes but no defaultTasksNote exists, we create one automatically
+    useEffect(() => {
+        if (!loading && viewMode === 'todos' && !defaultTasksNote) {
+            createNote(true);
+        }
+    }, [viewMode, loading, defaultTasksNote]);
+
+    // Create note
+    const createNote = async (isTodo: boolean) => {
+        const tempId = 'temp-' + Date.now();
+        const newNote: Note = {
+            id: tempId,
+            title: isTodo ? 'My Tasks' : 'Untitled Note',
+            content: '',
+            is_todo: isTodo,
+            todos: [],
+            is_pinned: false,
+            is_archived: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+        setNotes(prev => [newNote, ...prev]);
+        if (!isTodo) setActiveNote(newNote);
+        try {
+            const res = await api.post('/api/notes', { title: newNote.title, content: '', is_todo: isTodo, todos: [] });
+            const saved = res.data?.data;
+            if (saved) {
+                setNotes(prev => prev.map(n => n.id === tempId ? saved : n));
+                if (!isTodo) setActiveNote(saved);
+                queryClient.invalidateQueries({ queryKey: ['notes'] });
+            }
+        } catch {
+            showToast('error', 'Failed to create');
+            setNotes(prev => prev.filter(n => n.id !== tempId));
+            if (!isTodo) setActiveNote(null);
+        }
+    };
+
+    // Debounced update
+    const updateNote = useCallback((fields: Partial<Note>) => {
+        if (!activeNote) return;
+        const updated: Note = { ...activeNote, ...fields, updated_at: new Date().toISOString() };
+        setActiveNote(updated);
+        setNotes(prev => prev.map(n => n.id === activeNote.id ? updated : n));
+
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(async () => {
+            if (activeNote.id.startsWith('temp-')) return;
+            try { 
+                await api.put(`/api/notes/${activeNote.id}`, fields);
+                queryClient.invalidateQueries({ queryKey: ['notes'] });
+            } catch { /* silent */ }
+        }, 700);
+    }, [activeNote, queryClient]);
+
+    const togglePin = async (note: Note) => {
+        const pinned = !note.is_pinned;
+        setNotes(prev => prev.map(n => n.id === note.id ? { ...n, is_pinned: pinned } : n).sort((a, b) => {
+            if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        }));
+        if (activeNote?.id === note.id) setActiveNote(a => a ? { ...a, is_pinned: pinned } : a);
+        try { 
+            await api.put(`/api/notes/${note.id}`, { is_pinned: pinned });
+            queryClient.invalidateQueries({ queryKey: ['notes'] });
+        } catch { fetchNotes(); }
+    };
+
+    const deleteNote = async (noteId: string) => {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate([15, 5, 15]);
+        setNotes(prev => prev.filter(n => n.id !== noteId));
+        if (activeNote?.id === noteId) setActiveNote(null);
+        try {
+            await api.delete(`/api/notes/${noteId}`);
+            showToast('success', 'Deleted');
+            queryClient.invalidateQueries({ queryKey: ['notes'] });
+        } catch { fetchNotes(); }
+    };
+
+    const filtered = notes.filter(n => {
+        const q = searchQuery.toLowerCase();
+        const matchSearch = !q || n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q);
+        const matchMode = viewMode === 'todos' ? n.is_todo : !n.is_todo;
+        return matchSearch && matchMode;
+    });
+    const pinned = filtered.filter(n => n.is_pinned);
+    const unpinned = filtered.filter(n => !n.is_pinned);
+
+    return (
+        <div className="pb-24 max-w-7xl mx-auto px-4">
+            {viewMode === 'todos' ? (
+                // Single unified checklist view
+                <div className="w-full">
+                    {/* Top bar with tabs only */}
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-1 p-1 bg-surface-container border border-outline rounded-lg">
+                            {(['notes', 'todos'] as const).map(mode => (
+                                <button
+                                    key={mode}
+                                    onClick={() => { setViewMode(mode); setActiveNote(null); }}
+                                    className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${viewMode === mode ? 'bg-surface text-on-surface shadow-sm border border-outline' : 'text-on-surface-variant/50 hover:text-on-surface'}`}
+                                >
+                                    {mode === 'notes' ? <><StickyNote size={12} />Notes</> : <><ListTodo size={12} />Tasks</>}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {loading ? (
+                        <div className="py-24 text-center">
+                            <span className="text-xs text-on-surface-variant/30 animate-pulse">Loading Tasks…</span>
+                        </div>
+                    ) : defaultTasksNote ? (
+                        <TodoPanel
+                            note={defaultTasksNote}
+                            onUpdate={(fields) => {
+                                const updated: Note = { ...defaultTasksNote, ...fields, updated_at: new Date().toISOString() };
+                                setNotes(prev => prev.map(n => n.id === defaultTasksNote.id ? updated : n));
+                                if (saveTimer.current) clearTimeout(saveTimer.current);
+                                saveTimer.current = setTimeout(async () => {
+                                    try { 
+                                        await api.put(`/api/notes/${defaultTasksNote.id}`, fields);
+                                        queryClient.invalidateQueries({ queryKey: ['notes'] });
+                                    } catch {}
+                                }, 700);
+                            }}
+                            onDelete={() => deleteNote(defaultTasksNote.id)}
+                            onClose={() => {}}
+                            isInline={true}
+                        />
+                    ) : (
+                        <div className="py-24 text-center">
+                            <span className="text-xs text-on-surface-variant/30 animate-pulse">Setting up checklist…</span>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                // Traditional Notes view
+                <div className="flex flex-col lg:flex-row gap-6 w-full">
+                    {/* Left: Notes List */}
+                    <div className="flex-1 min-w-0">
+                        {/* Top bar */}
+                        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 mb-6">
+                            <div className="flex items-center gap-1 p-1 bg-surface-container border border-outline rounded-lg self-start">
+                                {(['notes', 'todos'] as const).map(mode => (
+                                    <button
+                                        key={mode}
+                                        onClick={() => { setViewMode(mode); setActiveNote(null); }}
+                                        className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${viewMode === mode ? 'bg-surface text-on-surface shadow-sm border border-outline' : 'text-on-surface-variant/50 hover:text-on-surface'}`}
+                                    >
+                                        {mode === 'notes' ? <><StickyNote size={12} />Notes</> : <><ListTodo size={12} />Tasks</>}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-1 max-w-sm">
+                                <input
+                                    type="text"
+                                    placeholder="Search notes…"
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="w-full text-xs px-4 py-2 bg-surface border border-outline rounded-lg outline-none focus:border-on-surface transition-all placeholder:text-on-surface-variant/25"
+                                />
+                                <button
+                                    onClick={() => createNote(false)}
+                                    className="h-9 w-9 flex items-center justify-center bg-on-surface text-surface hover:bg-on-surface/85 rounded-lg shrink-0 transition-all cursor-pointer"
+                                    title="New Note"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Card grid */}
+                        {loading ? (
+                            <div className="py-24 text-center">
+                                <span className="text-xs text-on-surface-variant/30 animate-pulse">Loading…</span>
+                            </div>
+                        ) : filtered.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-24 rounded-xl border border-dashed border-outline">
+                                <StickyNote size={22} className="text-on-surface-variant/15 mb-3" />
+                                <p className="text-xs font-bold text-on-surface-variant/25 uppercase tracking-widest">
+                                    {searchQuery ? 'No results' : 'No notes yet'}
+                                </p>
+                                {!searchQuery && (
+                                    <button onClick={() => createNote(false)} className="mt-4 text-xs font-semibold text-on-surface-variant/40 hover:text-on-surface transition-colors cursor-pointer underline underline-offset-2">
+                                        Create one
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="space-y-5">
+                                {pinned.length > 0 && (
+                                    <div>
+                                        <p className="text-[10px] font-bold text-on-surface-variant/30 uppercase tracking-wider mb-2.5 px-0.5">Pinned</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {pinned.map(note => (
+                                                <NoteCard key={note.id} note={note} isActive={activeNote?.id === note.id} onSelect={setActiveNote} onDelete={deleteNote} onTogglePin={togglePin} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {unpinned.length > 0 && (
+                                    <div>
+                                        {pinned.length > 0 && <p className="text-[10px] font-bold text-on-surface-variant/30 uppercase tracking-wider mb-2.5 px-0.5">Recent</p>}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {unpinned.map(note => (
+                                                <NoteCard key={note.id} note={note} isActive={activeNote?.id === note.id} onSelect={setActiveNote} onDelete={deleteNote} onTogglePin={togglePin} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Right: Editor panel */}
+                    <AnimatePresence mode="wait">
+                        {activeNote && (
+                            <NoteEditor
+                                key={activeNote.id}
+                                note={activeNote}
+                                onUpdate={updateNote}
+                                onDelete={() => deleteNote(activeNote.id)}
+                                onClose={() => setActiveNote(null)}
+                                onTogglePin={() => togglePin(activeNote)}
+                            />
+                        )}
+                    </AnimatePresence>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default Notes;
