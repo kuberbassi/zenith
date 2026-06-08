@@ -242,7 +242,12 @@ const ResultsDashboard: React.FC<ResultsDashboardProps> = ({
                         {results.semesters.map((sem: any) => {
                             const sgpa = sem.sgpa ? parseFloat(sem.sgpa) : 0;
                             const semCredits = (sem.subjects || []).reduce((a: number, s: any) => a + (parseFloat(s.credits || '0') || 0), 0);
-                            const passRate = sem.subjects?.length ? Math.round((sem.subjects.filter((s: any) => (s.grade ? true : false) && ((s.grade && ['O', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'P'].includes(s.grade))).length / sem.subjects.length) * 100)) : 0;
+                            const passedCount = (sem.subjects || []).filter((s: any) => {
+                                const grade = String(s.grade || '').toUpperCase();
+                                return ['O', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'P'].includes(grade);
+                            }).length;
+                            const totalCount = sem.subjects?.length || 0;
+                            const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
                             return (
                                 <div key={sem.semester} onClick={() => setSelectedSem(sem.semester)} className="cursor-pointer group rounded-lg border border-outline bg-surface p-5 hover:border-on-surface transition-all">
                                     <div className="flex justify-between items-start mb-4">
