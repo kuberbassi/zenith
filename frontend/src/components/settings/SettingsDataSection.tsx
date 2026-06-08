@@ -51,7 +51,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                 await fetchDriveStatus();
             } catch (err: any) {
                 console.error(err);
-                showToast('error', 'Failed to link Google Drive');
+                showToast('error', err?.response?.data?.error || err?.message || 'Failed to link Google Drive');
             } finally {
                 setDriveLoading(false);
             }

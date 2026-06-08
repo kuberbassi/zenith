@@ -93,13 +93,13 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const getColors = (type: ToastType) => {
         switch (type) {
             case 'success':
-                return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+                return 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/25 text-emerald-800 dark:text-emerald-300';
             case 'error':
-                return 'bg-red-500/10 border-red-500/20 text-red-400';
+                return 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/25 text-red-800 dark:text-red-300';
             case 'warning':
-                return 'bg-amber-500/10 border-amber-500/20 text-amber-400';
+                return 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/25 text-amber-900 dark:text-amber-300';
             case 'info':
-                return 'bg-white/5 border-white/10 text-white/90';
+                return 'bg-surface border-outline text-on-surface';
         }
     };
 
@@ -107,7 +107,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         <ToastContext.Provider value={{ showToast, success, error, warning, info }}>
             {children}
 
-            <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+            <div className="fixed top-4 right-4 left-4 sm:left-auto z-50 flex flex-col items-stretch sm:items-end gap-2 pointer-events-none">
                 <AnimatePresence>
                     {toasts.map((toast) => (
                         <motion.div
@@ -115,13 +115,14 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                             initial={{ opacity: 0, x: 100, scale: 0.8 }}
                             animate={{ opacity: 1, x: 0, scale: 1 }}
                             exit={{ opacity: 0, x: 100, scale: 0.8 }}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-lg border backdrop-blur-md shadow-lg min-w-[300px] max-w-md ${getColors(toast.type)}`}
+                            className={`pointer-events-auto flex w-full sm:w-auto items-center gap-3 px-4 py-3 rounded-lg border shadow-lg sm:min-w-[300px] max-w-md ${getColors(toast.type)}`}
                         >
-                            {getIcon(toast.type)}
-                            <p className="flex-1 text-sm font-medium">{toast.message}</p>
+                            <span className="shrink-0">{getIcon(toast.type)}</span>
+                            <p className="flex-1 min-w-0 text-sm font-medium leading-snug break-words">{toast.message}</p>
                             <button
                                 onClick={() => removeToast(toast.id)}
-                                className="p-1 rounded hover:bg-white/10 transition-colors"
+                                className="p-1 rounded hover:bg-on-surface/10 transition-colors shrink-0"
+                                aria-label="Dismiss notification"
                             >
                                 <X className="w-4 h-4" />
                             </button>

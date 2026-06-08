@@ -479,7 +479,7 @@ const ManualCourseSchema = z.object({
     name: z.string().max(200).nullish(),
     platform: z.string().max(200).nullish(),
     provider: z.string().max(200).nullish(),
-    url: z.string().nullish(),
+    url: z.string().max(2048).nullish(),
     progress: z.number().min(0).max(100).nullish(),
     percentage: z.number().min(0).max(100).nullish(),
     status: z.enum(['not_started', 'in_progress', 'completed']).nullish(),
@@ -488,6 +488,18 @@ const ManualCourseSchema = z.object({
     targetCompletionDate: z.string().nullish(),
     notes: z.string().max(1000).nullish(),
 })
+
+function normalizeHttpUrl(url?: string | null): string | null {
+    const raw = String(url ?? '').trim()
+    if (!raw) return null
+    try {
+        const parsed = new URL(raw)
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Invalid URL protocol')
+        return parsed.toString()
+    } catch {
+        throw new Error('Course URL must be a valid http or https URL')
+    }
+}
 
 function normalizeCourseForSave(raw: z.infer<typeof ManualCourseSchema>) {
     const courseName = raw.title || raw.name || ''
@@ -499,7 +511,7 @@ function normalizeCourseForSave(raw: z.infer<typeof ManualCourseSchema>) {
     if (raw.instructor) extra.instructor = raw.instructor
     if (raw.enrolledDate) extra.enrolledDate = raw.enrolledDate
     if (raw.targetCompletionDate) extra.targetCompletionDate = raw.targetCompletionDate
-    return { name: courseName, platform, status: computedStatus, progress, url: raw.url || null, notes: raw.notes || '', extra }
+    return { name: courseName, platform, status: computedStatus, progress, url: normalizeHttpUrl(raw.url), notes: raw.notes || '', extra }
 }
 
 function formatCourseForClient(c: { id: string; name: string | null; platform: string | null; status: string | null; progress: number; url: string | null; notes: string | null; extra: unknown; created_at: Date }) {
@@ -586,6 +598,9 @@ router.post('/courses/manual', async (req: AuthRequest, res) => {
         if (err instanceof Error && err.message === 'Course name/title is required') { 
             fail(res, err.message, 'INVALID_PARAMS', 400); return 
         }
+        if (err instanceof Error && err.message === 'Course URL must be a valid http or https URL') {
+            fail(res, err.message, 'INVALID_PARAMS', 400); return
+        }
         
         // Comprehensive error logging to diagnose the 500 error
         console.error('[academic/courses/manual POST] Unexpected Error:', err)
@@ -622,7 +637,7 @@ router.put('/courses/manual/:id', async (req: AuthRequest, res) => {
                 ...(raw.platform !== undefined ? { platform: raw.platform || raw.provider || null } : {}),
                 status: computedStatus,
                 progress,
-                ...(raw.url !== undefined ? { url: raw.url || null } : {}),
+                ...(raw.url !== undefined ? { url: normalizeHttpUrl(raw.url) } : {}),
                 ...(raw.notes !== undefined ? { notes: raw.notes } : {}),
                 extra: Object.keys(newExtra).length ? newExtra as any : undefined,
             },
@@ -631,6 +646,9 @@ router.put('/courses/manual/:id', async (req: AuthRequest, res) => {
         ok(res, { message: 'Course updated', course: formatCourseForClient(course) })
     } catch (err) {
         if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
+        if (err instanceof Error && err.message === 'Course URL must be a valid http or https URL') {
+            fail(res, err.message, 'INVALID_PARAMS', 400); return
+        }
         console.error('[academic/courses/manual PUT]', err)
         fail(res, 'Failed to update course', 'UPDATE_FAILED', 500)
     }

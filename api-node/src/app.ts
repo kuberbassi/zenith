@@ -20,12 +20,34 @@ const app = express()
 app.set('trust proxy', 1)
 
 /* ── Security ─────────────────────────────────────────────── */
-app.use(helmet())
+const allowedOrigins = new Set(ENV.ALLOWED_ORIGINS.map(origin => origin.trim()).filter(Boolean))
+app.disable('x-powered-by')
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      frameAncestors: ["'none'"],
+      objectSrc: ["'none'"],
+      formAction: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: 'no-referrer' },
+  hsts: ENV.NODE_ENV === 'production'
+    ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+    : false,
+}))
 app.use(
   cors({
-    origin: ENV.ALLOWED_ORIGINS,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) return callback(null, true)
+      return callback(new Error('Origin not allowed by CORS'))
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Timezone', 'X-Device-Id'],
   }),
 )
 
@@ -162,7 +184,7 @@ app.use(
     console.error('[Error]', err)
     res.status(500).json({
       success: false,
-      error: err.message ?? 'Internal server error',
+      error: ENV.NODE_ENV === 'development' ? (err.message ?? 'Internal server error') : 'Internal server error',
       code: 'INTERNAL_ERROR',
     })
   },
@@ -170,4 +192,3 @@ app.use(
 
 // Reload trigger: 1
 export default app
-

@@ -8,6 +8,7 @@ import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middlewar
 import { ok, fail } from '../utils/response.js'
 import { getClientIp } from '../utils/ip.js'
 import { triggerAutoBackupIfNeeded } from '../utils/googleDrive.js'
+import { encryptSecret } from '../utils/secrets.js'
 
 const router = Router()
 const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID)
@@ -383,10 +384,20 @@ router.post('/google/link-drive', requireAuth, async (req: AuthRequest, res) => 
 
     const redirect = redirectUri || 'postmessage'
 
+    if (!ENV.GOOGLE_CLIENT_SECRET) {
+      fail(
+        res,
+        'Google Drive linking is not configured. Set GOOGLE_CLIENT_SECRET for the API server and restart it.',
+        'GOOGLE_SECRET_MISSING',
+        500
+      )
+      return
+    }
+
     // Google API requires a client secret for offline access exchange
     const exchangeClient = new OAuth2Client(
       ENV.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
+      ENV.GOOGLE_CLIENT_SECRET,
       redirect
     )
 
@@ -404,7 +415,9 @@ router.post('/google/link-drive', requireAuth, async (req: AuthRequest, res) => 
     const nextPrefs = {
       ...current,
       google_drive_linked: true,
-      google_drive_refresh_token: tokens.refresh_token || current.google_drive_refresh_token,
+      google_drive_refresh_token: tokens.refresh_token
+        ? encryptSecret(tokens.refresh_token)
+        : current.google_drive_refresh_token,
       google_drive_backup_frequency: current.google_drive_backup_frequency || 'daily',
       google_drive_last_backup: current.google_drive_last_backup || null
     }

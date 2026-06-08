@@ -11,6 +11,7 @@ function sanitizeValue(val: any): any {
   if (val && typeof val === 'object') {
     const res: Record<string, any> = {};
     for (const key of Object.keys(val)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
       res[key] = sanitizeValue(val[key]);
     }
     return res;

@@ -136,20 +136,20 @@ const SkillTracker: React.FC = () => {
     const filteredSkills = filter === 'all' ? skills : skills.filter(s => s.category === filter);
 
     return (
-        <div className="w-full max-w-4xl mx-auto pb-24 px-4 select-none">
+        <div className="w-full max-w-5xl mx-auto pb-24 select-none">
             {/* Page Header */}
             <div className="mb-8">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">
                     Development / Skills
                 </p>
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                         <h1 className="text-2xl font-bold text-on-surface tracking-tight">Skills</h1>
                         <p className="text-xs text-on-surface-variant/40 mt-0.5">{skills.length} skills tracked</p>
                     </div>
                     <button
                         onClick={() => { setEditingSkill(null); setFormData({ name: '', category: 'Technical', level: 'beginner', progress: 0, notes: '' }); setIsModalOpen(true); }}
-                        className="h-8 px-3 text-xs font-bold rounded bg-on-surface text-surface hover:opacity-90 transition-all cursor-pointer"
+                        className="h-9 w-full sm:w-auto px-3 text-xs font-bold rounded bg-on-surface text-surface hover:opacity-90 transition-all cursor-pointer"
                     >
                         Add Skill
                     </button>
@@ -180,7 +180,7 @@ const SkillTracker: React.FC = () => {
                     ))}
                 </div>
             ) : (
-                <div className="border border-outline rounded-lg overflow-hidden bg-surface">
+                    <div className="border border-outline rounded-lg overflow-hidden bg-surface">
                     <AnimatePresence>
                         {filteredSkills.length === 0 ? (
                             <div className="py-20 text-center">
@@ -201,22 +201,22 @@ const SkillTracker: React.FC = () => {
                                     {/* Mobile View Layout */}
                                     <div className="flex flex-col gap-2.5 w-full md:hidden">
                                         <div className="flex items-start justify-between gap-2">
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-on-surface truncate">{skill.name}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-bold text-on-surface break-words">{skill.name}</p>
                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                    <span style={levelTag.style} className={`px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded text-center leading-none ${levelTag.className}`}>
+                                                    <span style={levelTag.style} className={`px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded text-center leading-tight ${levelTag.className}`}>
                                                         {skill.level}
                                                     </span>
-                                                    <span style={catTag.style} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider leading-none ${catTag.className}`}>
+                                                    <span style={catTag.style} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider leading-tight ${catTag.className}`}>
                                                         {skill.category}
                                                     </span>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-1.5 shrink-0">
-                                                <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
+                                                <button aria-label={`Edit ${skill.name}`} onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="no-fluid h-8 w-8 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
                                                     <Edit2 size={11} />
                                                 </button>
-                                                <button onClick={() => handleDelete(skill._id!)} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer">
+                                                <button aria-label={`Delete ${skill.name}`} onClick={() => handleDelete(skill._id!)} className="no-fluid h-8 w-8 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer">
                                                     <Trash size={11} />
                                                 </button>
                                             </div>
@@ -258,10 +258,10 @@ const SkillTracker: React.FC = () => {
 
                                         {/* Actions */}
                                         <div className="flex items-center gap-1.5 shrink-0 ml-4">
-                                            <button onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
+                                            <button aria-label={`Edit ${skill.name}`} onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="no-fluid h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
                                                 <Edit2 size={11} />
                                             </button>
-                                            <button onClick={() => handleDelete(skill._id!)} className="h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer">
+                                            <button aria-label={`Delete ${skill.name}`} onClick={() => handleDelete(skill._id!)} className="no-fluid h-7 w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer">
                                                 <Trash size={11} />
                                             </button>
                                         </div>
@@ -280,7 +280,7 @@ const SkillTracker: React.FC = () => {
                         <label className="block text-[10px] font-bold text-on-surface-variant/40 uppercase mb-3 ml-1">Skill Name</label>
                         <Input type="text" placeholder="e.g., UI/UX Design" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                     </div>
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <Select label="Category" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} options={SKILL_CATEGORIES.map(c => ({ value: c, label: c }))} />
                         <Select label="Current Level" value={formData.level} onChange={e => setFormData({ ...formData, level: e.target.value as any })} options={SKILL_LEVELS.map(l => ({ value: l, label: l.toUpperCase() }))} />
                     </div>
@@ -292,7 +292,7 @@ const SkillTracker: React.FC = () => {
                         <label className="block text-[10px] font-bold text-on-surface-variant/40 uppercase mb-3 ml-1">Additional Notes</label>
                         <textarea placeholder="Write brief notes or milestones..." value={formData.notes || ''} onChange={e => setFormData({ ...formData, notes: e.target.value })} className="w-full min-h-[100px] p-4 text-sm bg-surface border border-outline rounded-lg focus:outline-none focus:border-on-surface transition-all text-on-surface placeholder-on-surface-variant/30" />
                     </div>
-                    <div className="flex gap-4 pt-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4">
                         <Button variant="outlined" onClick={() => setIsModalOpen(false)} className="flex-1 uppercase tracking-wider text-xs font-bold h-12">Cancel</Button>
                         <Button onClick={handleSave} isLoading={isSaving} className="flex-1 uppercase tracking-wider text-xs font-bold h-12 bg-on-surface text-surface hover:opacity-90">{editingSkill ? 'Save' : 'Add'}</Button>
                     </div>

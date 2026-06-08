@@ -28,7 +28,8 @@ function setCacheHeaders(res: Response, maxAge: number) {
   if (maxAge > 0) {
     res.set('Cache-Control', `private, max-age=${maxAge}`)
   } else {
-    res.set('Cache-Control', 'no-cache')
+    res.set('Cache-Control', 'no-store')
+    res.set('Pragma', 'no-cache')
   }
 }
 

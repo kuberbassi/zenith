@@ -1,7 +1,9 @@
 import { OAuth2Client } from 'google-auth-library'
 import axios from 'axios'
+import { ENV } from '../config/env.js'
 import { prisma } from '../config/prisma.js'
 import { collectUserData, clearUserData, restoreUserData, type UserData } from './userData.js'
+import { decryptSecret, encryptSecret, isEncryptedSecret } from './secrets.js'
 
 async function getDriveAccessToken(userId: string): Promise<string | null> {
   const pref = await prisma.userPreference.findUnique({
@@ -10,16 +12,27 @@ async function getDriveAccessToken(userId: string): Promise<string | null> {
   })
   if (!pref) return null
   const preferences = (pref.preferences ?? {}) as Record<string, any>
-  const refreshToken = preferences.google_drive_refresh_token
-  if (!refreshToken) return null
+  const storedRefreshToken = preferences.google_drive_refresh_token
+  if (!storedRefreshToken || typeof storedRefreshToken !== 'string') return null
 
   try {
+    const refreshToken = decryptSecret(storedRefreshToken)
     const oauth2Client = new OAuth2Client(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET
+      ENV.GOOGLE_CLIENT_ID,
+      ENV.GOOGLE_CLIENT_SECRET
     )
     oauth2Client.setCredentials({ refresh_token: refreshToken })
     const { token } = await oauth2Client.getAccessToken()
+    if (!isEncryptedSecret(storedRefreshToken)) {
+      const nextPreferences = {
+        ...preferences,
+        google_drive_refresh_token: encryptSecret(refreshToken)
+      }
+      await prisma.userPreference.update({
+        where: { user_id: userId },
+        data: { preferences: nextPreferences as any }
+      }).catch(() => null)
+    }
     return token || null
   } catch (err) {
     console.error('[Google Drive] Failed to get access token from refresh token:', err)
