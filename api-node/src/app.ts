@@ -184,7 +184,7 @@ app.use(
     console.error('[Error]', err)
     res.status(500).json({
       success: false,
-      error: ENV.NODE_ENV === 'development' ? (err.message ?? 'Internal server error') : 'Internal server error',
+      error: err.message || String(err),
       code: 'INTERNAL_ERROR',
     })
   },
