@@ -1,5 +1,6 @@
 import api from './api';
 import type { User } from '@/types';
+import { attendanceService } from './attendance.service';
 
 
 export const authService = {
@@ -42,6 +43,7 @@ export const authService = {
         } catch (error) {
             console.error('Logout error:', error);
         } finally {
+            attendanceService.clearAllLocalCaches();
             localStorage.removeItem('user');
             window.location.href = '/login';
         }
@@ -54,6 +56,7 @@ export const authService = {
                 confirmation_text: 'DELETE',
             },
         });
+        attendanceService.clearAllLocalCaches();
         localStorage.removeItem('user');
     },
 

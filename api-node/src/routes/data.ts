@@ -20,6 +20,7 @@ import {
   restoreDriveBackup,
   downloadDriveBackup
 } from '../utils/googleDrive.js'
+import { clearUserViewCache } from '../utils/viewCache.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -154,6 +155,7 @@ router.post('/import_data', async (req: AuthRequest, res) => {
       console.log(`[data/import] Clearing data for user: ${userId}`)
       await clearUserData(userId)
       await restoreUserData(userId, importData)
+      await clearUserViewCache(userId).catch(() => {})
       ok(res, { message: 'Data imported successfully' })
     } catch (txErr: any) {
       console.error('[data/import] Transaction failed at:', txErr.table || 'unknown', txErr)
@@ -161,6 +163,7 @@ router.post('/import_data', async (req: AuthRequest, res) => {
         console.warn(`[data/import] Rolling back import for user: ${userId}`)
         await clearUserData(userId)
         await restoreUserData(userId, backupData)
+        await clearUserViewCache(userId).catch(() => {})
       } catch (rollbackErr) {
         console.error('[data/import] Rollback failed:', rollbackErr)
       }
@@ -256,6 +259,8 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
       data: { user_id: userId, action: 'Account Reset', description: `All personal data deleted. Backup ID: ${backup.id}. Summary: ${JSON.stringify(summary)}. IP: ${clientIp}.` },
     })
 
+    await clearUserViewCache(userId).catch(() => {})
+
     const expires = backup.expires_at || new Date()
     ok(res, { message: 'All data wiped successfully.', backup_id: backup.id, backup_expires: expires instanceof Date ? expires.toISOString() : expires, summary })
   } catch (err) {
@@ -313,6 +318,7 @@ router.post('/restore_backup/:backupId', async (req: AuthRequest, res) => {
     const data = backup.data as UserData
     await clearUserData(userId)
     await restoreUserData(userId, data)
+    await clearUserViewCache(userId).catch(() => {})
 
     ok(res, { message: 'Backup restored successfully' })
   } catch (err) {
@@ -441,6 +447,12 @@ router.post('/migration/complete', async (req: AuthRequest, res) => {
     await clearUserData(fromUserId)
     await prisma.user.delete({ where: { id: fromUserId } })
 
+    // Clear caches for both accounts
+    await Promise.all([
+      clearUserViewCache(userId),
+      clearUserViewCache(fromUserId)
+    ]).catch(() => null)
+
     // Create system log for auditing
     await prisma.systemLog.create({
       data: {
@@ -492,6 +504,7 @@ router.post('/drive/restore/:fileId', async (req: AuthRequest, res) => {
     const fileId = String(req.params.fileId)
     const result = await restoreDriveBackup(req.userId!, fileId)
     if (result.success) {
+      await clearUserViewCache(req.userId!).catch(() => {})
       ok(res, { message: 'Backup restored successfully from Google Drive' })
     } else {
       fail(res, result.error || 'Drive restore failed', 'DRIVE_RESTORE_FAILED', 400)

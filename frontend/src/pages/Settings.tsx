@@ -122,6 +122,7 @@ const Settings: React.FC = () => {
             }
 
             await attendanceService.deleteAllData(user?.email || '', backupRes.backup_id);
+            attendanceService.clearAllLocalCaches();
             showToast('success', 'Data Purged');
             setTimeout(() => window.location.reload(), 1500);
         } catch (err: any) {

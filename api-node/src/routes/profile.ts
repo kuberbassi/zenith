@@ -352,6 +352,7 @@ router.delete('/account', async (req: AuthRequest, res) => {
     }
 
     await prisma.user.delete({ where: { id: userId } })
+    await clearUserViewCache(userId).catch(() => {})
     invalidateAuthCache(req.headers.authorization?.slice(7))
     ok(res, { message: 'Account deleted permanently' })
   } catch (err) {

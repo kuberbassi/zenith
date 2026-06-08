@@ -741,4 +741,15 @@ export const attendanceService = {
         const response = await api.post('/api/data/drive/disconnect');
         return response.data?.data ?? response.data;
     },
+
+    clearAllLocalCaches: () => {
+        clearDerivedCaches();
+        try {
+            localStorage.removeItem('zenith_semester');
+            localStorage.removeItem('zenith_timetable_view');
+            localStorage.removeItem('zenith_skills_filter');
+        } catch {
+            // ignore storage access issues
+        }
+    },
 };

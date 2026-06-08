@@ -82,6 +82,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
         try {
             setDriveLoading(true);
             await attendanceService.restoreDriveBackup(fileId);
+            attendanceService.clearAllLocalCaches();
             showToast('success', 'Backup restored successfully!');
             window.location.reload();
         } catch (err: any) {
@@ -165,6 +166,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
 
         showToast('info', 'Importing data...');
         await attendanceService.importData(data);
+        attendanceService.clearAllLocalCaches();
         showToast('success', 'Data Imported');
         setTimeout(() => window.location.reload(), 1000);
     };
@@ -200,6 +202,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
         try {
             showToast('info', 'Migrating account records...');
             await attendanceService.completeMigration(inputKey);
+            attendanceService.clearAllLocalCaches();
             showToast('success', 'Migration completed successfully! Reloading...');
             setTimeout(() => window.location.reload(), 1500);
         } catch (err: any) {
