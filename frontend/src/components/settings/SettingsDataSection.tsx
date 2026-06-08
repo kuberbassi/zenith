@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, Shield, ShieldAlert, Upload, Copy, Check, Cloud, RefreshCw, Unlink } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import Button from '@/components/ui/Button';
+import Select from '@/components/ui/Select';
 import { attendanceService } from '@/services/attendance.service';
 
 type SettingsDataSectionProps = {
@@ -90,6 +91,27 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
         }
     };
 
+    const handleDriveDownload = async (fileId: string, createdAt: string) => {
+        try {
+            setDriveLoading(true);
+            const blob = await attendanceService.downloadDriveBackup(fileId);
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            const dateStr = new Date(createdAt).toISOString().split('T')[0];
+            anchor.download = `zenith_cloud_backup_${dateStr}_${fileId}.json`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(url);
+            showToast('success', 'Cloud backup downloaded successfully!');
+        } catch (err: any) {
+            showToast('error', err.message || 'Drive download failed');
+        } finally {
+            setDriveLoading(false);
+        }
+    };
+
     const handleUpdateFrequency = async (freq: string) => {
         try {
             setDriveLoading(true);
@@ -139,7 +161,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
     const handleImportFile = async (file: File) => {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (!confirm('Are you sure you want to import this data? Current data will be merged/overwritten and a safety backup will be created.')) return;
+        if (!confirm('⚠️ WARNING: Importing this backup will automatically WIPE all your current attendance, subjects, and results, replacing them with the backup data. A safety rollback backup will be created automatically. Do you want to proceed?')) return;
 
         showToast('info', 'Importing data...');
         await attendanceService.importData(data);
@@ -287,17 +309,19 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <p className="text-[10px] font-bold uppercase text-on-surface-variant/40 mb-1">Frequency</p>
-                                            <select
+                                            <p className="text-[10px] font-bold uppercase text-on-surface-variant/40 mb-1.5">Frequency</p>
+                                            <Select
                                                 value={driveStatus.google_drive_backup_frequency}
                                                 onChange={(e) => handleUpdateFrequency(e.target.value)}
-                                                className="w-full bg-surface border border-outline rounded-xl px-3 py-1.5 text-xs text-on-surface font-semibold focus:outline-none cursor-pointer"
-                                            >
-                                                <option value="daily">Daily</option>
-                                                <option value="weekly">Weekly</option>
-                                                <option value="monthly">Monthly</option>
-                                                <option value="never">Never (Manual)</option>
-                                            </select>
+                                                options={[
+                                                    { value: 'daily', label: 'Daily' },
+                                                    { value: 'weekly', label: 'Weekly' },
+                                                    { value: 'monthly', label: 'Monthly' },
+                                                    { value: 'never', label: 'Never (Manual)' }
+                                                ]}
+                                                className="!py-1.5 !px-3 !rounded-xl !text-xs !h-9"
+                                                fullWidth={true}
+                                            />
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-bold uppercase text-on-surface-variant/40 mb-1">Last Sync</p>
@@ -340,13 +364,24 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                                                             </p>
                                                             <p className="text-[9px] text-on-surface-variant/50">{(b.size / 1024).toFixed(1)} KB</p>
                                                         </div>
-                                                        <button
-                                                            disabled={driveLoading}
-                                                            onClick={() => handleDriveRestore(b.id)}
-                                                            className="px-2 py-1 text-[9px] font-extrabold uppercase bg-on-surface text-surface hover:opacity-90 rounded transition-all cursor-pointer disabled:opacity-50"
-                                                        >
-                                                            Restore
-                                                        </button>
+                                                        <div className="flex gap-1.5">
+                                                            <button
+                                                                disabled={driveLoading}
+                                                                onClick={() => handleDriveDownload(b.id, b.created_at)}
+                                                                className="px-2 py-1 text-[9px] font-extrabold uppercase border border-outline hover:bg-surface-container rounded transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 text-on-surface"
+                                                                title="Download Backup JSON"
+                                                            >
+                                                                <Download size={10} />
+                                                                Download
+                                                            </button>
+                                                            <button
+                                                                disabled={driveLoading}
+                                                                onClick={() => handleDriveRestore(b.id)}
+                                                                className="px-2 py-1 text-[9px] font-extrabold uppercase bg-on-surface text-surface hover:opacity-90 rounded transition-all cursor-pointer disabled:opacity-50"
+                                                            >
+                                                                Restore
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>

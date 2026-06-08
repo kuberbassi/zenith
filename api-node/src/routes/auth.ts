@@ -362,14 +362,18 @@ router.post('/refresh', async (req, res) => {
   }
 })
 
-router.get('/me', requireAuth, (req: AuthRequest, res) => {
+router.get('/me', requireAuth, async (req: AuthRequest, res) => {
   const authHeader = req.headers.authorization
   if (!req.headers.cookie && authHeader?.startsWith('Bearer ')) {
     setAccessCookie(res, authHeader.slice(7))
   }
   
   // Lazy trigger background backup if Drive is enabled & scheduled
-  void triggerAutoBackupIfNeeded(req.userId!).catch(() => null)
+  if (process.env.VERCEL) {
+    await triggerAutoBackupIfNeeded(req.userId!).catch(() => null)
+  } else {
+    void triggerAutoBackupIfNeeded(req.userId!).catch(() => null)
+  }
 
   ok(res, userResponse(req.user!))
 })

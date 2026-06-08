@@ -17,7 +17,8 @@ import {
 import { 
   performDriveBackup, 
   listDriveBackups, 
-  restoreDriveBackup 
+  restoreDriveBackup,
+  downloadDriveBackup
 } from '../utils/googleDrive.js'
 
 const router = Router()
@@ -84,10 +85,6 @@ router.get('/export_data', async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } })
 
     const data = await collectUserData(userId)
-    if (user) {
-      const { google_id: _g, ...safeUser } = user as any
-      data.user_profile = safeUser
-    }
 
     const payload = {
       metadata: { version: '2.0', exported_at: new Date().toISOString(), source_email: user?.email ?? '' },
@@ -147,11 +144,7 @@ router.post('/import_data', async (req: AuthRequest, res) => {
     console.log('[data/import] Received keys:', Object.keys(importData))
     if (!importData || typeof importData !== 'object') { fail(res, 'Invalid import file format', 'INVALID_FORMAT'); return }
 
-    const [user, backupData] = await Promise.all([
-      prisma.user.findUnique({ where: { id: userId } }),
-      collectUserData(userId),
-    ])
-    if (user) backupData.user_profile = user
+    const backupData = await collectUserData(userId)
 
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
     await prisma.userBackup.create({
@@ -276,9 +269,7 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
 router.post('/backups', async (req: AuthRequest, res) => {
   try {
     const userId = req.userId!
-    const user = await prisma.user.findUnique({ where: { id: userId } })
     const backupData = await collectUserData(userId)
-    if (user) backupData.user_profile = user
 
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
     const backup = await prisma.userBackup.create({
@@ -431,7 +422,12 @@ router.post('/migration/complete', async (req: AuthRequest, res) => {
 
     // 4. Update destination profile fields if empty but exist in source
     const updateData: Record<string, any> = {}
-    const fields = ['branch', 'course', 'college', 'batch', 'enrollment_number', 'mother_name', 'father_name', 'gender', 'phone_number', 'admission_year']
+    const fields = [
+      'branch', 'course', 'college', 'batch', 'enrollment_number',
+      'mother_name', 'father_name', 'gender', 'phone_number', 'admission_year',
+      'current_semester', 'target_attendance', 'attendance_threshold', 'warning_threshold',
+      'biometrics', 'picture'
+    ]
     for (const f of fields) {
       if (!destinationUser[f as keyof typeof destinationUser] && sourceUser[f as keyof typeof sourceUser]) {
         updateData[f] = sourceUser[f as keyof typeof sourceUser]
@@ -503,6 +499,25 @@ router.post('/drive/restore/:fileId', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('[data/drive/restore]', err)
     fail(res, 'Internal server error restoring Google Drive backup', 'DRIVE_RESTORE_ERROR', 500)
+  }
+})
+
+router.get('/drive/download/:fileId', async (req: AuthRequest, res) => {
+  try {
+    const fileId = String(req.params.fileId)
+    const result = await downloadDriveBackup(req.userId!, fileId)
+    if (result.success) {
+      const email = (req.user?.email ?? 'user').replace(/@/g, '_at_').replace(/\./g, '_')
+      const filename = `zenith_drive_backup_${email}_${fileId}.json`
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+      res.setHeader('Content-Type', 'application/json')
+      res.send(JSON.stringify(result.data))
+    } else {
+      fail(res, result.error || 'Drive download failed', 'DRIVE_DOWNLOAD_FAILED', 400)
+    }
+  } catch (err) {
+    console.error('[data/drive/download]', err)
+    fail(res, 'Internal server error downloading Google Drive backup', 'DRIVE_DOWNLOAD_ERROR', 500)
   }
 })
 

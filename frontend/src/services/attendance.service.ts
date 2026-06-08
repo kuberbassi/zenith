@@ -720,6 +720,13 @@ export const attendanceService = {
         return response.data?.data ?? response.data;
     },
 
+    downloadDriveBackup: async (fileId: string): Promise<Blob> => {
+        const response = await api.get(`/api/data/drive/download/${fileId}`, {
+            responseType: 'blob',
+        });
+        return response.data;
+    },
+
     getDriveStatus: async (): Promise<{ google_drive_linked: boolean; google_drive_backup_frequency: string; google_drive_last_backup: string | null; has_refresh_token: boolean }> => {
         const response = await api.get('/api/data/drive/status');
         return response.data?.data ?? response.data;

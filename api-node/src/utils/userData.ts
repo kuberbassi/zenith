@@ -46,7 +46,7 @@ export function getSafeProfileUpdate(profile: any) {
   const allowedProfileFields = [
     'name', 'course', 'branch', 'college', 'batch', 'current_semester',
     'enrollment_number', 'target_attendance', 'attendance_threshold', 'warning_threshold',
-    'phone_number', 'admission_year',
+    'phone_number', 'admission_year', 'mother_name', 'father_name', 'gender', 'biometrics', 'picture',
   ]
 
   const filteredProfile = Object.fromEntries(
@@ -63,7 +63,7 @@ export function getSafeProfileUpdate(profile: any) {
 }
 
 export async function collectUserData(userId: string): Promise<UserData> {
-  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs, notes] = await Promise.all([
+  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs, notes, user] = await Promise.all([
     prisma.subject.findMany({ where: { user_id: userId } }),
     prisma.attendanceLog.findMany({ where: { user_id: userId } }),
     prisma.timetable.findMany({ where: { user_id: userId } }),
@@ -73,8 +73,27 @@ export async function collectUserData(userId: string): Promise<UserData> {
     prisma.skill.findMany({ where: { user_id: userId } }),
     prisma.systemLog.findMany({ where: { user_id: userId }, orderBy: { timestamp: 'desc' }, take: 500 }),
     prisma.note.findMany({ where: { user_id: userId } }),
+    prisma.user.findUnique({ where: { id: userId } }),
   ])
-  return { subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs, notes }
+
+  const userData: UserData = {
+    subjects,
+    attendance_logs,
+    timetable,
+    semester_results,
+    manual_courses,
+    user_preferences,
+    skills,
+    system_logs,
+    notes,
+  }
+
+  if (user) {
+    const { google_id: _g, ...safeUser } = user as any
+    userData.user_profile = safeUser
+  }
+
+  return userData
 }
 
 export async function createInBatches<T>(items: T[], worker: (item: T) => Promise<unknown>, batchSize: number = 25) {

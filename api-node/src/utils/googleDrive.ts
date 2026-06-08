@@ -82,12 +82,7 @@ export async function performDriveBackup(userId: string): Promise<{ success: boo
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: userId } })
     const backupData = await collectUserData(userId)
-    if (user) {
-      const { google_id: _g, ...safeUser } = user as any
-      backupData.user_profile = safeUser
-    }
 
     const backupContent = JSON.stringify(backupData)
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -230,6 +225,27 @@ export async function restoreDriveBackup(userId: string, fileId: string): Promis
   } catch (err: any) {
     console.error('[Google Drive Restore Error]', err?.response?.data || err)
     return { success: false, error: err.message || 'Failed to restore backup from Google Drive' }
+  }
+}
+
+export async function downloadDriveBackup(userId: string, fileId: string): Promise<{ success: boolean; data?: any; error?: string }> {
+  const accessToken = await getDriveAccessToken(userId)
+  if (!accessToken) {
+    return { success: false, error: 'Google Drive is not linked or authorization expired' }
+  }
+
+  try {
+    const fileResponse = await axios.get(
+      `https://www.googleapis.com/drive/v3/files/${fileId}`,
+      {
+        params: { alt: 'media' },
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    )
+    return { success: true, data: fileResponse.data }
+  } catch (err: any) {
+    console.error('[Google Drive Download Error]', err?.response?.data || err)
+    return { success: false, error: err.message || 'Failed to download backup from Google Drive' }
   }
 }
 
