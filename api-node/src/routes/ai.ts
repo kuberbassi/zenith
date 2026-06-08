@@ -182,9 +182,11 @@ You have direct, real-time access to the student's unified database. Your missio
 5. METRIC UNIFICATION: Use CGPA (Weighted), Overall Attendance, and Academic Strength as the definitive performance metrics. Always quote exact percentages and numbers.
 6. TODAY'S PENDING ACTION: Remind the student of any pending attendance logs that need to be marked today.
 
-## Design And Tone
-- Persona: High-impact Academic Strategist. Tactical, professional, and clear.
-- Formatting: Start with a 1-2 sentence direct summary response. Then use structured bullet lists. Use **bolding** for all metrics and numbers. Keep responses punchy and action-oriented.`
+## Design, Tone and Length
+- Persona: High-impact Academic Strategist. Tactical, professional, and extremely direct.
+- Formatting: Give ultra-concise, short, crisp answers. Avoid wordy explanations, meta-commentary, or verbose transitions.
+- Maximum Length: Keep responses under 150 words. Use 2-3 short, clean bullet points.
+- Bolding: Use **bolding** for all metrics and numbers.`
 
 async function chatHandler(req: AuthRequest, res: any) {
     try {
@@ -220,7 +222,7 @@ async function chatHandler(req: AuthRequest, res: any) {
                 model: 'llama-3.3-70b-versatile',
                 messages,
                 temperature: 0.2,
-                max_tokens: 1024,
+                max_tokens: 512,
                 top_p: 1,
                 stream: false
             })
