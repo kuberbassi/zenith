@@ -143,6 +143,16 @@ const TimeTable: React.FC = () => {
     const [periods, setPeriods] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<'grid' | 'list'>(() => (localStorage.getItem('zenith_timetable_view') as 'grid' | 'list') || 'grid');
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 640);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    const activeView = isMobile ? 'list' : view;
 
     const handleSetView = (v: 'grid' | 'list') => { setView(v); localStorage.setItem('zenith_timetable_view', v); api.post('/api/profile/preferences', { timetable_view: v }).catch(() => {}); };
 
@@ -207,7 +217,7 @@ const TimeTable: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
                         {/* View toggle */}
-                        <div className="flex border border-outline rounded-lg overflow-hidden">
+                        <div className="hidden sm:flex border border-outline rounded-lg overflow-hidden">
                             <button
                                 onClick={() => handleSetView('grid')}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${view === 'grid' ? 'bg-on-surface text-surface' : 'text-on-surface-variant/50 hover:bg-surface-container hover:text-on-surface'}`}
@@ -234,7 +244,7 @@ const TimeTable: React.FC = () => {
 
             {loading ? (
                 <div className="flex justify-center py-40"><LoadingSpinner /></div>
-            ) : view === 'grid' ? (
+            ) : activeView === 'grid' ? (
                 <div className="pb-10">
                     <div className="overflow-x-auto w-full">
                         <div className="min-w-[750px] bg-surface border border-outline rounded-xl overflow-hidden">

@@ -130,8 +130,8 @@ const SubjectRow: React.FC<{
                     </div>
                 </div>
             </td>
-            <td className="px-6 py-4 text-center">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+            <td className="px-6 py-4 text-center whitespace-nowrap">
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border whitespace-nowrap ${
                     isCritical 
                         ? 'bg-red-500/10 border-red-500/20 text-red-500' 
                         : 'bg-primary/5 border-outline text-on-surface'

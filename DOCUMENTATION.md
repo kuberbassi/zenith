@@ -406,6 +406,7 @@ zenith/                          # Monorepo root
 - ✅ **Good**: ID remapping during import with subject reference repair
 - ✅ **Good**: **Cloud Auto-Sync**: Attendance, timetables, and results sync to database in real-time
 - ✅ **Good**: **Account Data Migration**: Secure token-based flow (`POST /migration/initiate` and `POST /migration/complete`) to transfer all academic history between distinct Google logins with automatic rollback safety backups
+- ✅ **Good**: **Google Drive Backup & Sync**: Secure OAuth2-linked automated cloud backups (`POST /drive/backup`, `GET /drive/backups`, `POST /drive/restore/:fileId`, `POST /drive/settings`, `POST /drive/disconnect`). Isolated in the user's private Google Drive `appDataFolder` with automatic cleanup (keeping only the 5 most recent backups) to manage storage smartly.
 - ⚠️ **Issue**: Import is NOT transactional — partial imports can leave data in inconsistent state
 - ⚠️ **Issue**: `createInBatches` runs 25 parallel creates — can overwhelm Neon serverless connection pool
 - 🔴 **Security**: Export includes full user data — should be encrypted or require re-authentication

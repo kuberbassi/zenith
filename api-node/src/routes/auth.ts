@@ -7,6 +7,7 @@ import { prisma } from '../config/prisma.js'
 import { requireAuth, invalidateAuthCache, type AuthRequest } from '../middleware/auth.js'
 import { ok, fail } from '../utils/response.js'
 import { getClientIp } from '../utils/ip.js'
+import { triggerAutoBackupIfNeeded } from '../utils/googleDrive.js'
 
 const router = Router()
 const googleClient = new OAuth2Client(ENV.GOOGLE_CLIENT_ID)
@@ -365,7 +366,63 @@ router.get('/me', requireAuth, (req: AuthRequest, res) => {
   if (!req.headers.cookie && authHeader?.startsWith('Bearer ')) {
     setAccessCookie(res, authHeader.slice(7))
   }
+  
+  // Lazy trigger background backup if Drive is enabled & scheduled
+  void triggerAutoBackupIfNeeded(req.userId!).catch(() => null)
+
   ok(res, userResponse(req.user!))
+})
+
+router.post('/google/link-drive', requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { code, redirectUri } = req.body
+    if (!code) {
+      fail(res, 'Authorization code is required', 'MISSING_CODE')
+      return
+    }
+
+    const redirect = redirectUri || 'postmessage'
+
+    // Google API requires a client secret for offline access exchange
+    const exchangeClient = new OAuth2Client(
+      ENV.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      redirect
+    )
+
+    const { tokens } = await exchangeClient.getToken(code)
+
+    if (!tokens.refresh_token) {
+      console.warn('[Google Drive] Code flow did not return a refresh token for user:', req.userId)
+    }
+
+    const pref = await prisma.userPreference.findUnique({
+      where: { user_id: req.userId! }
+    })
+    
+    const current = (pref?.preferences ?? {}) as Record<string, any>
+    const nextPrefs = {
+      ...current,
+      google_drive_linked: true,
+      google_drive_refresh_token: tokens.refresh_token || current.google_drive_refresh_token,
+      google_drive_backup_frequency: current.google_drive_backup_frequency || 'daily',
+      google_drive_last_backup: current.google_drive_last_backup || null
+    }
+
+    await prisma.userPreference.upsert({
+      where: { user_id: req.userId! },
+      create: { user_id: req.userId!, preferences: nextPrefs as any },
+      update: { preferences: nextPrefs as any }
+    })
+
+    ok(res, { 
+      message: 'Google Drive connected successfully.',
+      has_refresh_token: !!(tokens.refresh_token || current.google_drive_refresh_token)
+    })
+  } catch (err) {
+    console.error('[auth/google/link-drive]', err)
+    fail(res, 'Failed to link Google Drive', 'LINK_FAILED', 500)
+  }
 })
 
 // ─── Active Sessions Management ────────────────────────────────────────────────

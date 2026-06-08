@@ -698,4 +698,40 @@ export const attendanceService = {
         const response = await api.post('/api/data/migration/complete', { key });
         return response.data?.data ?? response.data;
     },
+
+    // Google Drive Backup
+    linkGoogleDrive: async (code: string, redirectUri?: string): Promise<{ message: string; has_refresh_token: boolean }> => {
+        const response = await api.post('/api/auth/google/link-drive', { code, redirectUri });
+        return response.data?.data ?? response.data;
+    },
+
+    performDriveBackup: async (): Promise<{ message: string; file_id: string }> => {
+        const response = await api.post('/api/data/drive/backup');
+        return response.data?.data ?? response.data;
+    },
+
+    listDriveBackups: async (): Promise<{ backups: any[] }> => {
+        const response = await api.get('/api/data/drive/backups');
+        return response.data?.data ?? response.data;
+    },
+
+    restoreDriveBackup: async (fileId: string): Promise<{ message: string }> => {
+        const response = await api.post(`/api/data/drive/restore/${fileId}`);
+        return response.data?.data ?? response.data;
+    },
+
+    getDriveStatus: async (): Promise<{ google_drive_linked: boolean; google_drive_backup_frequency: string; google_drive_last_backup: string | null; has_refresh_token: boolean }> => {
+        const response = await api.get('/api/data/drive/status');
+        return response.data?.data ?? response.data;
+    },
+
+    updateDriveSettings: async (frequency: string): Promise<{ message: string }> => {
+        const response = await api.post('/api/data/drive/settings', { frequency });
+        return response.data?.data ?? response.data;
+    },
+
+    disconnectDrive: async (): Promise<{ message: string }> => {
+        const response = await api.post('/api/data/drive/disconnect');
+        return response.data?.data ?? response.data;
+    },
 };

@@ -136,7 +136,7 @@ const SkillTracker: React.FC = () => {
     const filteredSkills = filter === 'all' ? skills : skills.filter(s => s.category === filter);
 
     return (
-        <div className="max-w-4xl mx-auto pb-24 px-4 select-none">
+        <div className="w-full max-w-4xl mx-auto pb-24 px-4 select-none">
             {/* Page Header */}
             <div className="mb-8">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">

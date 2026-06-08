@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Download, Shield, ShieldAlert, Upload, Key, Copy, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Download, Shield, ShieldAlert, Upload, Copy, Check, Cloud, RefreshCw, Unlink } from 'lucide-react';
+import { useGoogleLogin } from '@react-oauth/google';
 import Button from '@/components/ui/Button';
 import { attendanceService } from '@/services/attendance.service';
 
@@ -15,6 +16,109 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
     const [copied, setCopied] = useState(false);
     const [inputKey, setInputKey] = useState('');
     const [migrating, setMigrating] = useState(false);
+
+    // Google Drive Sync states
+    const [driveStatus, setDriveStatus] = useState<any>(null);
+    const [driveBackups, setDriveBackups] = useState<any[]>([]);
+    const [driveLoading, setDriveLoading] = useState(false);
+
+    const fetchDriveStatus = async () => {
+        try {
+            const status = await attendanceService.getDriveStatus();
+            setDriveStatus(status);
+            if (status.google_drive_linked) {
+                const backupsRes = await attendanceService.listDriveBackups();
+                setDriveBackups(backupsRes.backups || []);
+            }
+        } catch (err) {
+            console.error('Failed to fetch Google Drive status:', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchDriveStatus();
+    }, []);
+
+    const linkDrive = useGoogleLogin({
+        flow: 'auth-code',
+        scope: 'openid email profile https://www.googleapis.com/auth/drive.appdata',
+        select_account: true,
+        onSuccess: async (codeResponse) => {
+            try {
+                setDriveLoading(true);
+                await attendanceService.linkGoogleDrive(codeResponse.code);
+                showToast('success', 'Google Drive linked successfully!');
+                await fetchDriveStatus();
+            } catch (err: any) {
+                console.error(err);
+                showToast('error', 'Failed to link Google Drive');
+            } finally {
+                setDriveLoading(false);
+            }
+        },
+        onError: () => {
+            showToast('error', 'Google Drive authorization failed');
+        }
+    });
+
+    const handleDriveBackup = async () => {
+        try {
+            setDriveLoading(true);
+            await attendanceService.performDriveBackup();
+            showToast('success', 'Backup saved to Google Drive!');
+            await fetchDriveStatus();
+        } catch (err: any) {
+            showToast('error', err.message || 'Drive backup failed');
+        } finally {
+            setDriveLoading(false);
+        }
+    };
+
+    const handleDriveRestore = async (fileId: string) => {
+        if (!confirm('Warning: Restoring from backup will overwrite all current attendance logs, subjects, and timetables. Are you sure you want to proceed?')) {
+            return;
+        }
+        try {
+            setDriveLoading(true);
+            await attendanceService.restoreDriveBackup(fileId);
+            showToast('success', 'Backup restored successfully!');
+            window.location.reload();
+        } catch (err: any) {
+            showToast('error', err.message || 'Drive restore failed');
+        } finally {
+            setDriveLoading(false);
+        }
+    };
+
+    const handleUpdateFrequency = async (freq: string) => {
+        try {
+            setDriveLoading(true);
+            await attendanceService.updateDriveSettings(freq);
+            showToast('success', `Backup frequency set to ${freq}`);
+            await fetchDriveStatus();
+        } catch (err: any) {
+            showToast('error', 'Failed to update frequency');
+        } finally {
+            setDriveLoading(false);
+        }
+    };
+
+    const handleDisconnectDrive = async () => {
+        if (!confirm('Are you sure you want to disconnect Google Drive? Auto-backups will be disabled.')) {
+            return;
+        }
+        try {
+            setDriveLoading(true);
+            await attendanceService.disconnectDrive();
+            showToast('success', 'Google Drive disconnected');
+            setDriveStatus(null);
+            setDriveBackups([]);
+        } catch (err: any) {
+            showToast('error', 'Failed to disconnect');
+        } finally {
+            setDriveLoading(false);
+        }
+    };
 
     const handleExport = async () => {
         try {
@@ -145,29 +249,111 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                 <div className="mt-8 pt-8 border-t border-outline-variant">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="w-10 h-10 rounded-2xl bg-surface-container flex items-center justify-center text-on-surface">
-                            <Key size={20} />
+                            <Cloud size={20} />
                         </div>
                         <div>
-                            <h3 className="text-base font-bold text-on-surface tracking-tight">Account Sync & Migration</h3>
+                            <h3 className="text-base font-bold text-on-surface tracking-tight">Cloud Sync & Backup</h3>
                             <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Preserve & Port Academic Records</p>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Cloud Backup Status */}
-                        <div className="p-6 rounded-3xl bg-surface-container border border-outline-variant flex flex-col justify-between">
-                            <div>
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <h4 className="text-sm font-bold text-on-surface tracking-tight">Cloud Auto-Sync Active</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Google Drive Sync & Backup */}
+                        <div className="p-6 rounded-3xl bg-surface-container border border-outline-variant space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-bold text-on-surface tracking-tight">Google Drive Backup</h4>
+                                {driveStatus?.google_drive_linked && (
+                                    <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-bold uppercase tracking-wider">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        Linked
+                                    </span>
+                                )}
+                            </div>
+                            
+                            {!driveStatus?.google_drive_linked ? (
+                                <div className="space-y-4">
+                                    <p className="text-xs text-on-surface-variant/70 leading-relaxed">
+                                        Securely back up all your academic data to your private Google Drive AppData folder. Backups are automatic and isolated.
+                                    </p>
+                                    <button
+                                        disabled={driveLoading}
+                                        onClick={() => linkDrive()}
+                                        className="w-full h-11 rounded-2xl bg-on-surface text-surface hover:bg-on-surface/90 text-[11px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                                    >
+                                        <Cloud size={14} /> Connect Google Drive
+                                    </button>
                                 </div>
-                                <p className="text-xs text-on-surface-variant/70 leading-relaxed mb-4">
-                                    Your profile settings, timetables, logs, and results are continuously synced in real-time to our secure PostgreSQL database.
-                                </p>
-                            </div>
-                            <div className="text-[10px] font-semibold text-on-surface-variant/40 uppercase tracking-wider">
-                                Backup Status: Synced & Encrypted
-                            </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-on-surface-variant/40 mb-1">Frequency</p>
+                                            <select
+                                                value={driveStatus.google_drive_backup_frequency}
+                                                onChange={(e) => handleUpdateFrequency(e.target.value)}
+                                                className="w-full bg-surface border border-outline rounded-xl px-3 py-1.5 text-xs text-on-surface font-semibold focus:outline-none cursor-pointer"
+                                            >
+                                                <option value="daily">Daily</option>
+                                                <option value="weekly">Weekly</option>
+                                                <option value="monthly">Monthly</option>
+                                                <option value="never">Never (Manual)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-on-surface-variant/40 mb-1">Last Sync</p>
+                                            <p className="text-xs font-bold text-on-surface py-1.5 truncate">
+                                                {driveStatus.google_drive_last_backup 
+                                                    ? new Date(driveStatus.google_drive_last_backup).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+                                                    : 'Never'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            disabled={driveLoading}
+                                            onClick={handleDriveBackup}
+                                            className="flex-1 h-10 rounded-xl bg-on-surface text-surface hover:bg-on-surface/90 text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 animate-fade-in"
+                                        >
+                                            <RefreshCw size={13} className={driveLoading ? 'animate-spin' : ''} /> Backup Now
+                                        </button>
+                                        <button
+                                            disabled={driveLoading}
+                                            onClick={handleDisconnectDrive}
+                                            className="px-3 h-10 rounded-xl border border-outline hover:border-red-500/30 hover:bg-red-500/5 text-on-surface-variant/60 hover:text-red-500 transition-all flex items-center justify-center cursor-pointer"
+                                            title="Disconnect Drive"
+                                        >
+                                            <Unlink size={14} />
+                                        </button>
+                                    </div>
+
+                                    {/* Backups List */}
+                                    {driveBackups.length > 0 && (
+                                        <div className="border-t border-outline-variant pt-3 space-y-2">
+                                            <p className="text-[9px] font-bold uppercase text-on-surface-variant/40 tracking-wider">Available Cloud Backups</p>
+                                            <div className="max-h-[100px] overflow-y-auto space-y-1.5 pr-1 text-xs select-none">
+                                                {driveBackups.map((b) => (
+                                                    <div key={b.id} className="flex items-center justify-between p-2 rounded-lg bg-surface-container-high border border-outline-variant">
+                                                        <div className="min-w-0">
+                                                            <p className="font-bold text-[10px] text-on-surface truncate">
+                                                                {new Date(b.created_at).toLocaleDateString()} at {new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </p>
+                                                            <p className="text-[9px] text-on-surface-variant/50">{(b.size / 1024).toFixed(1)} KB</p>
+                                                        </div>
+                                                        <button
+                                                            disabled={driveLoading}
+                                                            onClick={() => handleDriveRestore(b.id)}
+                                                            className="px-2 py-1 text-[9px] font-extrabold uppercase bg-on-surface text-surface hover:opacity-90 rounded transition-all cursor-pointer disabled:opacity-50"
+                                                        >
+                                                            Restore
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         {/* Migration tools */}
