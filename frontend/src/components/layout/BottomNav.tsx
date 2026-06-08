@@ -9,6 +9,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 
+import { haptics } from '@/utils/haptics';
+
 interface BottomNavProps {}
 
 const radialItems = [
@@ -41,8 +43,8 @@ const BottomNav: React.FC<BottomNavProps> = () => {
 
     // Haptic vibration on hover change
     useEffect(() => {
-        if (activeIdx !== null && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-            try { navigator.vibrate(8); } catch {}
+        if (activeIdx !== null) {
+            haptics.light();
         }
     }, [activeIdx]);
 
@@ -59,9 +61,7 @@ const BottomNav: React.FC<BottomNavProps> = () => {
         
         holdTimerRef.current = setTimeout(() => {
             setIsHolding(true);
-            if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-                try { navigator.vibrate(25); } catch {}
-            }
+            haptics.medium();
         }, 220);
         
         setPointerDownTime(Date.now());

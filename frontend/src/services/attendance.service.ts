@@ -687,4 +687,15 @@ export const attendanceService = {
         const response = await api.post('/api/academic/results', payload);
         return response.data.data ?? response.data;
     },
+
+    // Account Migration
+    initiateMigration: async (): Promise<{ key: string }> => {
+        const response = await api.post('/api/data/migration/initiate');
+        return response.data?.data ?? response.data;
+    },
+
+    completeMigration: async (key: string): Promise<{ message: string }> => {
+        const response = await api.post('/api/data/migration/complete', { key });
+        return response.data?.data ?? response.data;
+    },
 };

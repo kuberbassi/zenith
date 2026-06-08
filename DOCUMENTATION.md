@@ -37,7 +37,7 @@
 - **Timetable Management** — Weekly schedule with slot CRUD, subject linking, legacy ID repair
 - **Dashboard & Analytics** — KPIs, streak tracking, day-of-week analysis, heatmaps, momentum scores
 - **Course & Skill Tracking** — Manual online courses, skill inventory
-- **Data Management** — Full export/import with backup/restore system
+- **Data Management** — Full export/import, backup/restore system, Cloud Auto-Sync, and secure cryptographically-signed Account Migration
 - **Profile Management** — Google OAuth, profile picture upload with Sharp compression, biometric registration
 - **Notice Scraper** — IPU notice board scraping with categorization and caching
 - **PWA Support** — Service worker, auto-update, push notifications, offline capability
@@ -399,11 +399,13 @@ zenith/                          # Monorepo root
 - ✅ **Good**: Notification generation from attendance thresholds
 - ⚠️ **Issue**: Streak calculation only works for consecutive weekdays — doesn't account for holidays/breaks
 
-### `src/routes/data.ts` (621 lines) — Data Management
+### `src/routes/data.ts` (~750 lines) — Data Management
 - ✅ **Good**: Auto-backup before import, 30-day backup retention
 - ✅ **Good**: Rate limiting on delete operations (5-min cooldown)
 - ✅ **Good**: Backup requirement before data wipe (backup_id validation)
 - ✅ **Good**: ID remapping during import with subject reference repair
+- ✅ **Good**: **Cloud Auto-Sync**: Attendance, timetables, and results sync to database in real-time
+- ✅ **Good**: **Account Data Migration**: Secure token-based flow (`POST /migration/initiate` and `POST /migration/complete`) to transfer all academic history between distinct Google logins with automatic rollback safety backups
 - ⚠️ **Issue**: Import is NOT transactional — partial imports can leave data in inconsistent state
 - ⚠️ **Issue**: `createInBatches` runs 25 parallel creates — can overwhelm Neon serverless connection pool
 - 🔴 **Security**: Export includes full user data — should be encrypted or require re-authentication

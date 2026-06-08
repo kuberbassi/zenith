@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import crypto, { randomUUID } from 'crypto'
+import jwt from 'jsonwebtoken'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { ok, fail } from '../utils/response.js'
@@ -584,6 +585,137 @@ router.post('/restore_backup/:backupId', async (req: AuthRequest, res) => {
   } catch (err) {
     console.error('[data/restore]', err)
     fail(res, 'Restore failed', 'RESTORE_FAILED', 500)
+  }
+})
+
+// ─── Account Data Migration ──────────────────────────────────────────────────
+
+router.post('/migration/initiate', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      fail(res, 'User not found', 'NOT_FOUND', 404)
+      return
+    }
+
+    const secret = process.env.JWT_SECRET || 'zenith-backup-encryption-key-fallback-secret-2026'
+    
+    // Sign a token valid for 15 minutes
+    const token = jwt.sign(
+      {
+        from_user_id: userId,
+        from_email: user.email,
+        purpose: 'account_migration'
+      },
+      secret,
+      { expiresIn: '15m' }
+    )
+
+    ok(res, { key: `zenith_migrate_${token}` })
+  } catch (err) {
+    console.error('[data/migration/initiate]', err)
+    fail(res, 'Failed to generate migration key', 'MIGRATION_INIT_FAILED', 500)
+  }
+})
+
+router.post('/migration/complete', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const { key } = req.body
+
+    if (!key || typeof key !== 'string') {
+      fail(res, 'Migration key is required', 'KEY_REQUIRED', 400)
+      return
+    }
+
+    const token = key.startsWith('zenith_migrate_') ? key.replace('zenith_migrate_', '') : key
+    const secret = process.env.JWT_SECRET || 'zenith-backup-encryption-key-fallback-secret-2026'
+
+    let decoded: any
+    try {
+      decoded = jwt.verify(token, secret)
+    } catch (err) {
+      fail(res, 'Invalid or expired migration key', 'INVALID_KEY', 400)
+      return
+    }
+
+    if (decoded.purpose !== 'account_migration' || !decoded.from_user_id) {
+      fail(res, 'Invalid migration key signature', 'INVALID_KEY_PURPOSE', 400)
+      return
+    }
+
+    const fromUserId = decoded.from_user_id
+
+    if (fromUserId === userId) {
+      fail(res, 'Cannot migrate data to the same account', 'SAME_ACCOUNT', 400)
+      return
+    }
+
+    // Verify source user exists
+    const sourceUser = await prisma.user.findUnique({ where: { id: fromUserId } })
+    if (!sourceUser) {
+      fail(res, 'Source user account no longer exists', 'SOURCE_NOT_FOUND', 404)
+      return
+    }
+
+    const destinationUser = await prisma.user.findUnique({ where: { id: userId } })
+    if (!destinationUser) {
+      fail(res, 'Destination user account not found', 'DEST_NOT_FOUND', 404)
+      return
+    }
+
+    // 1. Collect backups of both accounts in case of any transaction failure
+    const [sourceData, destData] = await Promise.all([
+      collectUserData(fromUserId),
+      collectUserData(userId)
+    ])
+
+    const backupExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days safety backup
+    await Promise.all([
+      prisma.userBackup.create({
+        data: { user_id: fromUserId, backup_type: 'pre_migration_source', data: sourceData as any, expires_at: backupExpires }
+      }),
+      prisma.userBackup.create({
+        data: { user_id: userId, backup_type: 'pre_migration_destination', data: destData as any, expires_at: backupExpires }
+      })
+    ]).catch(() => null)
+
+    // 2. Clear destination user data to avoid conflicts
+    await clearUserData(userId)
+
+    // 3. Restore source data into destination user
+    await restoreUserData(userId, sourceData)
+
+    // 4. Update destination profile fields if empty but exist in source
+    const updateData: Record<string, any> = {}
+    const fields = ['branch', 'course', 'college', 'batch', 'enrollment_number', 'mother_name', 'father_name', 'gender', 'phone_number', 'admission_year']
+    for (const f of fields) {
+      if (!destinationUser[f as keyof typeof destinationUser] && sourceUser[f as keyof typeof sourceUser]) {
+        updateData[f] = sourceUser[f as keyof typeof sourceUser]
+      }
+    }
+    if (Object.keys(updateData).length > 0) {
+      await prisma.user.update({ where: { id: userId }, data: updateData })
+    }
+
+    // 5. Completely clear and purge source user account
+    await clearUserData(fromUserId)
+    await prisma.user.delete({ where: { id: fromUserId } })
+
+    // Create system log for auditing
+    await prisma.systemLog.create({
+      data: {
+        user_id: userId,
+        action: 'Account Migration',
+        description: `Successfully migrated all academic data from user ID ${fromUserId} (${decoded.from_email}) to ${destinationUser.email}.`
+      }
+    }).catch(() => null)
+
+    ok(res, { message: 'Account data migrated successfully.' })
+  } catch (err) {
+    console.error('[data/migration/complete]', err)
+    fail(res, 'Failed to complete migration', 'MIGRATION_FAILED', 500)
   }
 })
 

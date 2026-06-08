@@ -3,6 +3,8 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 import { CheckCircle2, XCircle, AlertCircle, Info, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { haptics } from '@/utils/haptics';
+
 type ToastType = 'success' | 'error' | 'warning' | 'info';
 
 interface Toast {
@@ -37,6 +39,17 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         const newToast: Toast = { id, type, message, duration };
 
         setToasts((prev) => [...prev, newToast]);
+
+        // Trigger mobile haptics based on type
+        if (type === 'success') {
+            haptics.success();
+        } else if (type === 'error') {
+            haptics.error();
+        } else if (type === 'warning') {
+            haptics.medium();
+        } else {
+            haptics.light();
+        }
 
         if (duration > 0) {
             setTimeout(() => {

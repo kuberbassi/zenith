@@ -21,6 +21,9 @@ Zenith is a full-stack student productivity app with a React web client and a No
 - archive/root-legacy-configs: archived root-level legacy mobile/Python config files
 
 ## Performance & Optimization
+- **120Hz Fluid UX**: GPU-accelerated layouts (`will-change: transform`) and container optimizations (`content-visibility: auto`) keep animations lag-free.
+- **Tactile Haptics**: Integrated standard Web Vibration API (`navigator.vibrate`) to provide subtle physical touch impulses on mobile navigation, switches, and alerts.
+- **Account Migration**: Port all academic records, subjects, attendance logs, and results to a new Google login account using cryptographically signed migration tokens.
 - **Near-Instant API**: Average response time ~150ms via composite indexing and query optimization.
 - **Data Integrity**: Critical bulk writes (courses, attendance, imports) safely mapped and processed sequentially to support Neon HTTP Serverless connections.
 - **Caching**: 30s-120s caching layers for dashboard, reports, and analytics.

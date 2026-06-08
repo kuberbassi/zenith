@@ -714,3 +714,24 @@ input[type="range"]:active::-moz-range-thumb {
 .hover\:border-primary\/50:hover {
   border-color: color-mix(in srgb, var(--md-sys-color-primary) 50%, transparent) !important;
 }
+
+/* GPU acceleration & 120Hz rendering optimizations */
+button:not(.no-fluid),
+a:not(.no-fluid),
+[role="button"],
+.interactive-card,
+.sidebar-item,
+.bottom-nav-item,
+main {
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+/* Optimize off-screen rendering below fold */
+section, 
+.card-section,
+.bunk-card-grid {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 400px;
+}
