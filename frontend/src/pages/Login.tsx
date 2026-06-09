@@ -14,7 +14,7 @@ const Login: React.FC = () => {
     usePageMeta({
         title: 'Zenith | Student Center',
         description: 'Sign in to Zenith — your all-in-one student dashboard for IPU. Track attendance, sync results, manage timetables, and develop your skills.',
-        indexable: true,
+        indexable: false,
     });
 
     return (

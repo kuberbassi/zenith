@@ -49,7 +49,7 @@ const TermsOfService: React.FC = () => {
     usePageMeta({
         title: 'Terms of Service | Zenith',
         description: 'Read the Zenith terms of service. Understand your rights and responsibilities as a user.',
-        indexable: true,
+        indexable: false,
     });
 
     return (

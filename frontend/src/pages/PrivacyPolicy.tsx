@@ -53,7 +53,7 @@ const PrivacyPolicy: React.FC = () => {
     usePageMeta({
         title: 'Privacy Policy | Zenith',
         description: 'Read the Zenith privacy policy to understand how we collect, use, and protect your data.',
-        indexable: true,
+        indexable: false,
     });
 
     return (
