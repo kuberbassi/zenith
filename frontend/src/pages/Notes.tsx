@@ -653,21 +653,21 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, isActive, onSelect, onDelete,
     // Plain text preview from HTML, safely stripping tags and decoding HTML entities (like &nbsp;, &amp;)
     const plainText = (() => {
         if (!note.content) return '';
-        // Insert spaces before closing block tags to prevent text merging, and insert placeholders for media
+        // Insert newlines before closing block tags to preserve text line breaks, and insert placeholders for media
         const withPlaceholders = note.content
             .replace(/<img[^>]*>/gi, '[image] ')
             .replace(/<iframe[^>]*>/gi, '[video] ')
-            .replace(/<\/p>/gi, ' </p>')
-            .replace(/<\/div>/gi, ' </div>')
-            .replace(/<\/li>/gi, ' </li>')
-            .replace(/<br\s*\/?>/gi, ' <br> ')
-            .replace(/<\/h[1-6]>/gi, ' ');
+            .replace(/<\/p>/gi, '\n</p>')
+            .replace(/<\/div>/gi, '\n</div>')
+            .replace(/<\/li>/gi, '\n</li>')
+            .replace(/<br\s*\/?>/gi, '\n<br>\n')
+            .replace(/<\/h[1-6]>/gi, '\n');
 
         try {
             const parser = new DOMParser();
             const doc = parser.parseFromString(withPlaceholders, 'text/html');
             const text = doc.body.textContent || doc.body.innerText || '';
-            return text.replace(/\s+/g, ' ').trim();
+            return text.replace(/[^\S\r\n]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
         } catch {
             return withPlaceholders
                 .replace(/<[^>]+>/g, ' ')
@@ -677,7 +677,8 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, isActive, onSelect, onDelete,
                 .replace(/&gt;/g, '>')
                 .replace(/&quot;/g, '"')
                 .replace(/&#39;/g, "'")
-                .replace(/\s+/g, ' ')
+                .replace(/[^\S\r\n]+/g, ' ')
+                .replace(/\n\s*\n+/g, '\n')
                 .trim();
         }
     })();
@@ -745,7 +746,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, isActive, onSelect, onDelete,
                     {totalTodos > 4 && <span className="text-[10px] text-on-surface-variant/25 font-semibold">+{totalTodos - 4} more</span>}
                 </div>
             ) : (
-                <p className="text-xs text-on-surface-variant/60 line-clamp-3 leading-relaxed">{plainText || 'Empty note'}</p>
+                <p className="text-xs text-on-surface-variant/60 line-clamp-3 leading-relaxed whitespace-pre-line">{plainText || 'Empty note'}</p>
             )}
 
             <div className="flex items-center justify-between pt-2 border-t border-outline/40 mt-2 text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/25">
