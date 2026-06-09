@@ -477,7 +477,7 @@ interface NoteEditorProps {
 }
 
 const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClose, onTogglePin }) => {
-    const [readMode, setReadMode] = useState(false);
+    const [readMode, setReadMode] = useState(!note.id.startsWith('temp-'));
     const [loadingAi, setLoadingAi] = useState(false);
     const [hasAiDraft, setHasAiDraft] = useState(false);
     const [prevContent, setPrevContent] = useState<string | null>(null);
@@ -589,6 +589,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
         }
         setHasAiDraft(false);
         setPrevContent(null);
+        setReadMode(!note.id.startsWith('temp-'));
     }, [note.id]);
 
     // Paste / drop images
@@ -915,6 +916,13 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, isActive, onSelect, onDelete,
         }
     })();
 
+    const previewHtml = (() => {
+        if (!note.content) return '<p class="italic opacity-30">Empty note</p>';
+        return note.content
+            .replace(/<img[^>]*>/gi, '<span class="text-primary font-bold text-[9px] bg-primary/10 px-1 rounded uppercase tracking-wider">[Image]</span> ')
+            .replace(/<iframe[^>]*>/gi, '<span class="text-primary font-bold text-[9px] bg-primary/10 px-1 rounded uppercase tracking-wider">[Video]</span> ');
+    })();
+
     useEffect(() => {
         if (!menuOpen) return;
         const close = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
@@ -978,7 +986,10 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, isActive, onSelect, onDelete,
                     {totalTodos > 4 && <span className="text-[10px] text-on-surface-variant/25 font-semibold">+{totalTodos - 4} more</span>}
                 </div>
             ) : (
-                <p className="text-xs text-on-surface-variant/60 line-clamp-3 leading-relaxed whitespace-pre-line">{plainText || 'Empty note'}</p>
+                <div 
+                    className="text-xs text-on-surface-variant/60 line-clamp-3 leading-relaxed note-preview-html select-none pointer-events-none"
+                    dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
             )}
 
             <div className="flex items-center justify-between pt-2 border-t border-outline/40 mt-2 text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/25">

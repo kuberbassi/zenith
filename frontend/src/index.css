@@ -762,3 +762,75 @@ section,
   content-visibility: auto;
   contain-intrinsic-size: 0 400px;
 }
+
+/* Note card HTML preview container styling */
+.note-preview-html {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: 4.8rem; /* approx 3 lines at line-height 1.6 */
+}
+.note-preview-html p,
+.note-preview-html ul,
+.note-preview-html ol,
+.note-preview-html li,
+.note-preview-html h1,
+.note-preview-html h2,
+.note-preview-html h3,
+.note-preview-html h4,
+.note-preview-html h5,
+.note-preview-html h6,
+.note-preview-html blockquote,
+.note-preview-html pre {
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+.note-preview-html p {
+  margin-bottom: 2px;
+}
+.note-preview-html ul,
+.note-preview-html ol {
+  padding-left: 1rem !important;
+  margin: 2px 0 !important;
+}
+.note-preview-html li {
+  display: list-item !important;
+  list-style-type: disc !important;
+}
+.note-preview-html ol li {
+  list-style-type: decimal !important;
+}
+.note-preview-html h1,
+.note-preview-html h2,
+.note-preview-html h3,
+.note-preview-html h4,
+.note-preview-html h5,
+.note-preview-html h6 {
+  font-weight: 700;
+  display: block;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+.note-preview-html strong,
+.note-preview-html b {
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+.note-preview-html em,
+.note-preview-html i {
+  font-style: italic;
+}
+.note-preview-html code {
+  font-family: monospace;
+  background-color: var(--md-sys-color-surface-container);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+.note-preview-html a {
+  color: var(--md-sys-color-primary);
+  text-decoration: underline;
+}
