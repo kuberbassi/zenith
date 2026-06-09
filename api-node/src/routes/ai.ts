@@ -325,13 +325,14 @@ async function chatHandler(req: AuthRequest, res: any) {
 
 const ProcessNoteSchema = z.object({
     content: z.string(),
-    action: z.enum(['reformat', 'improve'])
+    action: z.enum(['reformat', 'improve', 'custom']),
+    customPrompt: z.string().optional()
 })
 
 async function processNoteHandler(req: AuthRequest, res: any) {
     try {
         const body = ProcessNoteSchema.parse(req.body)
-        const { content, action } = body
+        const { content, action, customPrompt } = body
 
         if (!ENV.GROQ_API_KEY) {
             fail(res, 'AI API key is not configured.', 'CONFIG_ERROR', 500)
@@ -343,19 +344,26 @@ async function processNoteHandler(req: AuthRequest, res: any) {
             systemInstruction = `You are an AI writing assistant specializing in structural organization and clean, professional styling.
 Your task is to take the user's note (which is provided in HTML format) and reformat it.
 Follow these strict rules:
-1. Preserve ALL original information, links, details, dates, lists, text, numbers, and meaning. DO NOT discard, summarize, or omit anything.
+1. Preserve 100% of all original information, links, details, dates, lists, text, numbers, and core meaning. DO NOT discard, summarize, edit, or omit anything.
 2. Structure the content logically. Use clear headings (H1, H2, H3), bullet points, and numbered lists where appropriate to make it highly readable.
 3. Clean up spacing, bad indents, or messy paragraphs.
 4. Output the result ONLY in clean, semantic HTML format. DO NOT wrap the output in markdown code blocks (such as \`\`\`html or \`\`\`). Do not include any conversational text outside of the HTML note content.`
-        } else {
+        } else if (action === 'improve') {
             systemInstruction = `You are an AI writing assistant specializing in content enhancement, grammar check, and stylistic improvement.
 Your task is to take the user's note (which is provided in HTML format) and improve it.
 Follow these strict rules:
-1. Preserve ALL original details, links, numbers, dates, and core meaning. DO NOT discard, summarize, or omit anything.
+1. Preserve 100% of all original details, links, numbers, dates, and core meaning. DO NOT discard, summarize, edit, or omit anything.
 2. Refine spelling, grammar, vocabulary, clarity, and overall writing quality.
 3. Make the prose sound more polished, professional, and clear.
 4. Maintain the structure (lists, headings, paragraphs) of the original note as much as possible, just refining the language within.
 5. Output the result ONLY in clean, semantic HTML format. DO NOT wrap the output in markdown code blocks (such as \`\`\`html or \`\`\`). Do not include any conversational text outside of the HTML note content.`
+        } else {
+            const userInstructions = customPrompt || 'Improve this note.'
+            systemInstruction = `You are an AI writing assistant. The user wants you to modify/improve their note based on this request: "${userInstructions}".
+Follow these strict rules:
+1. Preserve 100% of all original information, links, details, dates, lists, text, numbers, and meaning unless the user explicitly requested to remove something. DO NOT discard, summarize, edit, or omit anything due to hallucination or oversight.
+2. Carefully apply the user's request: "${userInstructions}" to improve, edit, or format the text.
+3. Output the result ONLY in clean, semantic HTML format. DO NOT wrap the output in markdown code blocks (such as \`\`\`html or \`\`\`). Do not include any conversational text outside of the HTML note content.`
         }
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {

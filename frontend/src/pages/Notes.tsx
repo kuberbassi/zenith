@@ -170,7 +170,7 @@ interface NoteToolbarProps {
     editor: Editor;
     loadingAi: boolean;
     hasAiDraft: boolean;
-    onAiAction: (action: 'reformat' | 'improve') => void;
+    onAiAction: (action: 'reformat' | 'improve' | 'custom', customPrompt?: string) => void;
     onAiUndo: () => void;
     onAiKeep: () => void;
 }
@@ -185,6 +185,7 @@ const NoteToolbar: React.FC<NoteToolbarProps> = ({
 }) => {
     const imgInputRef = useRef<HTMLInputElement>(null);
     const [showAiMenu, setShowAiMenu] = useState(false);
+    const [promptText, setPromptText] = useState('');
 
     const insertImage = (file: File) => {
         const reader = new FileReader();
@@ -199,29 +200,60 @@ const NoteToolbar: React.FC<NoteToolbarProps> = ({
         <div className="flex flex-col border-t border-outline pt-2 mt-2 gap-2">
             {/* AI Banner / Status bar */}
             {hasAiDraft && (
-                <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg p-2 animate-fadeIn">
-                    <div className="flex items-center gap-1.5 text-primary text-[10px] font-bold uppercase tracking-wider">
-                        <Sparkles size={12} className="animate-pulse" />
-                        AI Draft Generated
+                <div className="flex flex-col bg-primary/5 border border-primary/20 rounded-lg p-2.5 gap-2 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-primary text-[10px] font-bold uppercase tracking-wider">
+                            <Sparkles size={12} className="animate-pulse" />
+                            AI Draft Generated
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={onAiUndo}
+                                className="flex items-center gap-1 px-2 py-1 rounded bg-surface hover:bg-surface-container border border-outline text-[10px] font-bold text-on-surface transition-all cursor-pointer"
+                            >
+                                <RotateCcw size={10} />
+                                Undo
+                            </button>
+                            <button
+                                type="button"
+                                onClick={onAiKeep}
+                                className="flex items-center gap-1 px-2 py-1 rounded bg-primary text-surface hover:bg-primary/90 text-[10px] font-bold transition-all cursor-pointer"
+                            >
+                                <Check size={10} />
+                                Keep
+                            </button>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    {/* Custom Refinement Input */}
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            const val = promptText.trim();
+                            if (val) {
+                                onAiAction('custom', val);
+                                setPromptText('');
+                            }
+                        }}
+                        className="flex items-center gap-2 border border-outline bg-surface rounded-md px-2 py-1 focus-within:border-primary/50 transition-colors"
+                    >
+                        <input
+                            type="text"
+                            value={promptText}
+                            onChange={(e) => setPromptText(e.target.value)}
+                            placeholder="Instruct AI to refine draft further..."
+                            disabled={loadingAi}
+                            className="flex-1 text-[11px] bg-transparent outline-none border-none focus:ring-0 placeholder:text-on-surface-variant/30 py-0.5"
+                        />
                         <button
-                            type="button"
-                            onClick={onAiUndo}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-surface hover:bg-surface-container border border-outline text-[10px] font-bold text-on-surface transition-all cursor-pointer"
+                            type="submit"
+                            disabled={loadingAi || !promptText.trim()}
+                            className="text-[10px] font-bold text-primary hover:text-primary/80 disabled:opacity-35 transition-colors cursor-pointer"
                         >
-                            <RotateCcw size={10} />
-                            Undo
+                            Refine
                         </button>
-                        <button
-                            type="button"
-                            onClick={onAiKeep}
-                            className="flex items-center gap-1 px-2 py-1 rounded bg-primary text-surface hover:bg-primary/90 text-[10px] font-bold transition-all cursor-pointer"
-                        >
-                            <Check size={10} />
-                            Keep
-                        </button>
-                    </div>
+                    </form>
                 </div>
             )}
 
@@ -412,7 +444,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
     const [prevContent, setPrevContent] = useState<string | null>(null);
     const { showToast } = useToast();
 
-    const handleAiAction = async (action: 'reformat' | 'improve') => {
+    const handleAiAction = async (action: 'reformat' | 'improve' | 'custom', customPrompt?: string) => {
         if (!editor) return;
         const currentHtml = editor.getHTML();
         if (!currentHtml || currentHtml === '<p></p>') {
@@ -422,13 +454,15 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
 
         setLoadingAi(true);
         try {
-            const res = await api.post('/api/ai/process_note', { content: currentHtml, action });
+            const res = await api.post('/api/ai/process_note', { content: currentHtml, action, customPrompt });
             const processed = res.data?.data?.processedContent;
             if (processed) {
-                setPrevContent(currentHtml);
+                if (!hasAiDraft) {
+                    setPrevContent(currentHtml);
+                }
                 editor.commands.setContent(processed);
                 setHasAiDraft(true);
-                showToast('success', 'AI draft applied. Review the changes!');
+                showToast('success', 'AI draft updated. Review the changes!');
             } else {
                 showToast('error', 'AI returned empty content');
             }
