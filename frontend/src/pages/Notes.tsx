@@ -6,7 +6,7 @@ import {
     CheckCircle2, Circle, X, GripVertical, Pencil,
     Check, Eye, Bold, Italic, Underline as UnderlineIcon,
     AlignLeft, AlignCenter, AlignRight, List, ListOrdered,
-    Image as ImageIcon, MoreHorizontal, RotateCcw
+    Image as ImageIcon, MoreHorizontal, RotateCcw, Sparkles
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import api from '@/services/api';
@@ -166,8 +166,25 @@ const ToolbarBtn: React.FC<{ active?: boolean; onClick: () => void; title?: stri
     </button>
 );
 
-const NoteToolbar: React.FC<{ editor: Editor }> = ({ editor }) => {
+interface NoteToolbarProps {
+    editor: Editor;
+    loadingAi: boolean;
+    hasAiDraft: boolean;
+    onAiAction: (action: 'reformat' | 'improve') => void;
+    onAiUndo: () => void;
+    onAiKeep: () => void;
+}
+
+const NoteToolbar: React.FC<NoteToolbarProps> = ({
+    editor,
+    loadingAi,
+    hasAiDraft,
+    onAiAction,
+    onAiUndo,
+    onAiKeep
+}) => {
     const imgInputRef = useRef<HTMLInputElement>(null);
+    const [showAiMenu, setShowAiMenu] = useState(false);
 
     const insertImage = (file: File) => {
         const reader = new FileReader();
@@ -179,22 +196,106 @@ const NoteToolbar: React.FC<{ editor: Editor }> = ({ editor }) => {
     };
 
     return (
-        <div className="flex items-center gap-0.5 flex-wrap border-t border-outline pt-2 mt-2">
-            <ToolbarBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold"><Bold size={13} /></ToolbarBtn>
-            <ToolbarBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic"><Italic size={13} /></ToolbarBtn>
-            <ToolbarBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline"><UnderlineIcon size={13} /></ToolbarBtn>
-            <div className="w-px h-4 bg-outline mx-1" />
-            <ToolbarBtn active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} title="Left"><AlignLeft size={13} /></ToolbarBtn>
-            <ToolbarBtn active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} title="Center"><AlignCenter size={13} /></ToolbarBtn>
-            <ToolbarBtn active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} title="Right"><AlignRight size={13} /></ToolbarBtn>
-            <div className="w-px h-4 bg-outline mx-1" />
-            <ToolbarBtn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list"><List size={13} /></ToolbarBtn>
-            <ToolbarBtn active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list"><ListOrdered size={13} /></ToolbarBtn>
-            <div className="w-px h-4 bg-outline mx-1" />
-            <ToolbarBtn onClick={() => imgInputRef.current?.click()} title="Insert image"><ImageIcon size={13} /></ToolbarBtn>
-            <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) insertImage(f); e.target.value = ''; }} />
-            <div className="w-px h-4 bg-outline mx-1" />
-            <ToolbarBtn onClick={() => editor.chain().focus().undo().run()} title="Undo"><RotateCcw size={13} /></ToolbarBtn>
+        <div className="flex flex-col border-t border-outline pt-2 mt-2 gap-2">
+            {/* AI Banner / Status bar */}
+            {hasAiDraft && (
+                <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg p-2 animate-fadeIn">
+                    <div className="flex items-center gap-1.5 text-primary text-[10px] font-bold uppercase tracking-wider">
+                        <Sparkles size={12} className="animate-pulse" />
+                        AI Draft Generated
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onAiUndo}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-surface hover:bg-surface-container border border-outline text-[10px] font-bold text-on-surface transition-all cursor-pointer"
+                        >
+                            <RotateCcw size={10} />
+                            Undo
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onAiKeep}
+                            className="flex items-center gap-1 px-2 py-1 rounded bg-primary text-surface hover:bg-primary/90 text-[10px] font-bold transition-all cursor-pointer"
+                        >
+                            <Check size={10} />
+                            Keep
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex items-center justify-between flex-wrap gap-1">
+                <div className="flex items-center gap-0.5 flex-wrap">
+                    <ToolbarBtn active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold"><Bold size={13} /></ToolbarBtn>
+                    <ToolbarBtn active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic"><Italic size={13} /></ToolbarBtn>
+                    <ToolbarBtn active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} title="Underline"><UnderlineIcon size={13} /></ToolbarBtn>
+                    <div className="w-px h-4 bg-outline mx-1" />
+                    <ToolbarBtn active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} title="Left"><AlignLeft size={13} /></ToolbarBtn>
+                    <ToolbarBtn active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} title="Center"><AlignCenter size={13} /></ToolbarBtn>
+                    <ToolbarBtn active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} title="Right"><AlignRight size={13} /></ToolbarBtn>
+                    <div className="w-px h-4 bg-outline mx-1" />
+                    <ToolbarBtn active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list"><List size={13} /></ToolbarBtn>
+                    <ToolbarBtn active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list"><ListOrdered size={13} /></ToolbarBtn>
+                    <div className="w-px h-4 bg-outline mx-1" />
+                    <ToolbarBtn onClick={() => imgInputRef.current?.click()} title="Insert image"><ImageIcon size={13} /></ToolbarBtn>
+                    <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) insertImage(f); e.target.value = ''; }} />
+                    <div className="w-px h-4 bg-outline mx-1" />
+                    <ToolbarBtn onClick={() => editor.chain().focus().undo().run()} title="Undo"><RotateCcw size={13} /></ToolbarBtn>
+                </div>
+
+                <div className="relative shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => !loadingAi && setShowAiMenu(m => !m)}
+                        disabled={loadingAi}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+                            loadingAi 
+                                ? 'bg-surface-container border-outline text-on-surface-variant/40 cursor-not-allowed'
+                                : showAiMenu
+                                    ? 'bg-primary/10 border-primary/30 text-primary'
+                                    : 'border-outline text-on-surface-variant/70 hover:text-on-surface hover:bg-surface-container'
+                        }`}
+                    >
+                        {loadingAi ? (
+                            <>
+                                <div className="w-3 h-3 rounded-full border border-primary/20 border-t-primary animate-spin" />
+                                Processing...
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={12} className={showAiMenu ? 'animate-pulse' : ''} />
+                                AI Writer
+                            </>
+                        )}
+                    </button>
+
+                    {showAiMenu && !loadingAi && (
+                        <div className="absolute right-0 bottom-full mb-2 z-50 w-36 bg-surface border border-outline rounded-xl shadow-lg p-1.5 flex flex-col gap-0.5 animate-fadeIn">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowAiMenu(false);
+                                    onAiAction('reformat');
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container rounded-lg transition-colors cursor-pointer"
+                            >
+                                Re-format Spacing
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowAiMenu(false);
+                                    onAiAction('improve');
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container rounded-lg transition-colors cursor-pointer"
+                            >
+                                Improve Writing
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 };
@@ -306,6 +407,53 @@ interface NoteEditorProps {
 
 const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClose, onTogglePin }) => {
     const [readMode, setReadMode] = useState(false);
+    const [loadingAi, setLoadingAi] = useState(false);
+    const [hasAiDraft, setHasAiDraft] = useState(false);
+    const [prevContent, setPrevContent] = useState<string | null>(null);
+    const { showToast } = useToast();
+
+    const handleAiAction = async (action: 'reformat' | 'improve') => {
+        if (!editor) return;
+        const currentHtml = editor.getHTML();
+        if (!currentHtml || currentHtml === '<p></p>') {
+            showToast('error', 'Note is empty. Add some text first.');
+            return;
+        }
+
+        setLoadingAi(true);
+        try {
+            const res = await api.post('/api/ai/process_note', { content: currentHtml, action });
+            const processed = res.data?.data?.processedContent;
+            if (processed) {
+                setPrevContent(currentHtml);
+                editor.commands.setContent(processed);
+                setHasAiDraft(true);
+                showToast('success', 'AI draft applied. Review the changes!');
+            } else {
+                showToast('error', 'AI returned empty content');
+            }
+        } catch (err: any) {
+            console.error('[ai process error]', err);
+            showToast('error', err.response?.data?.error || 'Failed to process note');
+        } finally {
+            setLoadingAi(false);
+        }
+    };
+
+    const handleAiUndo = () => {
+        if (prevContent && editor) {
+            editor.commands.setContent(prevContent);
+            showToast('success', 'AI draft reverted');
+        }
+        setHasAiDraft(false);
+        setPrevContent(null);
+    };
+
+    const handleAiKeep = () => {
+        setHasAiDraft(false);
+        setPrevContent(null);
+        showToast('success', 'AI suggestion accepted');
+    };
 
     const editor = useEditor({
         extensions: [
@@ -366,6 +514,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
         if (editor && editor.getHTML() !== note.content) {
             editor.commands.setContent(note.content || '', { emitUpdate: false });
         }
+        setHasAiDraft(false);
+        setPrevContent(null);
     }, [note.id]);
 
     // Paste / drop images
@@ -451,7 +601,16 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
             </div>
 
             {/* Toolbar — only in edit mode */}
-            {!readMode && editor && <NoteToolbar editor={editor} />}
+            {!readMode && editor && (
+                <NoteToolbar
+                    editor={editor}
+                    loadingAi={loadingAi}
+                    hasAiDraft={hasAiDraft}
+                    onAiAction={handleAiAction}
+                    onAiUndo={handleAiUndo}
+                    onAiKeep={handleAiKeep}
+                />
+            )}
         </motion.div>
     );
 };

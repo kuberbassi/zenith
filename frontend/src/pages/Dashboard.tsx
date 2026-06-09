@@ -54,9 +54,8 @@ const getNotePlainText = (content: string): string => {
 
 const findSubjectForSlot = (subjects: any[], slot: any) => {
     const explicitType = String(slot?.type || '').trim().toLowerCase();
-    const hasSubjectRef = Boolean(normalizeId(slot?.subject_id || slot?.subjectId || slot?.subject?._id || slot?.subject?.id));
-    if (explicitType && explicitType !== 'class') return undefined;
-    if (!explicitType && !hasSubjectRef) return undefined;
+    
+    if (explicitType === 'break' || explicitType === 'lunch' || explicitType === 'gap') return undefined;
 
     const slotSubjectId = normalizeId(slot?.subject_id || slot?.subjectId || slot?.subject?._id || slot?.subject?.id);
     if (slotSubjectId) {
@@ -94,7 +93,7 @@ const findSubjectForSlot = (subjects: any[], slot: any) => {
         || slot?.subject?.code
         || ''
     ).trim().toLowerCase();
-    if (!slotLabel) return undefined;
+    if (!slotLabel || slotLabel === 'break' || slotLabel === 'lunch' || slotLabel === 'gap') return undefined;
 
     return subjects.find((sub: any) => {
         const subName = String(sub?.name || '').trim().toLowerCase();

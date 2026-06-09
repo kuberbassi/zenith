@@ -26,7 +26,7 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const todayStr = days[new Date().getDay()]
 
-    const [user, subjects, recentLogs, allTimetables, courses, prefs, skills, resultRows, systemLogs] = await Promise.all([
+    const [user, subjects, recentLogs, allTimetables, courses, prefs, skills, resultRows, systemLogs, notes] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId } }),
         prisma.subject.findMany({ where: { user_id: userId } }),
         prisma.attendanceLog.findMany({ where: { user_id: userId }, orderBy: { date: 'desc' }, take: 20 }),
@@ -35,7 +35,8 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         prisma.userPreference.findUnique({ where: { user_id: userId } }),
         prisma.skill.findMany({ where: { user_id: userId } }),
         prisma.semesterResult.findMany({ where: { user_id: userId }, orderBy: { semester: 'asc' } }),
-        prisma.systemLog.findMany({ where: { user_id: userId }, orderBy: { timestamp: 'desc' }, take: 10 })
+        prisma.systemLog.findMany({ where: { user_id: userId }, orderBy: { timestamp: 'desc' }, take: 10 }),
+        prisma.note.findMany({ where: { user_id: userId } })
     ])
 
     let resolvedTimetable = null
@@ -59,8 +60,19 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         lines.push(`Threshold Target: ${user.attendance_threshold || 75}%`)
     }
 
+    // Google Drive backup preferences and status
+    const preferences = (prefs?.preferences ?? {}) as Record<string, any>
+    const isDriveActive = !!preferences.google_drive_linked
+    const lastBackup = preferences.google_drive_last_backup || 'Never'
+    const backupFreq = preferences.google_drive_backup_frequency || 'never'
+    lines.push('## Google Drive Cloud Backup Settings')
+    lines.push(`Backup Active (Linked): ${isDriveActive ? 'YES' : 'NO'}`)
+    lines.push(`Backup Frequency: ${backupFreq}`)
+    lines.push(`Last Backup Timestamp: ${lastBackup}`)
+    lines.push('')
+
     if (subjects.length) {
-        lines.push('## Subjects & Attendance')
+        lines.push('## Subjects, Attendance & Trackers')
         let totalMarks = 0
         let totalMaxMarks = 0
 
@@ -68,7 +80,21 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
             const attended = sub.attended ?? 0
             const total = sub.total ?? 0
             const pct = AttendanceCalculator.calculatePercentage(attended, total)
-            lines.push(`  - ${sub.name}: ${pct}% (${attended}/${total}) | Target: ${sub.target ?? 75}%`)
+            const categories = sub.categories || []
+            const isPractical = categories.includes('Practical')
+            const isAssignment = categories.includes('Assignment')
+            
+            let trackerInfo = ''
+            if (isPractical) {
+                const p = (sub.practicals as any) || { total: 10, completed: 0, hardcopy: false }
+                trackerInfo += ` | Practicals: ${p.completed}/${p.total} (${p.hardcopy ? 'Submitted' : 'Not fully submitted'})`
+            }
+            if (isAssignment) {
+                const a = (sub.assignments as any) || { total: 4, completed: 0, hardcopy: false }
+                trackerInfo += ` | Assignments: ${a.completed}/${a.total} (${a.hardcopy ? 'Submitted' : 'Not fully submitted'})`
+            }
+
+            lines.push(`  - ${sub.name}: ${pct}% (${attended}/${total}) | Target: ${sub.target ?? 75}%${trackerInfo}`)
         }
         
         const semesterData = resultRows.map(row => {
@@ -99,6 +125,57 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         lines.push('')
         lines.push('## Analytics KPIs')
         lines.push(`Overall Attendance: ${summary.total_attended}/${summary.total_classes} = ${summary.overall_percentage}%`)
+    }
+
+    if (resultRows.length) {
+        lines.push('## Detailed Semester Results')
+        for (const row of resultRows) {
+            lines.push(`  ### Semester ${row.semester} (SGPA: ${row.sgpa}, Credits: ${row.total_credits}, Marks: ${row.total_marks || 'N/A'}/${row.max_marks || 'N/A'})`)
+            const rowSubjects = Array.isArray(row.subjects) ? row.subjects as any[] : []
+            for (const sub of rowSubjects) {
+                const isPending = sub.is_pending || sub.grade === '-'
+                const internal = sub.internal_theory ?? sub.internal_practical ?? 0
+                const external = sub.external_theory ?? sub.external_practical ?? 0
+                const total = sub.total_marks ?? (Number(internal) + Number(external))
+                const max = sub.max_marks ?? 100
+                lines.push(`    - ${sub.name || sub.subject_name || 'Subject'} (${sub.code || sub.paper_code || 'N/A'}): ${isPending ? 'Pending/Declared Late' : `Grade: ${sub.grade} | Marks: ${total}/${max} (Int: ${internal}, Ext: ${external}) | Credits: ${sub.credits ?? 3}`}`)
+            }
+        }
+        lines.push('')
+    }
+
+    if (notes && notes.length > 0) {
+        lines.push('## User Notes & Checklists (Todos)')
+        const textNotes = notes.filter(n => !n.is_todo)
+        const todoNotes = notes.filter(n => n.is_todo)
+
+        if (textNotes.length > 0) {
+            lines.push('  ### Notes')
+            for (const note of textNotes) {
+                // Strip HTML tags from note content to keep context compact and clean
+                const plainContent = note.content
+                    ? note.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+                    : ''
+                lines.push(`    - **${note.title || 'Untitled'}** (Category: ${note.category}): ${plainContent}`)
+            }
+        }
+
+        if (todoNotes.length > 0) {
+            lines.push('  ### Checklists (Todos)')
+            for (const todoNote of todoNotes) {
+                lines.push(`    - **${todoNote.title || 'Todo List'}** (Category: ${todoNote.category}):`)
+                const items = Array.isArray(todoNote.todos) ? todoNote.todos as any[] : []
+                if (items.length > 0) {
+                    for (const item of items) {
+                        const status = item.completed ? '[x]' : '[ ]'
+                        lines.push(`      ${status} ${item.text || 'Item'}`)
+                    }
+                } else {
+                    lines.push('      (No tasks in this list)')
+                }
+            }
+        }
+        lines.push('')
     }
 
     if (resolvedTimetable) {
@@ -246,7 +323,85 @@ async function chatHandler(req: AuthRequest, res: any) {
     }
 }
 
+const ProcessNoteSchema = z.object({
+    content: z.string(),
+    action: z.enum(['reformat', 'improve'])
+})
+
+async function processNoteHandler(req: AuthRequest, res: any) {
+    try {
+        const body = ProcessNoteSchema.parse(req.body)
+        const { content, action } = body
+
+        if (!ENV.GROQ_API_KEY) {
+            fail(res, 'AI API key is not configured.', 'CONFIG_ERROR', 500)
+            return
+        }
+
+        let systemInstruction = ''
+        if (action === 'reformat') {
+            systemInstruction = `You are an AI writing assistant specializing in structural organization and clean, professional styling.
+Your task is to take the user's note (which is provided in HTML format) and reformat it.
+Follow these strict rules:
+1. Preserve ALL original information, links, details, dates, lists, text, numbers, and meaning. DO NOT discard, summarize, or omit anything.
+2. Structure the content logically. Use clear headings (H1, H2, H3), bullet points, and numbered lists where appropriate to make it highly readable.
+3. Clean up spacing, bad indents, or messy paragraphs.
+4. Output the result ONLY in clean, semantic HTML format. DO NOT wrap the output in markdown code blocks (such as \`\`\`html or \`\`\`). Do not include any conversational text outside of the HTML note content.`
+        } else {
+            systemInstruction = `You are an AI writing assistant specializing in content enhancement, grammar check, and stylistic improvement.
+Your task is to take the user's note (which is provided in HTML format) and improve it.
+Follow these strict rules:
+1. Preserve ALL original details, links, numbers, dates, and core meaning. DO NOT discard, summarize, or omit anything.
+2. Refine spelling, grammar, vocabulary, clarity, and overall writing quality.
+3. Make the prose sound more polished, professional, and clear.
+4. Maintain the structure (lists, headings, paragraphs) of the original note as much as possible, just refining the language within.
+5. Output the result ONLY in clean, semantic HTML format. DO NOT wrap the output in markdown code blocks (such as \`\`\`html or \`\`\`). Do not include any conversational text outside of the HTML note content.`
+        }
+
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${ENV.GROQ_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [
+                    { role: 'system', content: systemInstruction },
+                    { role: 'user', content: content }
+                ],
+                temperature: 0.1,
+                max_tokens: 1536,
+                top_p: 1,
+                stream: false
+            })
+        })
+
+        if (!response.ok) {
+            const error = await response.text()
+            console.error('[ai/process_note] Groq API error:', response.status, error)
+            fail(res, 'AI service temporarily unavailable. Please try again.', 'AI_ERROR', 502)
+            return
+        }
+
+        const data = await response.json() as any
+        let aiResponse = data.choices?.[0]?.message?.content ?? ''
+
+        // Sanitize any wrapped markdown code block symbols if they were generated
+        if (aiResponse.includes('```')) {
+            aiResponse = aiResponse.replace(/```html/g, '').replace(/```/g, '').trim()
+        }
+
+        ok(res, { processedContent: aiResponse })
+    } catch (err) {
+        if (err instanceof z.ZodError) { fail(res, 'Invalid input parameters', 'VALIDATION_ERROR', 400); return }
+        console.error('[ai/process_note]', err)
+        fail(res, 'Failed to process note', 'SERVER_ERROR', 500)
+    }
+}
+
 router.post('/chat', chatHandler)
 router.post('/chat_v2', chatHandler)
+router.post('/process_note', processNoteHandler)
 
 export default router
