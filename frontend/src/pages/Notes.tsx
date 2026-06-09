@@ -185,7 +185,8 @@ const NoteToolbar: React.FC<NoteToolbarProps> = ({
 }) => {
     const imgInputRef = useRef<HTMLInputElement>(null);
     const [showAiMenu, setShowAiMenu] = useState(false);
-    const [promptText, setPromptText] = useState('');
+    const [menuPromptText, setMenuPromptText] = useState('');
+    const [bannerPromptText, setBannerPromptText] = useState('');
 
     const insertImage = (file: File) => {
         const reader = new FileReader();
@@ -202,8 +203,8 @@ const NoteToolbar: React.FC<NoteToolbarProps> = ({
             {hasAiDraft && (
                 <div className="flex flex-col bg-primary/5 border border-primary/20 rounded-lg p-2.5 gap-2 animate-fadeIn">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-primary text-[10px] font-bold uppercase tracking-wider">
-                            <Sparkles size={12} className="animate-pulse" />
+                        <div className="flex items-center gap-1.5 text-primary text-[10px] font-bold uppercase tracking-wider animate-pulse">
+                            <Sparkles size={12} />
                             AI Draft Generated
                         </div>
                         <div className="flex items-center gap-2">
@@ -230,29 +231,34 @@ const NoteToolbar: React.FC<NoteToolbarProps> = ({
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
-                            const val = promptText.trim();
+                            const val = bannerPromptText.trim();
                             if (val) {
                                 onAiAction('custom', val);
-                                setPromptText('');
+                                setBannerPromptText('');
                             }
                         }}
-                        className="flex items-center gap-2 border border-outline bg-surface rounded-md px-2 py-1 focus-within:border-primary/50 transition-colors"
+                        className="flex flex-col gap-1 w-full mt-0.5"
                     >
-                        <input
-                            type="text"
-                            value={promptText}
-                            onChange={(e) => setPromptText(e.target.value)}
-                            placeholder="Instruct AI to refine draft further..."
-                            disabled={loadingAi}
-                            className="flex-1 text-[11px] bg-transparent outline-none border-none focus:ring-0 placeholder:text-on-surface-variant/30 py-0.5"
-                        />
-                        <button
-                            type="submit"
-                            disabled={loadingAi || !promptText.trim()}
-                            className="text-[10px] font-bold text-primary hover:text-primary/80 disabled:opacity-35 transition-colors cursor-pointer"
-                        >
-                            Refine
-                        </button>
+                        <span className="text-[9px] font-bold text-on-surface-variant/50 uppercase tracking-wider px-0.5">
+                            Give Prompt for Improvements
+                        </span>
+                        <div className="flex items-center gap-2 border border-outline bg-surface rounded-md px-2.5 py-1 focus-within:border-primary/50 transition-colors">
+                            <input
+                                type="text"
+                                value={bannerPromptText}
+                                onChange={(e) => setBannerPromptText(e.target.value)}
+                                placeholder="e.g., make it more concise, bold key dates, format as list..."
+                                disabled={loadingAi}
+                                className="flex-1 text-[11px] bg-transparent outline-none border-none focus:ring-0 placeholder:text-on-surface-variant/30 py-0.5"
+                            />
+                            <button
+                                type="submit"
+                                disabled={loadingAi || !bannerPromptText.trim()}
+                                className="text-[10px] font-bold text-primary hover:text-primary/80 disabled:opacity-35 transition-colors cursor-pointer"
+                            >
+                                Apply
+                            </button>
+                        </div>
                     </form>
                 </div>
             )}
@@ -303,27 +309,60 @@ const NoteToolbar: React.FC<NoteToolbarProps> = ({
                     </button>
 
                     {showAiMenu && !loadingAi && (
-                        <div className="absolute right-0 bottom-full mb-2 z-50 w-36 bg-surface border border-outline rounded-xl shadow-lg p-1.5 flex flex-col gap-0.5 animate-fadeIn">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowAiMenu(false);
-                                    onAiAction('reformat');
+                        <div className="absolute right-0 bottom-full mb-2 z-50 w-64 bg-surface border border-outline rounded-xl shadow-lg p-2.5 flex flex-col gap-2.5 animate-fadeIn">
+                            <div className="flex flex-col gap-0.5">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowAiMenu(false);
+                                        onAiAction('reformat');
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container rounded-lg transition-colors cursor-pointer"
+                                >
+                                    Re-format Spacing
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowAiMenu(false);
+                                        onAiAction('improve');
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container rounded-lg transition-colors cursor-pointer"
+                                >
+                                    Improve Writing
+                                </button>
+                            </div>
+                            <div className="border-t border-outline" />
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const val = menuPromptText.trim();
+                                    if (val) {
+                                        setShowAiMenu(false);
+                                        onAiAction('custom', val);
+                                        setMenuPromptText('');
+                                    }
                                 }}
-                                className="w-full text-left px-3 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container rounded-lg transition-colors cursor-pointer"
+                                className="flex flex-col gap-1.5"
                             >
-                                Re-format Spacing
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setShowAiMenu(false);
-                                    onAiAction('improve');
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs font-semibold text-on-surface hover:bg-surface-container rounded-lg transition-colors cursor-pointer"
-                            >
-                                Improve Writing
-                            </button>
+                                <span className="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider px-1">Custom Prompt</span>
+                                <div className="flex items-center gap-1.5 border border-outline bg-surface rounded-md px-2 py-1 focus-within:border-primary/50 transition-colors">
+                                    <input
+                                        type="text"
+                                        value={menuPromptText}
+                                        onChange={(e) => setMenuPromptText(e.target.value)}
+                                        placeholder="e.g., summarize, translate to Spanish..."
+                                        className="flex-1 text-[11px] bg-transparent outline-none border-none focus:ring-0 placeholder:text-on-surface-variant/30 py-0.5"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!menuPromptText.trim()}
+                                        className="text-[10px] font-bold text-primary hover:text-primary/80 disabled:opacity-35 transition-colors cursor-pointer"
+                                    >
+                                        Run
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     )}
                 </div>

@@ -340,30 +340,37 @@ async function processNoteHandler(req: AuthRequest, res: any) {
         }
 
         let systemInstruction = ''
+        const DATA_PRESERVATION_PROTOCOL = `
+CRITICAL DATA PRESERVATION PROTOCOL (99.9% ACCURACY TARGET):
+- Absolutely ZERO information loss is allowed. Do NOT summarize, omit, truncate, or skip any facts, dates, names, links, image tags, checklists, details, numbers, or bullet points present in the original HTML.
+- Do NOT hallucinate new facts, details, links, or dates.
+- Keep all HTML links (<a href="...">...</a>) and inline tags exactly as they are without modifying their attributes.
+- Your output must consist ONLY of valid, clean, semantic HTML. Do not wrap the code in markdown code blocks (like \`\`\`html or \`\`\`). Do not output any chat or conversational prefix/suffix (e.g., "Here is your note:").`
+
         if (action === 'reformat') {
-            systemInstruction = `You are an AI writing assistant specializing in structural organization and clean, professional styling.
-Your task is to take the user's note (which is provided in HTML format) and reformat it.
-Follow these strict rules:
-1. Preserve 100% of all original information, links, details, dates, lists, text, numbers, and core meaning. DO NOT discard, summarize, edit, or omit anything.
-2. Structure the content logically. Use clear headings (H1, H2, H3), bullet points, and numbered lists where appropriate to make it highly readable.
-3. Clean up spacing, bad indents, or messy paragraphs.
-4. Output the result ONLY in clean, semantic HTML format. DO NOT wrap the output in markdown code blocks (such as \`\`\`html or \`\`\`). Do not include any conversational text outside of the HTML note content.`
+            systemInstruction = `You are an AI writing assistant specializing in structural organization, layout cleaning, and professional styling.
+Your task is to take the user's HTML note and reformat its layout, spacing, list hierarchy, and structure.
+${DATA_PRESERVATION_PROTOCOL}
+Specific rules for Re-Format:
+1. Re-organize spacing, fix improper list nests, alignment, and messy paragraph spacing.
+2. Group related items logically with headings (h1, h2, h3) and list structures if they are disorganized, but never remove any content.
+3. Make the formatting look premium, neat, and highly readable.`
         } else if (action === 'improve') {
-            systemInstruction = `You are an AI writing assistant specializing in content enhancement, grammar check, and stylistic improvement.
-Your task is to take the user's note (which is provided in HTML format) and improve it.
-Follow these strict rules:
-1. Preserve 100% of all original details, links, numbers, dates, and core meaning. DO NOT discard, summarize, edit, or omit anything.
-2. Refine spelling, grammar, vocabulary, clarity, and overall writing quality.
-3. Make the prose sound more polished, professional, and clear.
-4. Maintain the structure (lists, headings, paragraphs) of the original note as much as possible, just refining the language within.
-5. Output the result ONLY in clean, semantic HTML format. DO NOT wrap the output in markdown code blocks (such as \`\`\`html or \`\`\`). Do not include any conversational text outside of the HTML note content.`
+            systemInstruction = `You are an AI writing assistant specializing in language enhancement, grammatical checking, and stylistic improvements.
+Your task is to take the user's HTML note and polish its writing style, phrasing, clarity, and tone.
+${DATA_PRESERVATION_PROTOCOL}
+Specific rules for Improve Writing:
+1. Improve vocabulary, fix grammar/spelling errors, and make sentences flow smoother.
+2. Retain the structure (lists, headings, paragraph flow) of the original HTML as much as possible.
+3. Do not rewrite so aggressively that the original details or context are lost or obscured.`
         } else {
             const userInstructions = customPrompt || 'Improve this note.'
-            systemInstruction = `You are an AI writing assistant. The user wants you to modify/improve their note based on this request: "${userInstructions}".
-Follow these strict rules:
-1. Preserve 100% of all original information, links, details, dates, lists, text, numbers, and meaning unless the user explicitly requested to remove something. DO NOT discard, summarize, edit, or omit anything due to hallucination or oversight.
-2. Carefully apply the user's request: "${userInstructions}" to improve, edit, or format the text.
-3. Output the result ONLY in clean, semantic HTML format. DO NOT wrap the output in markdown code blocks (such as \`\`\`html or \`\`\`). Do not include any conversational text outside of the HTML note content.`
+            systemInstruction = `You are an AI writing assistant. The user wants you to modify/improve their HTML note based on this request: "${userInstructions}".
+${DATA_PRESERVATION_PROTOCOL}
+Specific rules for Custom Prompt:
+1. Apply the user's specific request: "${userInstructions}" to modify or refine the note content.
+2. If the user request does not ask to delete a specific piece of information, you MUST preserve 100% of all details, links, images, dates, and numbers.
+3. If the user's request is a refinement command (e.g., "make the second point bold" or "add a summary at the end"), perform it while keeping all other parts of the document fully intact.`
         }
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
