@@ -29,6 +29,8 @@ import ImageExtension from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import UnderlineExtension from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
+import Link from '@tiptap/extension-link';
+import Youtube from '@tiptap/extension-youtube';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -219,6 +221,24 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
             ImageExtension.configure({ inline: false, allowBase64: true }),
             Placeholder.configure({ placeholder: 'Start writing…' }),
+            Link.configure({
+                openOnClick: 'whenNotEditable',
+                autolink: true,
+                defaultProtocol: 'https',
+                HTMLAttributes: {
+                    class: 'text-primary underline cursor-pointer hover:text-primary/80',
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                },
+            }),
+            Youtube.configure({
+                controls: true,
+                nocookie: true,
+                allowFullscreen: true,
+                HTMLAttributes: {
+                    class: 'w-full aspect-video rounded-lg my-3 border border-outline shadow-sm',
+                },
+            }),
         ],
         content: note.content || '',
         editable: !readMode,
@@ -521,10 +541,37 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, isActive, onSelect, onDelete,
     const completedTodos = (note.todos || []).filter(t => t.completed).length;
     const totalTodos = (note.todos || []).length;
 
-    // Plain text preview from HTML
-    const plainText = note.content
-        ? note.content.replace(/<img[^>]*>/gi, '[image] ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-        : '';
+    // Plain text preview from HTML, safely stripping tags and decoding HTML entities (like &nbsp;, &amp;)
+    const plainText = (() => {
+        if (!note.content) return '';
+        // Insert spaces before closing block tags to prevent text merging, and insert placeholders for media
+        const withPlaceholders = note.content
+            .replace(/<img[^>]*>/gi, '[image] ')
+            .replace(/<iframe[^>]*>/gi, '[video] ')
+            .replace(/<\/p>/gi, ' </p>')
+            .replace(/<\/div>/gi, ' </div>')
+            .replace(/<\/li>/gi, ' </li>')
+            .replace(/<br\s*\/?>/gi, ' <br> ')
+            .replace(/<\/h[1-6]>/gi, ' ');
+
+        try {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(withPlaceholders, 'text/html');
+            const text = doc.body.textContent || doc.body.innerText || '';
+            return text.replace(/\s+/g, ' ').trim();
+        } catch {
+            return withPlaceholders
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+    })();
 
     useEffect(() => {
         if (!menuOpen) return;

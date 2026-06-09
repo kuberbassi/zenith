@@ -506,6 +506,33 @@ button.bg-white\/10:hover {
   margin: 0.75rem 0;
 }
 
+.tiptap-editor .ProseMirror a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.tiptap-editor .ProseMirror a:hover {
+  opacity: 0.8;
+}
+
+.dark .tiptap-editor .ProseMirror a {
+  color: #60a5fa;
+}
+
+.tiptap-editor .ProseMirror iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline);
+  margin: 1rem 0;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+
 /* Read mode — slightly muted */
 .tiptap-editor.read-mode .ProseMirror {
   opacity: 0.85;

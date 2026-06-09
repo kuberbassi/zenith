@@ -21,6 +21,36 @@ import { useNotes } from '@/hooks/useNotes';
 /* ── Helpers for Timetable slot subject mapping ── */
 const normalizeId = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
 
+const getNotePlainText = (content: string): string => {
+    if (!content) return 'Empty note';
+    const withPlaceholders = content
+        .replace(/<img[^>]*>/gi, '[image] ')
+        .replace(/<iframe[^>]*>/gi, '[video] ')
+        .replace(/<\/p>/gi, ' </p>')
+        .replace(/<\/div>/gi, ' </div>')
+        .replace(/<\/li>/gi, ' </li>')
+        .replace(/<br\s*\/?>/gi, ' <br> ')
+        .replace(/<\/h[1-6]>/gi, ' ');
+
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(withPlaceholders, 'text/html');
+        const text = doc.body.textContent || doc.body.innerText || '';
+        return text.replace(/\s+/g, ' ').trim();
+    } catch {
+        return withPlaceholders
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+};
+
 const findSubjectForSlot = (subjects: any[], slot: any) => {
     const explicitType = String(slot?.type || '').trim().toLowerCase();
     const hasSubjectRef = Boolean(normalizeId(slot?.subject_id || slot?.subjectId || slot?.subject?._id || slot?.subject?.id));
@@ -478,7 +508,7 @@ const Dashboard: React.FC = () => {
                                                 <div>
                                                     <h4 className="text-xs font-bold text-on-surface truncate">{note.title || 'Untitled'}</h4>
                                                     {!note.is_todo ? (
-                                                        <p className="text-[11px] text-on-surface-variant/65 mt-1.5 line-clamp-3 leading-relaxed whitespace-pre-wrap">{note.content ? note.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : 'Empty note'}</p>
+                                                        <p className="text-[11px] text-on-surface-variant/65 mt-1.5 line-clamp-3 leading-relaxed whitespace-pre-wrap">{getNotePlainText(note.content)}</p>
                                                     ) : (
                                                         <div className="space-y-1 mt-2">
                                                             {note.todos && note.todos.slice(0, 2).map((todo: any) => (
