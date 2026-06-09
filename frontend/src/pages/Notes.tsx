@@ -643,6 +643,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-outline mb-3">
                 <div className="flex items-center gap-1">
+                    <button onClick={onDelete} className="p-1.5 text-on-surface-variant/30 hover:text-red-500 rounded transition-colors cursor-pointer" title="Delete"><Trash2 size={14} /></button>
                     <button onClick={onTogglePin} className={`p-1.5 rounded hover:bg-surface-container transition-colors cursor-pointer ${note.is_pinned ? 'text-primary' : 'text-on-surface-variant/30'}`} title="Pin">
                         <Pin size={14} className={note.is_pinned ? 'fill-current' : ''} />
                     </button>
@@ -650,8 +651,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
                         {readMode ? <><Eye size={11} /> Reading</> : <><Pencil size={11} /> Editing</>}
                     </button>
                 </div>
-                <div className="flex items-center gap-1">
-                    <button onClick={onDelete} className="p-1.5 text-on-surface-variant/30 hover:text-red-500 rounded transition-colors cursor-pointer" title="Delete"><Trash2 size={14} /></button>
+                <div className="flex items-center">
                     <button onClick={onClose} className="p-1.5 text-on-surface-variant/30 hover:text-on-surface rounded transition-colors cursor-pointer" title="Close"><X size={14} /></button>
                 </div>
             </div>
@@ -760,6 +760,9 @@ const TodoPanel: React.FC<TodoPanelProps> = ({ note, onUpdate, onDelete, onClose
         >
             {/* Header */}
             <div className="flex items-center justify-between pb-3 border-b border-outline mb-4">
+                {!isInline && (
+                    <button onClick={onDelete} className="p-1.5 text-on-surface-variant/30 hover:text-red-500 rounded transition-colors cursor-pointer mr-1" title="Delete"><Trash2 size={14} /></button>
+                )}
                 {isInline ? (
                     <span className="text-xs font-bold text-on-surface-variant/40 uppercase tracking-widest ml-1">My Tasks Checklist</span>
                 ) : (
@@ -779,10 +782,7 @@ const TodoPanel: React.FC<TodoPanelProps> = ({ note, onUpdate, onDelete, onClose
                         {editMode ? <><Check size={10} /> Done</> : <><Pencil size={10} /> Edit Mode</>}
                     </button>
                     {!isInline && (
-                        <>
-                            <button onClick={onDelete} className="p-1.5 text-on-surface-variant/30 hover:text-red-500 rounded transition-colors cursor-pointer"><Trash2 size={14} /></button>
-                            <button onClick={onClose} className="p-1.5 text-on-surface-variant/30 hover:text-on-surface rounded transition-colors cursor-pointer"><X size={14} /></button>
-                        </>
+                        <button onClick={onClose} className="p-1.5 text-on-surface-variant/30 hover:text-on-surface rounded transition-colors cursor-pointer" title="Close"><X size={14} /></button>
                     )}
                 </div>
             </div>
@@ -1113,6 +1113,11 @@ const Notes: React.FC = () => {
     };
 
     const deleteNote = async (noteId: string) => {
+        const isTemp = noteId.startsWith('temp-');
+        if (!isTemp) {
+            const confirmed = window.confirm("Are you sure you want to delete this note?");
+            if (!confirmed) return;
+        }
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate([15, 5, 15]);
         setNotes(prev => prev.filter(n => n.id !== noteId));
         if (activeNote?.id === noteId) setActiveNote(null);
