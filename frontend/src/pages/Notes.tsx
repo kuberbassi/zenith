@@ -592,6 +592,27 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
         setReadMode(!note.id.startsWith('temp-'));
     }, [note.id]);
 
+    // Keep track of latest AI draft state in refs for the unmount/switching cleanup function
+    const hasAiDraftRef = useRef(hasAiDraft);
+    const prevContentRef = useRef(prevContent);
+
+    useEffect(() => {
+        hasAiDraftRef.current = hasAiDraft;
+    }, [hasAiDraft]);
+
+    useEffect(() => {
+        prevContentRef.current = prevContent;
+    }, [prevContent]);
+
+    // Auto-revert AI draft if editor is closed or note is switched without explicitly accepting it
+    useEffect(() => {
+        return () => {
+            if (hasAiDraftRef.current && prevContentRef.current) {
+                onUpdate({ content: prevContentRef.current });
+            }
+        };
+    }, [note.id, onUpdate]);
+
     // Paste / drop images
     useEffect(() => {
         if (!editor) return;
