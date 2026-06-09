@@ -203,6 +203,99 @@ const NoteToolbar: React.FC<{ editor: Editor }> = ({ editor }) => {
 // Rich Note Editor panel
 // ─────────────────────────────────────────────────────────────────────────────
 
+const isMarkdown = (t: string): boolean => {
+    return /^\s*(#|\*|-|\d+\.)/m.test(t) || t.includes('**') || t.includes('__') || t.includes('`');
+};
+
+const parseInlineMarkdown = (text: string): string => {
+    let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // Bold
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+
+    // Italic
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+
+    // Code
+    html = html.replace(/`(.*?)`/g, '<code>$1</code>');
+
+    // Links [text](url)
+    html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
+
+    return html;
+};
+
+const convertMarkdownToHtml = (markdown: string): string => {
+    const lines = markdown.split(/\r?\n/);
+    let html = '';
+    let inList = false;
+    let listType = ''; // 'ul' or 'ol'
+
+    const closeList = () => {
+        if (inList) {
+            html += `</${listType}>`;
+            inList = false;
+            listType = '';
+        }
+    };
+
+    for (let line of lines) {
+        // Headers
+        const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
+        if (headerMatch) {
+            closeList();
+            const level = headerMatch[1].length;
+            html += `<h${level}>${parseInlineMarkdown(headerMatch[2])}</h${level}>`;
+            continue;
+        }
+
+        // Bullet lists
+        const bulletMatch = line.match(/^(\*|-)\s+(.*)$/);
+        if (bulletMatch) {
+            if (!inList || listType !== 'ul') {
+                closeList();
+                html += '<ul>';
+                inList = true;
+                listType = 'ul';
+            }
+            html += `<li>${parseInlineMarkdown(bulletMatch[2])}</li>`;
+            continue;
+        }
+
+        // Ordered lists
+        const orderedMatch = line.match(/^(\d+)\.\s+(.*)$/);
+        if (orderedMatch) {
+            if (!inList || listType !== 'ol') {
+                closeList();
+                html += '<ol>';
+                inList = true;
+                listType = 'ol';
+            }
+            html += `<li>${parseInlineMarkdown(orderedMatch[2])}</li>`;
+            continue;
+        }
+
+        // Empty line
+        if (!line.trim()) {
+            closeList();
+            html += '<p></p>';
+            continue;
+        }
+
+        // Paragraph line
+        closeList();
+        html += `<p>${parseInlineMarkdown(line)}</p>`;
+    }
+
+    closeList();
+    return html;
+};
+
 interface NoteEditorProps {
     note: Note;
     onUpdate: (fields: Partial<Note>) => void;
@@ -245,6 +338,22 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
         onUpdate: ({ editor }) => {
             onUpdate({ content: editor.getHTML() });
         },
+        editorProps: {
+            handlePaste(view, event) {
+                const text = event.clipboardData?.getData('text/plain');
+                if (text && isMarkdown(text)) {
+                    event.preventDefault();
+                    const html = convertMarkdownToHtml(text);
+                    const dom = new DOMParser().parseFromString(html, 'text/html');
+                    const parser = view.state.schema.cached.domParser;
+                    const slice = parser.parseSlice(dom.body);
+                    const transaction = view.state.tr.replaceSelection(slice);
+                    view.dispatch(transaction);
+                    return true;
+                }
+                return false;
+            }
+        }
     });
 
     // Sync read mode with editor editability
@@ -656,8 +765,17 @@ const Notes: React.FC = () => {
     const queryClient = useQueryClient();
     const [notes, setNotes] = useState<Note[]>([]);
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'notes' | 'todos'>('notes');
+    const [viewMode, setViewMode] = useState<'notes' | 'todos'>(() => {
+        const saved = localStorage.getItem('zenith_notes_view_mode');
+        return (saved === 'notes' || saved === 'todos') ? saved : 'notes';
+    });
     const [activeNote, setActiveNote] = useState<Note | null>(null);
+
+    const handleViewModeChange = (mode: 'notes' | 'todos') => {
+        setViewMode(mode);
+        setActiveNote(null);
+        localStorage.setItem('zenith_notes_view_mode', mode);
+    };
     const [searchQuery, setSearchQuery] = useState('');
     const saveTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -781,7 +899,7 @@ const Notes: React.FC = () => {
                             {(['notes', 'todos'] as const).map(mode => (
                                 <button
                                     key={mode}
-                                    onClick={() => { setViewMode(mode); setActiveNote(null); }}
+                                    onClick={() => handleViewModeChange(mode)}
                                     className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${viewMode === mode ? 'bg-surface text-on-surface shadow-sm border border-outline' : 'text-on-surface-variant/50 hover:text-on-surface'}`}
                                 >
                                     {mode === 'notes' ? <><StickyNote size={12} />Notes</> : <><ListTodo size={12} />Tasks</>}
@@ -829,7 +947,7 @@ const Notes: React.FC = () => {
                                 {(['notes', 'todos'] as const).map(mode => (
                                     <button
                                         key={mode}
-                                        onClick={() => { setViewMode(mode); setActiveNote(null); }}
+                                        onClick={() => handleViewModeChange(mode)}
                                         className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-md transition-all cursor-pointer ${viewMode === mode ? 'bg-surface text-on-surface shadow-sm border border-outline' : 'text-on-surface-variant/50 hover:text-on-surface'}`}
                                     >
                                         {mode === 'notes' ? <><StickyNote size={12} />Notes</> : <><ListTodo size={12} />Tasks</>}
