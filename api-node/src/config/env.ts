@@ -19,6 +19,7 @@ export const ENV = {
   NODE_ENV: process.env.NODE_ENV ?? 'development',
   ALLOWED_ORIGINS: (process.env.ALLOWED_ORIGINS ?? 'http://localhost:3002').split(','),
   GROQ_API_KEY: process.env.GROQ_API_KEY ?? '',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY ?? '',
   COOKIE_DOMAIN: process.env.COOKIE_DOMAIN ?? '',
   COOKIE_SECURE: (process.env.COOKIE_SECURE ?? (process.env.NODE_ENV === 'production' ? 'true' : 'false')) === 'true',
 }

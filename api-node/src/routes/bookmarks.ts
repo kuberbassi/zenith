@@ -7,6 +7,7 @@ import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { ok, created, fail } from '../utils/response.js'
 import { getClientIp } from '../utils/ip.js'
 import { ENV } from '../config/env.js'
+import { callLLM, ChatMessage } from '../utils/llm.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -331,11 +332,6 @@ router.post('/ai-enrich', async (req: AuthRequest, res) => {
     const userId = req.userId!
     const body = AiEnrichSchema.parse(req.body)
 
-    if (!ENV.GROQ_API_KEY) {
-      fail(res, 'AI API key is not configured.', 'CONFIG_ERROR', 500)
-      return
-    }
-
     const bookmarks = await prisma.bookmark.findMany({
       where: {
         id: { in: body.ids },
@@ -412,32 +408,15 @@ Example Output:
 ]
 `
 
-    const aiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${ENV.GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: JSON.stringify(listPayload) },
-        ],
-        temperature: 0.1,
-        response_format: { type: 'json_object' }, // ensures JSON outputs
-      }),
+    const messages: ChatMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: JSON.stringify(listPayload) },
+    ]
+
+    let contentStr = await callLLM(messages, {
+      temperature: 0.1,
+      jsonMode: true,
     })
-
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text()
-      console.error('[bookmarks AI ENRICH] Groq error:', aiResponse.status, errText)
-      fail(res, 'AI service failed to respond', 'AI_SERVICE_ERROR', 502)
-      return
-    }
-
-    const data = await aiResponse.json() as any
-    let contentStr = data.choices?.[0]?.message?.content ?? ''
 
     // Cleanup potential code blocks
     if (contentStr.includes('```')) {

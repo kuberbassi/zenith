@@ -5,6 +5,7 @@ import { ENV } from '../config/env.js'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { ok, fail } from '../utils/response.js'
 import { GradeCalculator, AttendanceCalculator } from '../lib/calculations.js'
+import { callLLM, ChatMessage } from '../utils/llm.js'
 
 const router = Router()
 router.use(requireAuth)
@@ -278,48 +279,22 @@ async function chatHandler(req: AuthRequest, res: any) {
             context = 'Profile sync temporarily unavailable.'
         }
 
-        const messages = [
+        const messages: ChatMessage[] = [
             { role: 'system', content: `${systemPrompt}\n\nCURRENT ACADEMIC CONTEXT:\n${context}` },
             ...history,
             { role: 'user', content: message }
         ]
 
-        if (!ENV.GROQ_API_KEY) {
-            fail(res, 'AI API key is not configured.', 'CONFIG_ERROR', 500)
-            return
-        }
-
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${ENV.GROQ_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages,
-                temperature: 0.2,
-                max_tokens: 512,
-                top_p: 1,
-                stream: false
-            })
+        const aiResponse = await callLLM(messages, {
+            temperature: 0.2,
+            maxTokens: 512
         })
 
-        if (!response.ok) {
-            const error = await response.text()
-            console.error('[ai/chat] Groq API error:', response.status, error)
-            fail(res, 'AI service temporarily unavailable. Please try again.', 'AI_ERROR', 502)
-            return
-        }
-
-        const data = await response.json() as any
-        const aiResponse = data.choices?.[0]?.message?.content ?? 'Sorry, I could not process that.'
-
         ok(res, { response: aiResponse })
-    } catch (err) {
+    } catch (err: any) {
         if (err instanceof z.ZodError) { fail(res, 'Invalid message', 'VALIDATION_ERROR', 400); return }
         console.error('[ai/chat]', err)
-        fail(res, 'Failed to process message', 'SERVER_ERROR', 500)
+        fail(res, err.message || 'Failed to process message', 'SERVER_ERROR', 500)
     }
 }
 
@@ -333,11 +308,6 @@ async function processNoteHandler(req: AuthRequest, res: any) {
     try {
         const body = ProcessNoteSchema.parse(req.body)
         const { content, action, customPrompt } = body
-
-        if (!ENV.GROQ_API_KEY) {
-            fail(res, 'AI API key is not configured.', 'CONFIG_ERROR', 500)
-            return
-        }
 
         let systemInstruction = ''
         const DATA_PRESERVATION_PROTOCOL = `
@@ -373,34 +343,15 @@ Specific rules for Custom Prompt:
 3. If the user's request is a refinement command (e.g., "make the second point bold" or "add a summary at the end"), perform it while keeping all other parts of the document fully intact.`
         }
 
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${ENV.GROQ_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
-                messages: [
-                    { role: 'system', content: systemInstruction },
-                    { role: 'user', content: content }
-                ],
-                temperature: 0.1,
-                max_tokens: 1536,
-                top_p: 1,
-                stream: false
-            })
+        const messages: ChatMessage[] = [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: content }
+        ]
+
+        let aiResponse = await callLLM(messages, {
+            temperature: 0.1,
+            maxTokens: 1536
         })
-
-        if (!response.ok) {
-            const error = await response.text()
-            console.error('[ai/process_note] Groq API error:', response.status, error)
-            fail(res, 'AI service temporarily unavailable. Please try again.', 'AI_ERROR', 502)
-            return
-        }
-
-        const data = await response.json() as any
-        let aiResponse = data.choices?.[0]?.message?.content ?? ''
 
         // Sanitize any wrapped markdown code block symbols if they were generated
         if (aiResponse.includes('```')) {
@@ -408,10 +359,10 @@ Specific rules for Custom Prompt:
         }
 
         ok(res, { processedContent: aiResponse })
-    } catch (err) {
+    } catch (err: any) {
         if (err instanceof z.ZodError) { fail(res, 'Invalid input parameters', 'VALIDATION_ERROR', 400); return }
         console.error('[ai/process_note]', err)
-        fail(res, 'Failed to process note', 'SERVER_ERROR', 500)
+        fail(res, err.message || 'Failed to process note', 'SERVER_ERROR', 500)
     }
 }
 
