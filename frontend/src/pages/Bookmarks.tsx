@@ -828,7 +828,7 @@ const Bookmarks: React.FC = () => {
                             {searchQuery && (
                                 <button 
                                     onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container transition-colors"
+                                    className="no-fluid absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container transition-colors"
                                 >
                                     <X size={14} className="shrink-0" />
                                 </button>
