@@ -538,24 +538,27 @@ const Bookmarks: React.FC = () => {
         // 4. Sort (Skip if Already Sorting by Clicked Date in 'Recently Used')
         if (selectedCategory !== 'Recently Used') {
             list.sort((a, b) => {
-                const key = sortBy as keyof BookmarkType;
-                let valA = a[key];
-                let valB = b[key];
+                const getSortValue = (item: BookmarkType): string | number => {
+                    switch (sortBy) {
+                        case 'title': return item.cleaned_title || item.title;
+                        case 'priority': return item.priority;
+                        case 'click_count': return item.click_count;
+                        case 'created_at': return item.created_at;
+                        default: return item.created_at;
+                    }
+                };
 
-                // fallbacks
-                if (sortBy === 'title') {
-                    valA = a.cleaned_title || a.title;
-                    valB = b.cleaned_title || b.title;
-                }
+                const valA = getSortValue(a);
+                const valB = getSortValue(b);
 
-                if (typeof valA === 'string') {
+                if (typeof valA === 'string' && typeof valB === 'string') {
                     return sortOrder === 'asc' 
                         ? valA.localeCompare(valB) 
                         : valB.localeCompare(valA);
                 } else {
                     return sortOrder === 'asc' 
-                        ? (valA || 0) - (valB || 0) 
-                        : (valB || 0) - (valA || 0);
+                        ? (Number(valA) || 0) - (Number(valB) || 0) 
+                        : (Number(valB) || 0) - (Number(valA) || 0);
                 }
             });
         }
