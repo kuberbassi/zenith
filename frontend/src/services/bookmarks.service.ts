@@ -25,7 +25,12 @@ export const bookmarksService = {
         sort?: string;
         order?: string;
     }): Promise<Bookmark[]> => {
-        const response = await api.get('/api/bookmarks', { params });
+    const response = await api.get('/api/bookmarks', { params });
+        return response.data.data;
+    },
+
+    addBookmark: async (url: string, title?: string, category?: string): Promise<Bookmark> => {
+        const response = await api.post('/api/bookmarks', { url, title, category });
         return response.data.data;
     },
 

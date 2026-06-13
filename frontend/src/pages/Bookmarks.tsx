@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Bookmark, Upload, Sparkles, Search, Trash2, Edit,
     ExternalLink, Globe, Star, AlertTriangle, Clock, RefreshCw, X,
-    Folder, CheckSquare, Square, Tag, ArrowUpDown, ChevronDown, Check, ArrowUp,
+    Folder, CheckSquare, Square, Tag, ArrowUpDown, ChevronDown, Check,
     Briefcase, Code, Palette, Users, FileText, Tv,
-    Book, Laptop, Settings, Link, Heart, Smile, Compass, HelpCircle
+    Book, Laptop, Settings, Link, Heart, Smile, Compass, HelpCircle,
+    Copy, Plus
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { bookmarksService, type Bookmark as BookmarkType } from '@/services/bookmarks.service';
@@ -15,7 +16,7 @@ import Modal from '@/components/ui/Modal';
 
 const DEFAULT_CATEGORIES = ['Learning', 'Career', 'Developer Tools', 'Design Assets', 'Productivity & Utilities', 'Social & Community', 'News & Blogs', 'Entertainment & Media', 'General'];
 
-export const ICON_MAP: Record<string, React.ComponentType<any>> = {
+const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
     Star,
     Briefcase,
     Code,
@@ -87,6 +88,67 @@ const Bookmarks: React.FC = () => {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isEditing, setIsEditing] = useState<BookmarkType | null>(null);
 
+    // Starred Bookmarks (localStorage-backed, no DB required)
+    const [starredIds, setStarredIds] = useState<Set<string>>(() => {
+        try {
+            const saved = localStorage.getItem('zenith_starred_bookmarks');
+            return saved ? new Set(JSON.parse(saved)) : new Set();
+        } catch {
+            return new Set();
+        }
+    });
+
+    const toggleStar = useCallback((id: string) => {
+        setStarredIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            localStorage.setItem('zenith_starred_bookmarks', JSON.stringify(Array.from(next)));
+            return next;
+        });
+    }, []);
+
+    // Copied URL state (for copy-to-clipboard feedback)
+    const [copiedId, setCopiedId] = useState<string | null>(null);
+
+    const handleCopyUrl = useCallback((id: string, url: string) => {
+        navigator.clipboard.writeText(url).then(() => {
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 1500);
+        });
+    }, []);
+
+    // Quick Add URL state
+    const [quickAddUrl, setQuickAddUrl] = useState('');
+    const [quickAddLoading, setQuickAddLoading] = useState(false);
+    const quickAddInputRef = useRef<HTMLInputElement>(null);
+
+    const handleQuickAdd = async () => {
+        const url = quickAddUrl.trim();
+        if (!url) return;
+        // Basic URL validation
+        try { new URL(url.startsWith('http') ? url : `https://${url}`); } catch {
+            showToast('error', 'Please enter a valid URL');
+            return;
+        }
+        const normalizedUrl = url.startsWith('http') ? url : `https://${url}`;
+        setQuickAddLoading(true);
+        try {
+            const newBookmark = await bookmarksService.addBookmark(normalizedUrl);
+            setBookmarks(prev => [newBookmark, ...prev]);
+            setQuickAddUrl('');
+            showToast('success', 'Bookmark added! Use AI Auto-Organize to categorize it.');
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to add bookmark';
+            showToast('error', msg);
+        } finally {
+            setQuickAddLoading(false);
+        }
+    };
+
     // AI Enrichment State
     const [aiEnriching, setAiEnriching] = useState(false);
     const [aiProgress, setAiProgress] = useState({ current: 0, total: 0 });
@@ -144,13 +206,11 @@ const Bookmarks: React.FC = () => {
         }
     };
 
-    const [showScrollTop, setShowScrollTop] = useState(false);
-
     const fileInputRef = useRef<HTMLInputElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     // Fetch Bookmarks on Mount
-    const fetchBookmarks = async () => {
+    const fetchBookmarks = useCallback(async () => {
         setLoading(true);
         try {
             const data = await bookmarksService.getBookmarks();
@@ -161,11 +221,11 @@ const Bookmarks: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [showToast]);
 
     useEffect(() => {
         fetchBookmarks();
-    }, []);
+    }, [fetchBookmarks]);
 
     // Sync editing states
     useEffect(() => {
@@ -217,19 +277,6 @@ const Bookmarks: React.FC = () => {
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
-
-    // Scroll-to-top display trigger
-    useEffect(() => {
-        const handleScroll = () => {
-            if (window.scrollY > 300) {
-                setShowScrollTop(true);
-            } else {
-                setShowScrollTop(false);
-            }
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
     // Get Domain Name from URL
@@ -290,7 +337,9 @@ const Bookmarks: React.FC = () => {
                 next.delete(id);
                 setSelectedIds(next);
             }
-        } catch (err) {
+            // Remove from starred if starred
+            if (starredIds.has(id)) toggleStar(id);
+        } catch {
             showToast('error', 'Failed to delete bookmark');
         }
     };
@@ -298,7 +347,6 @@ const Bookmarks: React.FC = () => {
     // Bulk delete selected
     const handleBulkDelete = async () => {
         if (selectedIds.size === 0) return;
-        if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} bookmarks?`)) return;
 
         const idsArray = Array.from(selectedIds);
         try {
@@ -306,7 +354,7 @@ const Bookmarks: React.FC = () => {
             setBookmarks(prev => prev.filter(b => !selectedIds.has(b.id)));
             setSelectedIds(new Set());
             showToast('success', `Deleted ${idsArray.length} bookmarks`);
-        } catch (err) {
+        } catch {
             showToast('error', 'Failed to delete selected bookmarks');
         }
     };
@@ -318,7 +366,7 @@ const Bookmarks: React.FC = () => {
             setBookmarks(prev => prev.map(b => b.id === id ? updated : b));
             setIsEditing(null);
             showToast('success', 'Bookmark updated');
-        } catch (err) {
+        } catch {
             showToast('error', 'Failed to update bookmark');
         }
     };
@@ -330,8 +378,9 @@ const Bookmarks: React.FC = () => {
             const res = await bookmarksService.importBookmarks(contentStr, type);
             showToast('success', `Successfully imported ${res.importedCount} bookmarks!`);
             fetchBookmarks();
-        } catch (err: any) {
-            showToast('error', err.response?.data?.error || 'Failed to parse/import file');
+        } catch (err: unknown) {
+            const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to parse/import file';
+            showToast('error', msg);
             setLoading(false);
         }
     };
@@ -420,10 +469,11 @@ const Bookmarks: React.FC = () => {
     const categoriesCount = useMemo(() => {
         return {
             All: bookmarks.length,
+            Starred: starredIds.size,
             'Recently Used': bookmarks.filter(b => b.clicked_at).length,
             Duplicates: bookmarks.filter(b => b.is_duplicate).length,
         };
-    }, [bookmarks]);
+    }, [bookmarks, starredIds]);
 
     const dynamicCategories = useMemo(() => {
         const counts: Record<string, number> = {};
@@ -459,6 +509,8 @@ const Bookmarks: React.FC = () => {
                     const dateB = b.clicked_at ? new Date(b.clicked_at).getTime() : 0;
                     return dateB - dateA;
                 });
+            } else if (selectedCategory === 'Starred') {
+                list = list.filter(b => starredIds.has(b.id));
             } else if (selectedCategory === 'Duplicates') {
                 list = list.filter(b => b.is_duplicate);
             } else {
@@ -486,8 +538,9 @@ const Bookmarks: React.FC = () => {
         // 4. Sort (Skip if Already Sorting by Clicked Date in 'Recently Used')
         if (selectedCategory !== 'Recently Used') {
             list.sort((a, b) => {
-                let valA: any = a[sortBy];
-                let valB: any = b[sortBy];
+                const key = sortBy as keyof BookmarkType;
+                let valA = a[key];
+                let valB = b[key];
 
                 // fallbacks
                 if (sortBy === 'title') {
@@ -508,7 +561,7 @@ const Bookmarks: React.FC = () => {
         }
 
         return list;
-    }, [bookmarks, selectedCategory, selectedTags, searchQuery, sortBy, sortOrder]);
+    }, [bookmarks, selectedCategory, selectedTags, searchQuery, sortBy, sortOrder, starredIds]);
 
     const stats = useMemo(() => {
         return {
@@ -543,7 +596,7 @@ const Bookmarks: React.FC = () => {
                             className="h-9 px-3.5 flex items-center gap-2 text-xs font-bold rounded bg-surface border border-outline hover:bg-surface-container text-on-surface transition-all cursor-pointer"
                         >
                             <Upload size={13} />
-                            Import Bookmarks
+                            Import
                         </button>
                         <input
                             ref={fileInputRef}
@@ -562,6 +615,32 @@ const Bookmarks: React.FC = () => {
                             {selectedIds.size > 0 ? `Optimize Selected (${selectedIds.size})` : 'AI Auto-Organize'}
                         </button>
                     </div>
+                </div>
+            </div>
+
+            {/* Quick Add URL Bar */}
+            <div className="mb-6">
+                <div className="flex gap-2 items-center bg-surface/50 border border-outline/20 backdrop-blur-md rounded-2xl px-4 py-2.5 shadow-sm focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+                    <Plus size={15} className="text-on-surface-variant/40 shrink-0" />
+                    <input
+                        ref={quickAddInputRef}
+                        type="url"
+                        value={quickAddUrl}
+                        onChange={e => setQuickAddUrl(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleQuickAdd()}
+                        placeholder="Paste any URL and press Enter to save instantly..."
+                        className="flex-1 bg-transparent text-xs font-semibold text-on-surface placeholder:text-on-surface-variant/30 outline-none"
+                    />
+                    {quickAddUrl && (
+                        <button
+                            onClick={handleQuickAdd}
+                            disabled={quickAddLoading}
+                            className="shrink-0 h-7 px-3 rounded-lg bg-primary text-surface text-[11px] font-bold hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5"
+                        >
+                            {quickAddLoading ? <RefreshCw size={10} className="animate-spin" /> : <Plus size={10} />}
+                            Save
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -636,6 +715,7 @@ const Bookmarks: React.FC = () => {
                             {/* Fixed Quick Filters */}
                             {[
                                 { name: 'All', icon: Folder, count: categoriesCount.All, color: 'hover:bg-primary/5 hover:text-primary' },
+                                { name: 'Starred', icon: Star, count: categoriesCount.Starred, color: 'hover:bg-amber-500/5 hover:text-amber-500', countColor: 'text-amber-500 bg-amber-500/10' },
                                 { name: 'Recently Used', icon: Clock, count: categoriesCount['Recently Used'], color: 'hover:bg-purple-500/5 hover:text-purple-500' },
                                 { name: 'Duplicates', icon: AlertTriangle, count: categoriesCount.Duplicates, countColor: 'text-amber-500 bg-amber-500/10', color: 'hover:bg-amber-500/5 hover:text-amber-500' }
                             ].map(cat => {
@@ -661,7 +741,7 @@ const Bookmarks: React.FC = () => {
                                 );
                             })}
 
-                            <div className="border-t border-outline/10 my-2 pt-2" />
+                            <div className="border-t border-outline/25 my-3 pt-2" />
 
                             {/* Dynamic AI categories list */}
                             {dynamicCategories.map(cat => {
@@ -747,6 +827,7 @@ const Bookmarks: React.FC = () => {
                         <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none -mx-4 px-4 mask-image">
                             {[
                                 { name: 'All', icon: Folder, count: categoriesCount.All },
+                                { name: 'Starred', icon: Star, count: categoriesCount.Starred, countColor: 'text-amber-500 bg-amber-500/10' },
                                 { name: 'Recently Used', icon: Clock, count: categoriesCount['Recently Used'] },
                                 { name: 'Duplicates', icon: AlertTriangle, count: categoriesCount.Duplicates, countColor: 'text-amber-500 bg-amber-500/10' },
                                 ...dynamicCategories.map(cat => ({
@@ -882,7 +963,7 @@ const Bookmarks: React.FC = () => {
                                                         key={opt.value}
                                                         type="button"
                                                         onClick={() => {
-                                                            setSortBy(opt.value as any);
+                                                            setSortBy(opt.value as 'created_at' | 'click_count' | 'priority' | 'title');
                                                             setSortDropdownOpen(false);
                                                         }}
                                                         className={`w-full px-3.5 py-2 text-left text-[11px] font-semibold flex items-center justify-between transition-colors ${
@@ -981,12 +1062,50 @@ const Bookmarks: React.FC = () => {
                                 <span className="text-xs font-semibold mt-3">Loading resources...</span>
                             </div>
                         ) : filteredBookmarks.length === 0 ? (
-                            <div className="border border-outline/10 rounded-2xl bg-surface/20 py-20 px-4 text-center">
-                                <Bookmark className="w-10 h-10 text-on-surface-variant/15 mx-auto mb-3" />
-                                <h3 className="text-sm font-bold text-on-surface">No bookmarks found</h3>
-                                <p className="text-xs text-on-surface-variant/50 max-w-sm mx-auto mt-1">
-                                    No resources matched your filters or search keywords. Import a bookmarks file or optimize existing ones with AI.
-                                </p>
+                            <div className="border border-outline/10 rounded-2xl bg-surface/20 py-16 px-4 text-center">
+                                {selectedCategory === 'Starred' ? (
+                                    <>
+                                        <Star className="w-9 h-9 text-amber-400/30 mx-auto mb-3" />
+                                        <h3 className="text-sm font-bold text-on-surface">No starred bookmarks yet</h3>
+                                        <p className="text-xs text-on-surface-variant/50 max-w-xs mx-auto mt-1.5">
+                                            Hover any bookmark and click the ⭐ star icon to pin your favourites here.
+                                        </p>
+                                    </>
+                                ) : selectedCategory === 'Duplicates' ? (
+                                    <>
+                                        <Check className="w-9 h-9 text-green-500/30 mx-auto mb-3" />
+                                        <h3 className="text-sm font-bold text-on-surface">No duplicates found</h3>
+                                        <p className="text-xs text-on-surface-variant/50 max-w-xs mx-auto mt-1.5">
+                                            Your bookmark library is clean — no duplicate URLs detected.
+                                        </p>
+                                    </>
+                                ) : selectedCategory === 'Recently Used' ? (
+                                    <>
+                                        <Clock className="w-9 h-9 text-purple-400/30 mx-auto mb-3" />
+                                        <h3 className="text-sm font-bold text-on-surface">No recently opened links</h3>
+                                        <p className="text-xs text-on-surface-variant/50 max-w-xs mx-auto mt-1.5">
+                                            Click any bookmark to open it — recently used links will appear here.
+                                        </p>
+                                    </>
+                                ) : searchQuery ? (
+                                    <>
+                                        <Search className="w-9 h-9 text-on-surface-variant/15 mx-auto mb-3" />
+                                        <h3 className="text-sm font-bold text-on-surface">No results for &ldquo;{searchQuery}&rdquo;</h3>
+                                        <p className="text-xs text-on-surface-variant/50 max-w-xs mx-auto mt-1.5">
+                                            Try a different keyword, tag, or URL.
+                                        </p>
+                                        <button onClick={() => setSearchQuery('')} className="mt-4 text-[11px] font-bold text-primary hover:underline cursor-pointer">Clear search</button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Bookmark className="w-9 h-9 text-on-surface-variant/15 mx-auto mb-3" />
+                                        <h3 className="text-sm font-bold text-on-surface">No bookmarks here yet</h3>
+                                        <p className="text-xs text-on-surface-variant/50 max-w-xs mx-auto mt-1.5">
+                                            Paste a URL above to add instantly, or import a bookmarks file.
+                                        </p>
+                                        <button onClick={() => quickAddInputRef.current?.focus()} className="mt-4 text-[11px] font-bold text-primary hover:underline cursor-pointer">Add your first bookmark →</button>
+                                    </>
+                                )}
                             </div>
                         ) : (
                             <>
@@ -1076,16 +1195,16 @@ const Bookmarks: React.FC = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Right Section: Priority, Category Badge & Action Menu */}
-                                                <div className="flex items-center justify-between sm:justify-end gap-3.5 sm:gap-4 shrink-0 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-outline/5">
-                                                    
-                                                    {/* Rating / Priority */}
+                                                {/* Right Section: Star, Category Badge & Action Menu */}
+                                                <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-3.5 shrink-0 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-outline/5">
+
+                                                    {/* Priority stars (decorative, hidden on mobile) */}
                                                     {b.priority > 0 && (
                                                         <div className="hidden sm:flex items-center gap-0.5">
                                                             {Array.from({ length: 5 }).map((_, starIdx) => (
-                                                                <Star 
+                                                                <Star
                                                                     key={starIdx}
-                                                                    size={10}
+                                                                    size={9}
                                                                     className={starIdx < b.priority ? 'fill-primary text-primary' : 'text-on-surface-variant/15'}
                                                                 />
                                                             ))}
@@ -1099,16 +1218,43 @@ const Bookmarks: React.FC = () => {
                                                         {b.category}
                                                     </span>
 
-                                                    {/* Row Inline Edit / Actions */}
-                                                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                                                        <button 
+                                                    {/* Row Inline Actions */}
+                                                    <div className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                                        {/* ⭐ Star Toggle */}
+                                                        <button
+                                                            onClick={() => toggleStar(b.id)}
+                                                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                                                starredIds.has(b.id)
+                                                                    ? 'text-amber-400 hover:text-amber-300 opacity-100'
+                                                                    : 'text-on-surface-variant/30 hover:text-amber-400 md:opacity-0 md:group-hover:opacity-100'
+                                                            }`}
+                                                            title={starredIds.has(b.id) ? 'Remove from Starred' : 'Add to Starred'}
+                                                        >
+                                                            <Star size={12} className={starredIds.has(b.id) ? 'fill-amber-400' : ''} />
+                                                        </button>
+
+                                                        {/* 📋 Copy URL */}
+                                                        <button
+                                                            onClick={() => handleCopyUrl(b.id, b.url)}
+                                                            className="p-1.5 rounded-lg text-on-surface-variant/30 hover:text-on-surface hover:bg-surface-container cursor-pointer transition-all"
+                                                            title="Copy URL"
+                                                        >
+                                                            {copiedId === b.id
+                                                                ? <Check size={11} className="text-green-500" />
+                                                                : <Copy size={11} />}
+                                                        </button>
+
+                                                        {/* ✏️ Edit */}
+                                                        <button
                                                             onClick={() => setIsEditing(b)}
                                                             className="p-1.5 hover:bg-surface-container rounded-lg text-on-surface-variant/40 hover:text-on-surface cursor-pointer"
                                                             title="Edit Details"
                                                         >
                                                             <Edit size={11} />
                                                         </button>
-                                                        <button 
+
+                                                        {/* 🗑️ Delete */}
+                                                        <button
                                                             onClick={() => handleDelete(b.id)}
                                                             className="p-1.5 hover:bg-red-500/5 rounded-lg text-on-surface-variant/30 hover:text-red-500 cursor-pointer"
                                                             title="Delete Link"
@@ -1334,22 +1480,6 @@ const Bookmarks: React.FC = () => {
                     </form>
                 )}
             </Modal>
-
-            {/* Scroll to Top Floating Button */}
-            <AnimatePresence>
-                {showScrollTop && (
-                    <motion.button
-                        initial={{ opacity: 0, scale: 0.8, y: 15 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.8, y: 15 }}
-                        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                        className="fixed bottom-6 right-6 md:bottom-8 md:right-8 w-11 h-11 rounded-full bg-on-surface text-surface hover:opacity-90 shadow-2xl z-[999] flex items-center justify-center border border-outline/10 cursor-pointer active:scale-95 transition-transform"
-                        title="Scroll to Top"
-                    >
-                        <ArrowUp size={16} />
-                    </motion.button>
-                )}
-            </AnimatePresence>
         </div>
     );
 };

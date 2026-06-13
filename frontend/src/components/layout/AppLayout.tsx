@@ -1,11 +1,27 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowUp } from 'lucide-react';
 import Sidebar from './Sidebar';
 import BottomNav from './BottomNav';
 import AIChat from './AIChat';
 
 const AppLayout: React.FC = () => {
     const location = useLocation();
+    const [showScrollTop, setShowScrollTop] = useState(false);
+
+    // Scroll-to-top display trigger - triggers as soon as scroll starts (>10px)
+    useEffect(() => {
+        const handleScroll = () => {
+            if (window.scrollY > 10) {
+                setShowScrollTop(true);
+            } else {
+                setShowScrollTop(false);
+            }
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     return (
         <div className="min-h-screen bg-background font-sans text-on-background flex relative overflow-x-hidden">
@@ -25,6 +41,22 @@ const AppLayout: React.FC = () => {
 
             {/* Neural AI Assistant */}
             <AIChat />
+
+            {/* Scroll to Top Floating Button (positioned cleanly above AI button) */}
+            <AnimatePresence>
+                {showScrollTop && (
+                    <motion.button
+                        initial={{ opacity: 0, scale: 0.8, y: 15 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, y: 15 }}
+                        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                        className="fixed bottom-[92px] right-[30px] lg:right-[38px] z-40 w-11 h-11 rounded-full bg-on-surface text-surface hover:opacity-90 shadow-2xl flex items-center justify-center border border-outline/10 cursor-pointer active:scale-95 transition-all"
+                        title="Scroll to Top"
+                    >
+                        <ArrowUp size={16} />
+                    </motion.button>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

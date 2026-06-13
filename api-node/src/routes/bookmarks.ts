@@ -180,6 +180,66 @@ router.get('/', async (req: AuthRequest, res) => {
   }
 })
 
+/* POST /api/bookmarks — Quick add a single bookmark by URL */
+const AddBookmarkSchema = z.object({
+  url: z.string().url(),
+  title: z.string().optional(),
+  category: z.string().optional(),
+})
+
+router.post('/', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId!
+    const body = AddBookmarkSchema.parse(req.body)
+
+    const cleanedUrl = cleanUrl(body.url)
+
+    // Duplicate check
+    const existing = await prisma.bookmark.findFirst({
+      where: { user_id: userId, url: { equals: cleanedUrl, mode: 'insensitive' } },
+    })
+
+    const isDuplicate = !!existing
+
+    let titleRaw = body.title?.trim() || ''
+    if (!titleRaw) {
+      // Derive a readable name from the URL
+      try {
+        const u = new URL(cleanedUrl)
+        titleRaw = u.hostname.replace('www.', '')
+      } catch {
+        titleRaw = cleanedUrl
+      }
+    }
+
+    const bookmark = await prisma.bookmark.create({
+      data: {
+        id: randomUUID(),
+        user_id: userId,
+        url: cleanedUrl,
+        title: titleRaw,
+        cleaned_title: cleanTitleFallback(titleRaw),
+        category: body.category?.trim() || 'General',
+        tags: [],
+        priority: 0,
+        is_duplicate: isDuplicate,
+        ai_processed: false,
+      },
+    })
+
+    sysLog(req, userId, 'Bookmark Added', `Added: ${titleRaw}`).catch(() => {})
+
+    created(res, bookmark)
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      fail(res, 'Invalid URL', 'INVALID_PARAMS', 400)
+      return
+    }
+    console.error('[bookmarks POST]', err)
+    fail(res, 'Failed to add bookmark', 'SERVER_ERROR', 500)
+  }
+})
+
 /* POST /api/bookmarks/import */
 const ImportSchema = z.object({
   content: z.string(),
