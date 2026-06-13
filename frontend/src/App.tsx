@@ -34,6 +34,7 @@ const Courses = lazy(() => import('./pages/Courses.tsx'));
 const Practicals = lazy(() => import('./pages/Practicals.tsx'));
 const Notes = lazy(() => import('./pages/Notes.tsx'));
 const Results = lazy(() => import('./pages/Results.tsx'));
+const Bookmarks = lazy(() => import('./pages/Bookmarks.tsx'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy.tsx'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService.tsx'));
 const NotFound = lazy(() => import('./pages/NotFound.tsx'));
@@ -180,6 +181,16 @@ const AppRoutes: React.FC = () => {
             <ProtectedRoute>
               <Suspense fallback={<LoadingSpinner fullScreen />}>
                 <Notes />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bookmarks"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={<LoadingSpinner fullScreen />}>
+                <Bookmarks />
               </Suspense>
             </ProtectedRoute>
           }

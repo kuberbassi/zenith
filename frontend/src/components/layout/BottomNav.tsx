@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard, CalendarClock, Trophy, Settings,
     GraduationCap, Target, StickyNote, Sun, Moon,
-    PieChart, CalendarDays, Beaker, LogOut
+    PieChart, CalendarDays, Beaker, LogOut, Bookmark
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -16,6 +16,7 @@ interface BottomNavProps {}
 const radialItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Notes & Todos', href: '/notes', icon: StickyNote },
+    { name: 'Bookmarks', href: '/bookmarks', icon: Bookmark },
     { name: 'Analytics', href: '/analytics', icon: PieChart },
     { name: 'Schedule', href: '/timetable', icon: CalendarClock },
     { name: 'Calendar', href: '/calendar', icon: CalendarDays },

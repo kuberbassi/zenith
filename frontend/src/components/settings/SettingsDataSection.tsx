@@ -76,7 +76,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
     };
 
     const handleDriveRestore = async (fileId: string) => {
-        if (!confirm('Warning: Restoring from backup will overwrite all current attendance logs, subjects, and timetables. Are you sure you want to proceed?')) {
+        if (!confirm('Warning: Restoring from backup will overwrite all current attendance logs, subjects, timetables, and bookmarks. Are you sure you want to proceed?')) {
             return;
         }
         try {
@@ -162,7 +162,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
     const handleImportFile = async (file: File) => {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (!confirm('⚠️ WARNING: Importing this backup will automatically WIPE all your current attendance, subjects, and results, replacing them with the backup data. A safety rollback backup will be created automatically. Do you want to proceed?')) return;
+        if (!confirm('⚠️ WARNING: Importing this backup will automatically WIPE all your current attendance, subjects, results, and bookmarks, replacing them with the backup data. A safety rollback backup will be created automatically. Do you want to proceed?')) return;
 
         showToast('info', 'Importing data...');
         await attendanceService.importData(data);
@@ -195,7 +195,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
             showToast('error', 'Please enter a migration key');
             return;
         }
-        if (!confirm('⚠️ CRITICAL WARNING: Complete migration? All current subjects, attendance logs, and results on this account will be permanently overwritten by the migrated data.')) {
+        if (!confirm('⚠️ CRITICAL WARNING: Complete migration? All current subjects, attendance logs, results, and bookmarks on this account will be permanently overwritten by the migrated data.')) {
             return;
         }
         setMigrating(true);
@@ -235,7 +235,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                                 <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase">Export to .JSON</p>
                             </div>
                         </div>
-                        <p className="text-xs text-on-surface-variant/70 mb-6 leading-relaxed">Save your entire profile, attendance logs, and settings to a secure offline file.</p>
+                        <p className="text-xs text-on-surface-variant/70 mb-6 leading-relaxed">Save your entire profile, attendance logs, bookmarks, and settings to a secure offline file.</p>
                         <Button variant="secondary" className="w-full justify-center rounded-2xl h-11" onClick={handleExport}>Export Backup</Button>
                     </div>
                     <div className="p-6 rounded-3xl bg-surface-container border border-outline-variant">
@@ -298,7 +298,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                             {!driveStatus?.google_drive_linked ? (
                                 <div className="space-y-4">
                                     <p className="text-xs text-on-surface-variant/70 leading-relaxed">
-                                        Securely back up all your academic data to your private Google Drive AppData folder. Backups are automatic and isolated.
+                                        Securely back up all your academic data and bookmarks to your private Google Drive AppData folder. Backups are automatic and isolated.
                                     </p>
                                     <button
                                         disabled={driveLoading}

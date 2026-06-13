@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard, PieChart, GraduationCap, Trophy, Beaker,
     Target, CalendarClock, CalendarDays, Settings, LogOut,
-    Sun, Moon, Search, X, StickyNote
+    Sun, Moon, Search, X, StickyNote, Bookmark
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -17,6 +17,7 @@ interface SidebarProps {
 const quickNavItems = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Notes', href: '/notes', icon: StickyNote },
+    { name: 'Bookmarks', href: '/bookmarks', icon: Bookmark },
     { name: 'Analytics', href: '/analytics', icon: PieChart },
     { name: 'Schedule', href: '/timetable', icon: CalendarClock },
     { name: 'Calendar', href: '/calendar', icon: CalendarDays },
@@ -150,6 +151,7 @@ const Sidebar: React.FC<SidebarProps> = ({ notificationCount: _notificationCount
                                 {[
                                     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
                                     { name: 'Notes & Todos', href: '/notes', icon: StickyNote },
+                                    { name: 'Bookmarks', href: '/bookmarks', icon: Bookmark },
                                     { name: 'Analytics', href: '/analytics', icon: PieChart },
                                     { name: 'Schedule', href: '/timetable', icon: CalendarClock },
                                     { name: 'Calendar', href: '/calendar', icon: CalendarDays },
