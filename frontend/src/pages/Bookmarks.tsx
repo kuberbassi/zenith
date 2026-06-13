@@ -820,17 +820,17 @@ const Bookmarks: React.FC = () => {
                             <input
                                 ref={searchInputRef}
                                 type="text"
-                                placeholder="Search bookmarks by title, URL, tag, or folder... (Press '/' to focus)"
+                                placeholder="Search bookmarks... (Press '/')"
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
-                                className="w-full bg-surface border border-outline/80 hover:border-outline focus:border-primary focus:ring-4 focus:ring-primary/10 rounded-xl pl-10 pr-8 py-2.5 text-xs font-semibold placeholder:text-on-surface-variant/35 outline-none transition-all duration-200"
+                                className="w-full bg-surface border border-outline/80 hover:border-outline focus:border-primary focus:ring-4 focus:ring-primary/10 rounded-xl pl-10 pr-10 py-2.5 text-xs font-semibold placeholder:text-on-surface-variant/35 outline-none transition-all duration-200"
                             />
                             {searchQuery && (
                                 <button 
                                     onClick={() => setSearchQuery('')}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-on-surface-variant/40 hover:text-on-surface transition-colors"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded-full text-on-surface-variant/40 hover:text-on-surface hover:bg-surface-container transition-colors"
                                 >
-                                    <X size={12} />
+                                    <X size={14} className="shrink-0" />
                                 </button>
                             )}
                         </div>
