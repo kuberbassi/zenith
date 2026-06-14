@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { useDashboard, useMarkAttendance } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -195,8 +195,22 @@ const SubjectRow: React.FC<{
 const Dashboard: React.FC = () => {
     const { showToast } = useToast();
     const { user } = useAuth();
-    const { currentSemester } = useSemester();
+    const { currentSemester, setCurrentSemester } = useSemester();
     const { data: dashboardData, isLoading, refetch: loadDashboard } = useDashboard();
+    const [semDropOpen, setSemDropOpen] = useState(false);
+    const semRef = useRef<HTMLDivElement>(null);
+
+    // Close mobile semester dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (semRef.current && !semRef.current.contains(e.target as Node)) {
+                setSemDropOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
     const markAttendanceMutation = useMarkAttendance();
 
     usePageMeta({
@@ -341,12 +355,51 @@ const Dashboard: React.FC = () => {
                         Manage and track subject attendance.
                     </p>
                 </div>
-                <button
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="flex items-center justify-center gap-2 px-3 py-1.5 rounded bg-on-surface text-surface text-xs font-bold transition-all hover:bg-on-surface/90 cursor-pointer self-start sm:self-auto"
-                >
-                    <Plus size={14} /> Add Subject
-                </button>
+
+                <div className="flex items-center gap-3 self-start sm:self-auto">
+                    {/* Mobile-only Semester Selector */}
+                    <div ref={semRef} className="lg:hidden block relative z-20">
+                        <button
+                            onClick={() => setSemDropOpen(!semDropOpen)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline bg-surface hover:bg-surface-container-high transition-colors text-xs font-semibold text-on-surface-variant hover:text-on-surface whitespace-nowrap cursor-pointer"
+                        >
+                            Sem {currentSemester}
+                            <span className="material-symbols-outlined text-[14px] leading-none">unfold_more</span>
+                        </button>
+                        <AnimatePresence>
+                            {semDropOpen && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -4 }}
+                                    transition={{ duration: 0.1 }}
+                                    className="absolute left-0 top-full mt-2 w-32 bg-surface border border-outline rounded-lg p-1 shadow-lg z-50 text-on-surface"
+                                >
+                                    {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
+                                        <button
+                                            key={s}
+                                            onClick={() => { setCurrentSemester(s); setSemDropOpen(false); }}
+                                            className={`w-full text-left px-2.5 py-1.5 rounded text-[11px] font-semibold transition-colors cursor-pointer flex justify-between items-center ${s === currentSemester
+                                                ? 'bg-on-surface text-surface font-bold'
+                                                : 'text-on-surface-variant hover:bg-surface-container'
+                                                }`}
+                                        >
+                                            <span>Sem {s}</span>
+                                            {s === currentSemester && <span className="material-symbols-outlined text-[10px] leading-none">check</span>}
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="flex items-center justify-center gap-2 px-3 py-1.5 rounded bg-on-surface text-surface text-xs font-bold transition-all hover:bg-on-surface/90 cursor-pointer"
+                    >
+                        <Plus size={14} /> Add Subject
+                    </button>
+                </div>
             </div>
 
             {isLoading && !dashboardData ? (

@@ -31,6 +31,8 @@ import UnderlineExtension from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import Link from '@tiptap/extension-link';
 import Youtube from '@tiptap/extension-youtube';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -376,7 +378,7 @@ const NoteToolbar: React.FC<NoteToolbarProps> = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 const isMarkdown = (t: string): boolean => {
-    return /^\s*(#|\*|-|\d+\.)/m.test(t) || t.includes('**') || t.includes('__') || t.includes('`');
+    return /^\s*(#|\*|-|\d+\.)/m.test(t) || t.includes('**') || t.includes('__') || t.includes('`') || t.includes('[ ]') || t.includes('[x]');
 };
 
 const parseInlineMarkdown = (text: string): string => {
@@ -406,7 +408,7 @@ const convertMarkdownToHtml = (markdown: string): string => {
     const lines = markdown.split(/\r?\n/);
     let html = '';
     let inList = false;
-    let listType = ''; // 'ul' or 'ol'
+    let listType = ''; // 'ul' or 'ol' or 'taskList'
 
     const closeList = () => {
         if (inList) {
@@ -423,6 +425,20 @@ const convertMarkdownToHtml = (markdown: string): string => {
             closeList();
             const level = headerMatch[1].length;
             html += `<h${level}>${parseInlineMarkdown(headerMatch[2])}</h${level}>`;
+            continue;
+        }
+
+        // Checkbox bullet lists (Task List)
+        const taskMatch = line.match(/^(\*|-)\s+\[([ xX])\]\s+(.*)$/);
+        if (taskMatch) {
+            if (!inList || listType !== 'taskList') {
+                closeList();
+                html += '<ul data-type="taskList">';
+                inList = true;
+                listType = 'taskList';
+            }
+            const isChecked = taskMatch[2].toLowerCase() === 'x';
+            html += `<li data-type="taskItem" data-checked="${isChecked}">${isChecked ? '<label><input type="checkbox" checked="checked"></label>' : '<label><input type="checkbox"></label>'}<div>${parseInlineMarkdown(taskMatch[3])}</div></li>`;
             continue;
         }
 
@@ -553,6 +569,17 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
                     class: 'w-full aspect-video rounded-lg my-3 border border-outline shadow-sm',
                 },
             }),
+            TaskList.configure({
+                HTMLAttributes: {
+                    class: 'not-prose list-none pl-0 my-3 space-y-1',
+                },
+            }),
+            TaskItem.configure({
+                HTMLAttributes: {
+                    class: 'flex items-start gap-2 checkbox-item',
+                },
+                nested: true,
+            }),
         ],
         content: note.content || '',
         editable: !readMode,
@@ -654,59 +681,88 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
         };
     }, [editor]);
 
+    // Scroll lock on mobile when NoteEditor is mounted
+    useEffect(() => {
+        const handleResize = () => {
+            const isMob = window.innerWidth < 1024;
+            if (isMob) {
+                document.body.style.overflow = 'hidden';
+                document.documentElement.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+                document.documentElement.style.overflow = '';
+            }
+        };
+
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+        };
+    }, []);
+
     return (
-        <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="w-full lg:w-[460px] border border-outline bg-surface rounded-xl p-5 shrink-0 flex flex-col self-start min-h-[400px] h-[calc(100vh-160px)] sticky top-20 shadow-sm"
+        <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm lg:relative lg:inset-auto lg:z-auto lg:p-0 lg:bg-transparent lg:backdrop-blur-none"
+            onClick={onClose}
         >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-outline mb-3">
-                <div className="flex items-center gap-1">
-                    <button onClick={onDelete} className="p-1.5 text-on-surface-variant/30 hover:text-red-500 rounded transition-colors cursor-pointer" title="Delete"><Trash2 size={14} /></button>
-                    <button onClick={onTogglePin} className={`p-1.5 rounded hover:bg-surface-container transition-colors cursor-pointer ${note.is_pinned ? 'text-primary' : 'text-on-surface-variant/30'}`} title="Pin">
-                        <Pin size={14} className={note.is_pinned ? 'fill-current' : ''} />
-                    </button>
-                    <button onClick={() => setReadMode(m => !m)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${readMode ? 'bg-surface-container text-on-surface' : 'text-on-surface-variant/40 hover:text-on-surface'}`}>
-                        {readMode ? <><Eye size={11} /> Reading</> : <><Pencil size={11} /> Editing</>}
-                    </button>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                onClick={e => e.stopPropagation()}
+                className="w-full max-w-lg lg:w-[460px] border border-outline bg-surface rounded-2xl lg:rounded-xl p-5 flex flex-col max-h-[85vh] lg:max-h-none lg:h-[calc(100vh-160px)] shadow-2xl lg:shadow-sm lg:sticky lg:top-20 lg:self-start lg:shrink-0"
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between pb-3 border-b border-outline mb-3">
+                    <div className="flex items-center gap-1">
+                        <button onClick={onDelete} className="p-1.5 text-on-surface-variant/30 hover:text-red-500 rounded transition-colors cursor-pointer" title="Delete"><Trash2 size={14} /></button>
+                        <button onClick={onTogglePin} className={`p-1.5 rounded hover:bg-surface-container transition-colors cursor-pointer ${note.is_pinned ? 'text-primary' : 'text-on-surface-variant/30'}`} title="Pin">
+                            <Pin size={14} className={note.is_pinned ? 'fill-current' : ''} />
+                        </button>
+                        <button onClick={() => setReadMode(m => !m)} className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${readMode ? 'bg-surface-container text-on-surface' : 'text-on-surface-variant/40 hover:text-on-surface'}`}>
+                            {readMode ? <><Eye size={11} /> Reading</> : <><Pencil size={11} /> Editing</>}
+                        </button>
+                    </div>
+                    <div className="flex items-center">
+                        <button onClick={onClose} className="p-1.5 text-on-surface-variant/30 hover:text-on-surface rounded transition-colors cursor-pointer" title="Close"><X size={14} /></button>
+                    </div>
                 </div>
-                <div className="flex items-center">
-                    <button onClick={onClose} className="p-1.5 text-on-surface-variant/30 hover:text-on-surface rounded transition-colors cursor-pointer" title="Close"><X size={14} /></button>
+
+                {/* Title */}
+                <input
+                    type="text"
+                    value={note.title}
+                    onChange={e => onUpdate({ title: e.target.value })}
+                    placeholder="Title"
+                    readOnly={readMode}
+                    className="w-full text-base font-bold tracking-tight bg-transparent outline-none mb-3 py-1 border-none focus:ring-0"
+                />
+
+                {/* Tiptap Editor area */}
+                <div className="flex-1 overflow-y-auto min-h-0 prose-area">
+                    <EditorContent
+                        editor={editor}
+                        className={`h-full tiptap-editor text-sm leading-relaxed ${readMode ? 'read-mode' : ''}`}
+                    />
                 </div>
-            </div>
 
-            {/* Title */}
-            <input
-                type="text"
-                value={note.title}
-                onChange={e => onUpdate({ title: e.target.value })}
-                placeholder="Title"
-                readOnly={readMode}
-                className="w-full text-base font-bold tracking-tight bg-transparent outline-none mb-3 py-1 border-none focus:ring-0"
-            />
-
-            {/* Tiptap Editor area */}
-            <div className="flex-1 overflow-y-auto min-h-0 prose-area">
-                <EditorContent
-                    editor={editor}
-                    className={`h-full tiptap-editor text-sm leading-relaxed ${readMode ? 'read-mode' : ''}`}
-                />
-            </div>
-
-            {/* Toolbar — only in edit mode */}
-            {!readMode && editor && (
-                <NoteToolbar
-                    editor={editor}
-                    loadingAi={loadingAi}
-                    hasAiDraft={hasAiDraft}
-                    onAiAction={handleAiAction}
-                    onAiUndo={handleAiUndo}
-                    onAiKeep={handleAiKeep}
-                />
-            )}
-        </motion.div>
+                {/* Toolbar — only in edit mode */}
+                {!readMode && editor && (
+                    <NoteToolbar
+                        editor={editor}
+                        loadingAi={loadingAi}
+                        hasAiDraft={hasAiDraft}
+                        onAiAction={handleAiAction}
+                        onAiUndo={handleAiUndo}
+                        onAiKeep={handleAiKeep}
+                    />
+                )}
+            </motion.div>
+        </div>
     );
 };
 

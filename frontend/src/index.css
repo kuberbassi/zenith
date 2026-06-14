@@ -834,3 +834,116 @@ section,
   color: var(--md-sys-color-primary);
   text-decoration: underline;
 }
+
+/* Tiptap Task List and Task Items */
+.tiptap-editor .ProseMirror ul[data-type="taskList"] {
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin: 0.5rem 0 !important;
+}
+
+.tiptap-editor .ProseMirror li[data-type="taskItem"] {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.5rem !important;
+  margin: 0.25rem 0 !important;
+}
+
+.tiptap-editor .ProseMirror li[data-type="taskItem"] > label {
+  margin-top: 0.2rem;
+  user-select: none;
+}
+
+.tiptap-editor .ProseMirror li[data-type="taskItem"] > label input[type="checkbox"] {
+  appearance: none;
+  background-color: var(--md-sys-color-surface) !important;
+  margin: 0;
+  font: inherit;
+  color: var(--md-sys-color-primary);
+  width: 1.1em;
+  height: 1.1em;
+  border: 1px solid var(--md-sys-color-outline) !important;
+  border-radius: 4px !important;
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.tiptap-editor .ProseMirror li[data-type="taskItem"] > label input[type="checkbox"]::before {
+  content: "";
+  width: 0.6em;
+  height: 0.6em;
+  transform: scale(0);
+  transition: 120ms transform ease-in-out;
+  background-color: var(--md-sys-color-on-primary);
+  /* Checkmark clip-path */
+  clip-path: polygon(14% 44%, 0 58%, 38% 96%, 100% 23%, 86% 9%, 38% 68%);
+}
+
+.tiptap-editor .ProseMirror li[data-type="taskItem"] > label input[type="checkbox"]:checked {
+  background-color: var(--md-sys-color-primary) !important;
+  border-color: var(--md-sys-color-primary) !important;
+}
+
+.tiptap-editor .ProseMirror li[data-type="taskItem"] > label input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+.tiptap-editor .ProseMirror li[data-type="taskItem"] > div {
+  flex: 1;
+}
+
+.tiptap-editor .ProseMirror li[data-type="taskItem"][data-checked="true"] > div {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+/* Previews for task lists in NoteCard */
+.note-preview-html ul[data-type="taskList"] {
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin: 0.25rem 0 !important;
+}
+
+.note-preview-html li[data-type="taskItem"] {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+  margin: 0.15rem 0 !important;
+}
+
+.note-preview-html li[data-type="taskItem"] input[type="checkbox"] {
+  appearance: none;
+  background-color: var(--md-sys-color-surface) !important;
+  margin: 0;
+  width: 0.9em;
+  height: 0.9em;
+  border: 1px solid var(--md-sys-color-outline) !important;
+  border-radius: 3px !important;
+  display: grid;
+  place-content: center;
+}
+
+.note-preview-html li[data-type="taskItem"] input[type="checkbox"]::before {
+  content: "";
+  width: 0.5em;
+  height: 0.5em;
+  transform: scale(0);
+  background-color: var(--md-sys-color-on-primary);
+  clip-path: polygon(14% 44%, 0 58%, 38% 96%, 100% 23%, 86% 9%, 38% 68%);
+}
+
+.note-preview-html li[data-type="taskItem"] input[type="checkbox"]:checked {
+  background-color: var(--md-sys-color-primary) !important;
+  border-color: var(--md-sys-color-primary) !important;
+}
+
+.note-preview-html li[data-type="taskItem"] input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+.note-preview-html li[data-type="taskItem"][data-checked="true"] > div {
+  text-decoration: line-through;
+  opacity: 0.4;
+}
