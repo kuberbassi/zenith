@@ -31,7 +31,6 @@ import dataRoutes from './data.js'
 import ipuRoutes from './ipu.js'
 import aiRoutes from './ai.js'
 import notesRoutes from './notes.js'
-import bookmarksRoutes from './bookmarks.js'
 
 const v1Router = Router()
 
@@ -47,6 +46,5 @@ v1Router.use('/data', dataRoutes)
 v1Router.use('/ipu', ipuRoutes)
 v1Router.use('/ai', aiRoutes)
 v1Router.use('/notes', notesRoutes)
-v1Router.use('/bookmarks', bookmarksRoutes)
 
 export default v1Router

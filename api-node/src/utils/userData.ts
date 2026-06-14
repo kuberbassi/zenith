@@ -14,7 +14,6 @@ export type UserData = {
   skills: unknown[]
   system_logs: unknown[]
   notes?: unknown[]
-  bookmarks?: unknown[]
   user_profile?: unknown
 }
 
@@ -41,7 +40,6 @@ export async function clearUserData(userId: string) {
   await prisma.skill.deleteMany({ where: { user_id: userId } })
   await prisma.systemLog.deleteMany({ where: { user_id: userId } })
   await prisma.note.deleteMany({ where: { user_id: userId } })
-  await prisma.bookmark.deleteMany({ where: { user_id: userId } })
 }
 
 export function getSafeProfileUpdate(profile: any) {
@@ -65,7 +63,7 @@ export function getSafeProfileUpdate(profile: any) {
 }
 
 export async function collectUserData(userId: string): Promise<UserData> {
-  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs, notes, bookmarks, user] = await Promise.all([
+  const [subjects, attendance_logs, timetable, semester_results, manual_courses, user_preferences, skills, system_logs, notes, user] = await Promise.all([
     prisma.subject.findMany({ where: { user_id: userId } }),
     prisma.attendanceLog.findMany({ where: { user_id: userId } }),
     prisma.timetable.findMany({ where: { user_id: userId } }),
@@ -75,7 +73,6 @@ export async function collectUserData(userId: string): Promise<UserData> {
     prisma.skill.findMany({ where: { user_id: userId } }),
     prisma.systemLog.findMany({ where: { user_id: userId }, orderBy: { timestamp: 'desc' }, take: 500 }),
     prisma.note.findMany({ where: { user_id: userId } }),
-    prisma.bookmark.findMany({ where: { user_id: userId } }),
     prisma.user.findUnique({ where: { id: userId } }),
   ])
 
@@ -89,7 +86,6 @@ export async function collectUserData(userId: string): Promise<UserData> {
     skills,
     system_logs,
     notes,
-    bookmarks,
   }
 
   if (user) {
@@ -290,24 +286,6 @@ export async function restoreUserData(userId: string, rawData: UserData) {
     await createInBatches(notesData as any[], (row) => prisma.note.create({ data: row as any }))
   }
 
-  if (rawData.bookmarks?.length) {
-    const bookmarksData = (rawData.bookmarks as any[]).map((b) => ({
-      id: randomUUID(),
-      user_id: userId,
-      url: String(b.url ?? ''),
-      title: String(b.title ?? ''),
-      cleaned_title: b.cleaned_title ? String(b.cleaned_title) : null,
-      category: String(b.category ?? 'General'),
-      tags: Array.isArray(b.tags) ? b.tags : [],
-      priority: Number(b.priority ?? 0),
-      is_duplicate: Boolean(b.is_duplicate ?? false),
-      clicked_at: b.clicked_at ? new Date(normalizeValue(b.clicked_at)) : null,
-      click_count: Number(b.click_count ?? 0),
-      ai_processed: Boolean(b.ai_processed ?? false),
-      created_at: b.created_at ? new Date(normalizeValue(b.created_at)) : new Date(),
-    }))
-    await createInBatches(bookmarksData as any[], (row) => prisma.bookmark.create({ data: row as any }))
-  }
 
   if (rawData.user_profile) {
     const filteredProfile = getSafeProfileUpdate(rawData.user_profile)

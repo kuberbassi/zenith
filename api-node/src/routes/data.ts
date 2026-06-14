@@ -215,7 +215,7 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
     }
 
     // Wipe all collections
-    const [s, al, t, sr, mc, up, sk, sl, nt, bm] = await Promise.all([
+    const [s, al, t, sr, mc, up, sk, sl, nt] = await Promise.all([
       prisma.subject.deleteMany({ where: { user_id: userId } }),
       // attendance_logs cascade-deleted with subjects — but also delete orphans
       prisma.attendanceLog.deleteMany({ where: { user_id: userId } }),
@@ -226,10 +226,9 @@ router.delete('/delete_all_data', async (req: AuthRequest, res) => {
       prisma.skill.deleteMany({ where: { user_id: userId } }),
       prisma.systemLog.deleteMany({ where: { user_id: userId } }),
       prisma.note.deleteMany({ where: { user_id: userId } }),
-      prisma.bookmark.deleteMany({ where: { user_id: userId } }),
     ])
 
-    const summary = { subjects: s.count, attendance_logs: al.count, timetable: t.count, semester_results: sr.count, manual_courses: mc.count, user_preferences: up.count, skills: sk.count, system_logs: sl.count, notes: nt.count, bookmarks: bm.count }
+    const summary = { subjects: s.count, attendance_logs: al.count, timetable: t.count, semester_results: sr.count, manual_courses: mc.count, user_preferences: up.count, skills: sk.count, system_logs: sl.count, notes: nt.count }
 
     await prisma.user.update({
       where: { id: userId },
