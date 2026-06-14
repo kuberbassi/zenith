@@ -1,41 +1,81 @@
+let audioCtx: AudioContext | null = null;
+
+/**
+ * Synthesizes a subtle, short click sound using the Web Audio API.
+ * Acts as a tactile auditory fallback for browsers/platforms where physical vibration is disabled or unsupported.
+ */
+const playAudioClick = (duration: number = 0.03, frequency: number = 800) => {
+    try {
+        if (!audioCtx) {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            audioCtx = new AudioContextClass();
+        }
+        
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + duration);
+        
+        // Very quiet volume so it behaves like a device click sound (tactile feel)
+        gainNode.gain.setValueAtTime(0.012, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + duration);
+    } catch {
+        // Fallback silently if AudioContext is blocked or unsupported
+    }
+};
+
+/**
+ * Helper to trigger physical vibration, falling back to a synthesized click if unsupported.
+ */
+const triggerHaptic = (pattern: number | number[], frequency: number = 800) => {
+    let success = false;
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+        try {
+            success = navigator.vibrate(pattern);
+        } catch {
+            success = false;
+        }
+    }
+    
+    // If vibration API returned false (not supported/permitted) or threw an error, use the audio fallback
+    if (!success) {
+        const durationSec = Array.isArray(pattern)
+            ? pattern.reduce((a, b) => a + b, 0) / 1000
+            : pattern / 1000;
+        playAudioClick(Math.min(durationSec, 0.15), frequency);
+    }
+};
+
 /**
  * Haptic feedback utility using the Web Vibration API.
- * Safely falls back on desktop / unsupported environments.
+ * Safely falls back to audio click synthesis on desktop, iOS Safari, and Firefox Mobile.
  */
 export const haptics = {
     light: () => {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            try {
-                navigator.vibrate(10);
-            } catch { /* ignore */ }
-        }
+        triggerHaptic(10, 900);
     },
     medium: () => {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            try {
-                navigator.vibrate(20);
-            } catch { /* ignore */ }
-        }
+        triggerHaptic(20, 750);
     },
     heavy: () => {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            try {
-                navigator.vibrate(40);
-            } catch { /* ignore */ }
-        }
+        triggerHaptic(40, 600);
     },
     success: () => {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            try {
-                navigator.vibrate([15, 30, 15]);
-            } catch { /* ignore */ }
-        }
+        triggerHaptic([15, 30, 15], 850);
     },
     error: () => {
-        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            try {
-                navigator.vibrate([40, 60, 40]);
-            } catch { /* ignore */ }
-        }
+        triggerHaptic([40, 60, 40], 500);
     }
 };

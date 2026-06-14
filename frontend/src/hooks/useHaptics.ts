@@ -1,14 +1,12 @@
 import { useEffect } from 'react';
+import { haptics } from '../utils/haptics';
 
 /**
  * Hook to add global haptic feedback to clicks and interactions.
- * Works on devices that support the Vibration API (navigator.vibrate).
+ * Works on devices that support the Vibration API (navigator.vibrate), falling back to audio synthesis.
  */
 export const useHaptics = () => {
   useEffect(() => {
-    // Standard haptic duration for a "click" feel
-    const CLICK_VIBRATION_MS = 15;
-
     const handleInteraction = (e: PointerEvent) => {
       const target = e.target as HTMLElement;
       if (!target) return;
@@ -25,14 +23,7 @@ export const useHaptics = () => {
 
       if (!isInteractive) return;
 
-      // Check if vibration is supported
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate(CLICK_VIBRATION_MS);
-        } catch (error) {
-          // Ignore errors
-        }
-      }
+      haptics.light();
     };
 
     // Use pointerdown for faster response on mobile
