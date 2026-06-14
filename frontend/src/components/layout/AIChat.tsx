@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, X, ChevronDown, Trash2 } from 'lucide-react';
 import api from '@/services/api';
+import { useSemester } from '@/contexts/SemesterContext';
 
 // Custom Stark Minimalist Sparkle Star Prism Icon
 export const ZenithAIIcon: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
@@ -63,6 +64,7 @@ const SUGGESTIONS = [
 ];
 
 const AIChat: React.FC = () => {
+    const { currentSemester } = useSemester();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -123,6 +125,7 @@ const AIChat: React.FC = () => {
             const response = await api.post('/api/ai/chat_v2', {
                 message: msg,
                 history,
+                selectedSemester: currentSemester,
             });
 
             const aiContent = response.data?.data?.response || 'Sorry, I couldn\'t process that. Try again!';

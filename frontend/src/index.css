@@ -947,3 +947,14 @@ section,
   text-decoration: line-through;
   opacity: 0.4;
 }
+
+/* Subtle Dot Grid Background Utility */
+.subtle-dot-grid {
+  background-image: radial-gradient(circle, var(--md-sys-color-on-background) 1.2px, transparent 1.2px);
+  background-size: 24px 24px;
+  opacity: 0.15;
+  pointer-events: none;
+}
+.dark .subtle-dot-grid {
+  opacity: 0.08;
+}

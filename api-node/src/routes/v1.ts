@@ -14,7 +14,6 @@
  *   /api/v1/profile/*       — User profile, preferences, biometric, system logs
  *   /api/v1/skills/*        — Skills tracker
  *   /api/v1/data/*          — Export, import, backup, restore, delete
- *   /api/v1/ipu/*           — IPU scraper (captcha, results)
  *   /api/v1/scraper/*       — Notice scraper
  */
 
@@ -28,7 +27,6 @@ import timetableRoutes from './timetable.js'
 import profileRoutes from './profile.js'
 import skillsRoutes from './skills.js'
 import dataRoutes from './data.js'
-import ipuRoutes from './ipu.js'
 import aiRoutes from './ai.js'
 import notesRoutes from './notes.js'
 
@@ -43,7 +41,6 @@ v1Router.use('/timetable', timetableRoutes)
 v1Router.use('/profile', profileRoutes)
 v1Router.use('/skills', skillsRoutes)
 v1Router.use('/data', dataRoutes)
-v1Router.use('/ipu', ipuRoutes)
 v1Router.use('/ai', aiRoutes)
 v1Router.use('/notes', notesRoutes)
 

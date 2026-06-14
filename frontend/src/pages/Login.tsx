@@ -20,13 +20,7 @@ const Login: React.FC = () => {
     return (
         <div className="min-h-screen w-full flex flex-col justify-between items-center relative overflow-hidden bg-background text-on-background font-sans py-8">
             {/* Subtle Geist Dot Grid Background */}
-            <div 
-                className="absolute inset-0 z-0 pointer-events-none opacity-[0.04] dark:opacity-[0.06]"
-                style={{
-                    backgroundImage: `radial-gradient(var(--md-sys-color-primary) 1px, transparent 1px)`,
-                    backgroundSize: '24px 24px',
-                }}
-            />
+            <div className="fixed inset-0 z-0 subtle-dot-grid" />
 
             {/* Floating Top Header / Theme Toggle */}
             <header className="w-full max-w-7xl px-6 flex justify-end z-10">

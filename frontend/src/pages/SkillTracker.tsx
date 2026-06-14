@@ -9,6 +9,7 @@ import Select from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
 import { skillsService, type Skill } from '@/services/skills.service';
 import api from '@/services/api';
+import { useConfirm } from '@/contexts/ConfirmContext';
 
 const SKILL_CATEGORIES = [
     'Technical', 'Creative', 'Language', 'Professional', 'Life', 'Other'
@@ -78,6 +79,7 @@ export function getLevelTagStyles(level: string) {
 }
 
 const SkillTracker: React.FC = () => {
+    const confirm = useConfirm();
     const { showToast } = useToast();
     const [skills, setSkills] = useState<Skill[]>([]);
     const [loading, setLoading] = useState(true);
@@ -144,7 +146,11 @@ const SkillTracker: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this skill?')) return;
+        const isConfirmed = await confirm({
+            title: 'Delete Skill',
+            message: 'Are you sure you want to delete this skill?',
+        });
+        if (!isConfirmed) return;
         
         const previousSkills = [...skills];
         setSkills(prev => prev.filter(s => s._id !== id));
@@ -237,6 +243,11 @@ const SkillTracker: React.FC = () => {
                                                         {skill.category}
                                                     </span>
                                                 </div>
+                                                {skill.notes && (
+                                                    <p className="text-[10px] text-on-surface-variant/55 mt-1.5 line-clamp-2 leading-relaxed italic pr-2">
+                                                        {skill.notes}
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-1.5 shrink-0">
                                                 <button aria-label={`Edit ${skill.name}`} onClick={() => { setEditingSkill(skill); setFormData({ ...skill }); setIsModalOpen(true); }} className="no-fluid h-8 w-8 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
@@ -269,6 +280,11 @@ const SkillTracker: React.FC = () => {
                                                         {skill.category}
                                                     </span>
                                                 </div>
+                                                {skill.notes && (
+                                                    <p className="text-[10px] text-on-surface-variant/55 mt-1.5 line-clamp-2 leading-relaxed italic pr-2">
+                                                        {skill.notes}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
 

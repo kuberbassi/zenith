@@ -634,41 +634,9 @@ export const attendanceService = {
         return response.data;
     },
 
-    // IPU Exam Portal
-    getIPUCaptcha: async () => {
-        const response = await api.get('/api/ipu/captcha');
-        return response.data.data;
-    },
-
-    fetchIPUResults: async (payload: {
-        enrollment_number: string;
-        password: string;
-        captcha: string;
-        hidden_fields: Record<string, string>;
-        field_names: Record<string, string>;
-        login_action?: string;
-    }) => {
-        const response = await api.post('/api/ipu/fetch-results', payload);
-        return response.data.data;
-    },
-
-    // One-shot: auto-solves CAPTCHA via OCR, falls back to manual if OCR unavailable
-    autoFetchIPUResults: async (payload: {
-        enrollment_number: string;
-        password: string;
-    }) => {
-        const response = await api.post('/api/ipu/auto-fetch', payload);
-        return response.data.data;
-    },
-
     // Get previously saved IPU results from DB (no login needed)
     getSavedIPUResults: async () => {
         const response = await api.get('/api/academic/results/analytics');
-        return response.data.data;
-    },
-
-    syncResults: async (payload: { url: string, cookies: any[], semester: number }) => {
-        const response = await api.post('/api/academic/results/sync', payload);
         return response.data.data;
     },
 

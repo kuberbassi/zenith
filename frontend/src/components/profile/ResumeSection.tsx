@@ -3,8 +3,10 @@ import { Briefcase, Code, Zap, Award, Plus, Trash2, ChevronRight, ShieldCheck } 
 import { resumeService } from '@/services/resume.service';
 import type { Experience, Skill, Project, Certification } from '@/types';
 import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/contexts/ConfirmContext';
 
 export const TacticalOps: React.FC = () => {
+    const confirm = useConfirm();
     const { showToast } = useToast();
     const [experiences, setExperiences] = useState<Experience[]>([]);
     const [loading, setLoading] = useState(true);
@@ -31,7 +33,11 @@ export const TacticalOps: React.FC = () => {
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this record?')) return;
+        const isConfirmed = await confirm({
+            title: 'Delete Work Experience',
+            message: 'Are you sure you want to delete this work experience record?',
+        });
+        if (!isConfirmed) return;
         try {
             await resumeService.deleteExperience(id);
             load();
@@ -65,6 +71,7 @@ export const TacticalOps: React.FC = () => {
 };
 
 export const SkillArsenal: React.FC = () => {
+    const confirm = useConfirm();
     const { showToast } = useToast();
     const [skills, setSkills] = useState<Skill[]>([]);
     const [loading, setLoading] = useState(true);
@@ -87,7 +94,11 @@ export const SkillArsenal: React.FC = () => {
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this skill?')) return;
+        const isConfirmed = await confirm({
+            title: 'Delete Skill',
+            message: 'Are you sure you want to delete this skill?',
+        });
+        if (!isConfirmed) return;
         try {
             await resumeService.deleteSkill(id);
             load();
@@ -119,6 +130,7 @@ export const SkillArsenal: React.FC = () => {
 };
 
 export const MissionLogs: React.FC = () => {
+    const confirm = useConfirm();
     const { showToast } = useToast();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -144,7 +156,11 @@ export const MissionLogs: React.FC = () => {
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm('Delete this project?')) return;
+        const isConfirmed = await confirm({
+            title: 'Delete Project',
+            message: 'Are you sure you want to delete this project?',
+        });
+        if (!isConfirmed) return;
         try {
             await resumeService.deleteProject(id);
             load();
@@ -178,6 +194,7 @@ export const MissionLogs: React.FC = () => {
 };
 
 export const StrategicHonors: React.FC = () => {
+    const confirm = useConfirm();
     const { showToast } = useToast();
     const [certs, setCerts] = useState<Certification[]>([]);
     const [loading, setLoading] = useState(true);
@@ -202,7 +219,11 @@ export const StrategicHonors: React.FC = () => {
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this certification?')) return;
+        const isConfirmed = await confirm({
+            title: 'Delete Certification',
+            message: 'Are you sure you want to delete this certification?',
+        });
+        if (!isConfirmed) return;
         try {
             await resumeService.deleteCertification(id);
             load();

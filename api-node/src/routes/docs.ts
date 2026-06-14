@@ -20,7 +20,6 @@ const openApiSpec = {
     { name: 'academic' },
     { name: 'dashboard' },
     { name: 'data' },
-    { name: 'ipu' },
   ],
   paths: {
     '/auth/google': {
@@ -85,12 +84,6 @@ const openApiSpec = {
       post: {
         tags: ['data'],
         summary: 'Import a user data snapshot',
-      },
-    },
-    '/ipu/fetch-results': {
-      post: {
-        tags: ['ipu'],
-        summary: 'Login to IPU portal and fetch result payloads',
       },
     },
   },

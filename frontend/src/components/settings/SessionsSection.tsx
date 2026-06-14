@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Shield, Monitor, Smartphone, RefreshCw, LogOut, CheckCircle } from 'lucide-react';
 import Loader from '@/components/ui/Loader';
 import { authService } from '@/services/auth.service';
+import { useConfirm } from '@/contexts/ConfirmContext';
 
 interface Session {
   id: string;
@@ -17,6 +18,7 @@ interface SessionsSectionProps {
 }
 
 const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
+  const confirm = useConfirm();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
@@ -40,7 +42,11 @@ const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
   };
 
   const handleRevoke = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to terminate the session on ${name}?`)) return;
+    const isConfirmed = await confirm({
+      title: 'Terminate Session',
+      message: `Are you sure you want to terminate the session on ${name}?`,
+    });
+    if (!isConfirmed) return;
     setRevokingId(id);
     try {
       await authService.revokeSession(id);
@@ -55,7 +61,11 @@ const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
   };
 
   const handleRevokeOthers = async () => {
-    if (!confirm('Are you sure you want to terminate all other sessions? This will log out all other devices.')) return;
+    const isConfirmed = await confirm({
+      title: 'Terminate Other Sessions',
+      message: 'Are you sure you want to terminate all other sessions? This will log out all other devices.',
+    });
+    if (!isConfirmed) return;
     setRevokingAll(true);
     try {
       await authService.revokeOtherSessions();

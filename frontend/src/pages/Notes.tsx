@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import {
     StickyNote, ListTodo, Plus, Trash2, Pin,
     CheckCircle2, Circle, X, GripVertical, Pencil,
@@ -11,6 +12,7 @@ import {
 import { useToast } from '@/components/ui/Toast';
 import api from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { useConfirm } from '@/contexts/ConfirmContext';
 
 // ── dnd-kit ──────────────────────────────────────────────────────────────────
 import {
@@ -493,6 +495,7 @@ interface NoteEditorProps {
 }
 
 const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClose, onTogglePin }) => {
+    const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth < 1024 : false);
     const [readMode, setReadMode] = useState(!note.id.startsWith('temp-'));
     const [loadingAi, setLoadingAi] = useState(false);
     const [hasAiDraft, setHasAiDraft] = useState(false);
@@ -685,6 +688,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
     useEffect(() => {
         const handleResize = () => {
             const isMob = window.innerWidth < 1024;
+            setIsMobile(isMob);
             if (isMob) {
                 document.body.style.overflow = 'hidden';
                 document.documentElement.style.overflow = 'hidden';
@@ -703,7 +707,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
         };
     }, []);
 
-    return (
+    const modalContent = (
         <div 
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm lg:relative lg:inset-auto lg:z-auto lg:p-0 lg:bg-transparent lg:backdrop-blur-none"
             onClick={onClose}
@@ -764,6 +768,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
             </motion.div>
         </div>
     );
+
+    return isMobile ? createPortal(modalContent, document.body) : modalContent;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -779,6 +785,7 @@ interface TodoPanelProps {
 }
 
 const TodoPanel: React.FC<TodoPanelProps> = ({ note, onUpdate, onDelete, onClose, isInline = false }) => {
+    const confirm = useConfirm();
     const [editMode, setEditMode] = useState(false);
     const [newText, setNewText] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -805,7 +812,12 @@ const TodoPanel: React.FC<TodoPanelProps> = ({ note, onUpdate, onDelete, onClose
         onUpdate({ todos: (note.todos || []).map(t => t.id === id ? { ...t, completed: !t.completed } : t) });
     };
 
-    const deleteTodo = (id: string) => {
+    const deleteTodo = async (id: string) => {
+        const confirmed = await confirm({
+            title: 'Delete Task',
+            message: 'Are you sure you want to delete this task?',
+        });
+        if (!confirmed) return;
         onUpdate({ todos: (note.todos || []).filter(t => t.id !== id) });
     };
 
@@ -813,7 +825,12 @@ const TodoPanel: React.FC<TodoPanelProps> = ({ note, onUpdate, onDelete, onClose
         onUpdate({ todos: (note.todos || []).map(t => t.id === id ? { ...t, text } : t) });
     };
 
-    const clearDone = () => {
+    const clearDone = async () => {
+        const confirmed = await confirm({
+            title: 'Clear Completed Tasks',
+            message: 'Are you sure you want to delete all completed tasks?',
+        });
+        if (!confirmed) return;
         onUpdate({ todos: activeTodos });
     };
 
@@ -1082,6 +1099,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, isActive, onSelect, onDelete,
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Notes: React.FC = () => {
+    const confirm = useConfirm();
     const { showToast } = useToast();
     const queryClient = useQueryClient();
     const [notes, setNotes] = useState<Note[]>([]);
@@ -1192,7 +1210,10 @@ const Notes: React.FC = () => {
     const deleteNote = async (noteId: string) => {
         const isTemp = noteId.startsWith('temp-');
         if (!isTemp) {
-            const confirmed = window.confirm("Are you sure you want to delete this note?");
+            const confirmed = await confirm({
+                title: 'Delete Note',
+                message: 'Are you sure you want to delete this note?',
+            });
             if (!confirmed) return;
         }
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate([15, 5, 15]);

@@ -20,9 +20,12 @@ import SystemLogsSection from '@/components/settings/SystemLogsSection';
 import SettingsDataSection from '@/components/settings/SettingsDataSection';
 import SessionsSection from '@/components/settings/SessionsSection';
 
+import { useConfirm } from '@/contexts/ConfirmContext';
+
 type TabKey = 'profile' | 'activity' | 'data' | 'sessions';
 
 const Settings: React.FC = () => {
+    const confirm = useConfirm();
     const { user, logout, setUser } = useAuth();
     const { theme, toggleTheme, setAccentColor } = useTheme();
     const { currentSemester, setCurrentSemester } = useSemester();
@@ -109,9 +112,13 @@ const Settings: React.FC = () => {
     };
 
     const handleDeleteAllData = async () => {
-        if (!confirm('⚠️ IRREVERSIBLE ACTION: Delete all records?')) return;
-        const userInput = prompt('Type DELETE to purge everything:');
-        if (userInput !== 'DELETE') return;
+        const isConfirmed = await confirm({
+            title: 'Wipe All Data',
+            message: '⚠️ IRREVERSIBLE ACTION: Delete all records? This will purge all your attendance logs, subjects, timetable, notes, and task checklists. To proceed, please type DELETE below.',
+            requireDeleteText: true,
+            confirmText: 'Purge Everything'
+        });
+        if (!isConfirmed) return;
 
         try {
             showToast('info', 'Creating safety backup...');
@@ -133,9 +140,13 @@ const Settings: React.FC = () => {
 
     const handleDeleteAccount = async () => {
         if (!user?.email) { showToast('error', 'Account email unavailable'); return; }
-        if (!confirm('Delete your account permanently? This removes access and all linked data.')) return;
-        const confirmation = prompt(`Type ${user.email} to confirm permanent account deletion:`);
-        if (confirmation !== user.email) return;
+        const isConfirmed = await confirm({
+            title: 'Delete Account Permanently',
+            message: '⚠️ CRITICAL WARNING: Delete your account permanently? This removes all access, academic logs, skills progress, course data, and linked accounts. To proceed, please type DELETE below.',
+            requireDeleteText: true,
+            confirmText: 'Delete Account'
+        });
+        if (!isConfirmed) return;
 
         try {
             await authService.deleteAccount(user.email);

@@ -4,6 +4,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import { attendanceService } from '@/services/attendance.service';
+import { useConfirm } from '@/contexts/ConfirmContext';
 
 type SettingsDataSectionProps = {
     onLogout: () => void | Promise<void>;
@@ -13,6 +14,7 @@ type SettingsDataSectionProps = {
 };
 
 const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onDeleteAllData, onDeleteAccount, showToast }) => {
+    const confirm = useConfirm();
     const [migrationKey, setMigrationKey] = useState('');
     const [copied, setCopied] = useState(false);
     const [inputKey, setInputKey] = useState('');
@@ -76,7 +78,11 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
     };
 
     const handleDriveRestore = async (fileId: string) => {
-        if (!confirm('Warning: Restoring from backup will overwrite all current attendance logs, subjects, and timetables. Are you sure you want to proceed?')) {
+        const isConfirmed = await confirm({
+            title: 'Restore Backup',
+            message: 'Warning: Restoring from backup will overwrite all current attendance logs, subjects, and timetables. Are you sure you want to proceed?',
+        });
+        if (!isConfirmed) {
             return;
         }
         try {
@@ -127,7 +133,11 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
     };
 
     const handleDisconnectDrive = async () => {
-        if (!confirm('Are you sure you want to disconnect Google Drive? Auto-backups will be disabled.')) {
+        const isConfirmed = await confirm({
+            title: 'Disconnect Google Drive',
+            message: 'Are you sure you want to disconnect Google Drive? Auto-backups will be disabled.',
+        });
+        if (!isConfirmed) {
             return;
         }
         try {
@@ -162,7 +172,11 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
     const handleImportFile = async (file: File) => {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (!confirm('⚠️ WARNING: Importing this backup will automatically WIPE all your current attendance, subjects, and results, replacing them with the backup data. A safety rollback backup will be created automatically. Do you want to proceed?')) return;
+        const isConfirmed = await confirm({
+            title: 'Import Backup Configuration',
+            message: '⚠️ WARNING: Importing this backup will automatically WIPE all your current attendance, subjects, and results, replacing them with the backup data. A safety rollback backup will be created automatically. Do you want to proceed?',
+        });
+        if (!isConfirmed) return;
 
         showToast('info', 'Importing data...');
         await attendanceService.importData(data);
@@ -195,7 +209,11 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
             showToast('error', 'Please enter a migration key');
             return;
         }
-        if (!confirm('⚠️ CRITICAL WARNING: Complete migration? All current subjects, attendance logs, and results on this account will be permanently overwritten by the migrated data.')) {
+        const isConfirmed = await confirm({
+            title: 'Complete Account Migration',
+            message: '⚠️ CRITICAL WARNING: Complete migration? All current subjects, attendance logs, and results on this account will be permanently overwritten by the migrated data.',
+        });
+        if (!isConfirmed) {
             return;
         }
         setMigrating(true);

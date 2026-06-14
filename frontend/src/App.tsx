@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SemesterProvider } from './contexts/SemesterContext';
 import { ToastProvider } from './components/ui/Toast';
+import { ConfirmProvider } from './contexts/ConfirmContext';
 import LoadingSpinner from './components/ui/LoadingSpinner';
 import ErrorBoundary from './components/ui/ErrorBoundary';
 import './index.css';
@@ -263,11 +264,13 @@ const App: React.FC = () => {
             <AuthProvider>
               <SemesterProvider>
                 <ToastProvider>
-                  <ErrorBoundary>
-                    <KeyboardShortcutsProvider>
-                      <AppContent />
-                    </KeyboardShortcutsProvider>
-                  </ErrorBoundary>
+                  <ConfirmProvider>
+                    <ErrorBoundary>
+                      <KeyboardShortcutsProvider>
+                        <AppContent />
+                      </KeyboardShortcutsProvider>
+                    </ErrorBoundary>
+                  </ConfirmProvider>
                 </ToastProvider>
               </SemesterProvider>
             </AuthProvider>

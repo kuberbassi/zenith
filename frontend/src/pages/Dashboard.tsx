@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { useDashboard, useMarkAttendance } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Plus, Trash2, Edit2, Check, X,
-    Activity, Target, Flame, ChevronRight, Settings as SettingsIcon, FileText
+    Activity, Target, Flame, ChevronRight, Settings as SettingsIcon, FileText,
+    CheckCircle2, Circle
 } from 'lucide-react';
 import AddSubjectModal from '@/components/modals/AddSubjectModal';
 import EditSubjectModal from '@/components/modals/EditSubjectModal';
@@ -17,40 +18,12 @@ import { useSemester } from '@/contexts/SemesterContext';
 import { Link } from 'react-router-dom';
 import { formatTeacherName } from '@/utils/formatters';
 import { useNotes } from '@/hooks/useNotes';
+import { useQueryClient } from '@tanstack/react-query';
+import { useConfirm } from '@/contexts/ConfirmContext';
+import api from '@/services/api';
 
 /* ── Helpers for Timetable slot subject mapping ── */
 const normalizeId = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
-
-const getNotePlainText = (content: string): string => {
-    if (!content) return 'Empty note';
-    const withPlaceholders = content
-        .replace(/<img[^>]*>/gi, '[image] ')
-        .replace(/<iframe[^>]*>/gi, '[video] ')
-        .replace(/<\/p>/gi, '\n</p>')
-        .replace(/<\/div>/gi, '\n</div>')
-        .replace(/<\/li>/gi, '\n</li>')
-        .replace(/<br\s*\/?>/gi, '\n<br>\n')
-        .replace(/<\/h[1-6]>/gi, '\n');
-
-    try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(withPlaceholders, 'text/html');
-        const text = doc.body.textContent || doc.body.innerText || '';
-        return text.replace(/[^\S\r\n]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim();
-    } catch {
-        return withPlaceholders
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/&nbsp;/g, ' ')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'")
-            .replace(/[^\S\r\n]+/g, ' ')
-            .replace(/\n\s*\n+/g, '\n')
-            .trim();
-    }
-};
 
 const findSubjectForSlot = (subjects: any[], slot: any) => {
     const explicitType = String(slot?.type || '').trim().toLowerCase();
@@ -228,9 +201,57 @@ const Dashboard: React.FC = () => {
     } | null>(null);
 
     const [todayClasses, setTodayClasses] = useState<any[]>([]);
-    const [categoryFilter, setCategoryFilter] = useState<'Theory' | 'Practical' | 'All'>('Theory');
-    const { data: notesList } = useNotes();
-    const notesPreview = notesList || [];
+    const queryClient = useQueryClient();
+    const confirm = useConfirm();
+
+    const [categoryFilter, setCategoryFilter] = useState<'Theory' | 'Practical' | 'All'>(() => {
+        const saved = localStorage.getItem('zenith_dashboard_subject_filter');
+        return (saved === 'Theory' || saved === 'Practical' || saved === 'All') ? saved : 'All';
+    });
+    const [notesFilter, setNotesFilter] = useState<'all' | 'notes' | 'todos'>(() => {
+        const saved = localStorage.getItem('zenith_dashboard_notes_filter');
+        return (saved === 'all' || saved === 'notes' || saved === 'todos') ? saved : 'all';
+    });
+
+    const { data: notesList, refetch: refetchNotes } = useNotes();
+
+    const filteredNotesPreview = useMemo(() => {
+        const list = notesList || [];
+        if (notesFilter === 'all') return list;
+        if (notesFilter === 'notes') return list.filter(n => !n.is_todo);
+        return list.filter(n => n.is_todo);
+    }, [notesList, notesFilter]);
+
+    const handleToggleTodoInDashboard = async (note: any, todoId: string) => {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            navigator.vibrate(10);
+        }
+        const previousNotes = queryClient.getQueryData<any[]>(['notes']);
+        if (previousNotes) {
+            const updated = previousNotes.map(n => {
+                if (n.id === note.id) {
+                    return {
+                        ...n,
+                        todos: n.todos.map((t: any) => t.id === todoId ? { ...t, completed: !t.completed } : t)
+                    };
+                }
+                return n;
+            });
+            queryClient.setQueryData(['notes'], updated);
+        }
+        try {
+            const updatedTodos = note.todos.map((t: any) => t.id === todoId ? { ...t, completed: !t.completed } : t);
+            await api.put(`/api/notes/${note.id}`, { todos: updatedTodos });
+            queryClient.invalidateQueries({ queryKey: ['notes'] });
+            refetchNotes();
+        } catch (err) {
+            console.error("Failed to toggle todo status", err);
+            showToast('error', 'Failed to update task');
+            if (previousNotes) {
+                queryClient.setQueryData(['notes'], previousNotes);
+            }
+        }
+    };
 
     const targetThreshold = user?.attendance_threshold || 75;
 
@@ -274,7 +295,11 @@ const Dashboard: React.FC = () => {
     }, [currentSemester, user]);
 
     const handleDeleteSubject = async (subjectId: string, subjectName: string) => {
-        if (!confirm(`Delete "${subjectName}"?`)) return;
+        const isConfirmed = await confirm({
+            title: 'Delete Subject',
+            message: `Are you sure you want to delete "${subjectName}"? This will permanently remove all its classes and attendance records.`,
+        });
+        if (!isConfirmed) return;
         try {
             await attendanceService.deleteSubject(subjectId);
             showToast('success', `Deleted ${subjectName}`);
@@ -547,38 +572,88 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Bento Card 4: Recent Notes */}
-                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px] lg:col-span-2">
+                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[280px] lg:col-span-2">
                             <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Recent Notes & Checklists</span>
-                                    <FileText size={13} className="text-on-surface-variant/40" />
+                                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Recent Notes & Checklists</span>
+                                        <FileText size={13} className="text-on-surface-variant/40" />
+                                    </div>
+                                    <div className="flex items-center gap-1 p-0.5 bg-surface-container border border-outline rounded-lg">
+                                        {(['all', 'notes', 'todos'] as const).map(filter => (
+                                            <button
+                                                key={filter}
+                                                onClick={() => {
+                                                    setNotesFilter(filter);
+                                                    localStorage.setItem('zenith_dashboard_notes_filter', filter);
+                                                }}
+                                                className={`px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                                    notesFilter === filter
+                                                        ? 'bg-on-surface text-surface'
+                                                        : 'text-on-surface-variant/50 hover:text-on-surface'
+                                                }`}
+                                            >
+                                                {filter === 'all' ? 'All' : filter === 'notes' ? 'Notes' : 'Tasks'}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2">
-                                    {notesPreview.length > 0 ? (
-                                        notesPreview.slice(0, 2).map((note, idx) => (
-                                            <div key={note.id || idx} className="border border-outline bg-surface-container/20 rounded p-4 flex flex-col justify-between min-h-[120px]">
+                                    {filteredNotesPreview.length > 0 ? (
+                                        filteredNotesPreview.slice(0, 2).map((note, idx) => (
+                                            <div key={note.id || idx} className="border border-outline bg-surface-container/20 rounded-xl p-4 flex flex-col justify-between min-h-[140px] hover:border-on-surface/30 hover:bg-surface-container/30 transition-all">
                                                 <div>
-                                                    <h4 className="text-xs font-bold text-on-surface truncate">{note.title || 'Untitled'}</h4>
+                                                    <Link to="/notes" className="hover:underline cursor-pointer block">
+                                                        <h4 className="text-xs font-bold text-on-surface truncate">{note.title || 'Untitled'}</h4>
+                                                    </Link>
                                                     {!note.is_todo ? (
-                                                        <p className="text-[11px] text-on-surface-variant/65 mt-1.5 line-clamp-3 leading-relaxed whitespace-pre-line">{getNotePlainText(note.content)}</p>
+                                                        <Link to="/notes" className="cursor-pointer block mt-1.5 select-none pointer-events-none">
+                                                            <div
+                                                                className="text-xs text-on-surface-variant/60 line-clamp-3 leading-relaxed note-preview-html"
+                                                                dangerouslySetInnerHTML={{
+                                                                    __html: (note.content || '')
+                                                                        .replace(/<img[^>]*>/gi, '<span class="text-primary font-bold text-[9px] bg-primary/10 px-1 rounded uppercase tracking-wider">[Image]</span> ')
+                                                                        .replace(/<iframe[^>]*>/gi, '<span class="text-primary font-bold text-[9px] bg-primary/10 px-1 rounded uppercase tracking-wider">[Video]</span> ')
+                                                                }}
+                                                            />
+                                                        </Link>
                                                     ) : (
-                                                        <div className="space-y-1 mt-2">
-                                                            {note.todos && note.todos.slice(0, 2).map((todo: any) => (
-                                                                <div key={todo.id} className="flex items-center gap-1.5 text-[11px]">
-                                                                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${todo.completed ? 'bg-primary/30' : 'bg-primary'}`} />
-                                                                    <span className={`truncate ${todo.completed ? 'line-through opacity-40' : 'opacity-80'}`}>{todo.text}</span>
-                                                                </div>
+                                                        <div className="space-y-1.5 mt-2.5">
+                                                            {note.todos && note.todos.slice(0, 3).map((todo: any) => (
+                                                                <button
+                                                                    key={todo.id}
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                        void handleToggleTodoInDashboard(note, todo.id);
+                                                                    }}
+                                                                    className="flex items-center gap-2 text-[11px] text-left w-full hover:bg-surface-container/80 p-1 rounded-md transition-colors group/todo cursor-pointer"
+                                                                >
+                                                                    <span className={`shrink-0 transition-colors ${todo.completed ? 'text-primary' : 'text-on-surface-variant/30 group-hover/todo:text-on-surface-variant/70'}`}>
+                                                                        {todo.completed ? (
+                                                                            <CheckCircle2 size={14} className="fill-primary/10" />
+                                                                        ) : (
+                                                                            <Circle size={14} />
+                                                                        )}
+                                                                    </span>
+                                                                    <span className={`truncate leading-none ${todo.completed ? 'line-through text-on-surface-variant/30' : 'text-on-surface'}`}>
+                                                                        {todo.text}
+                                                                    </span>
+                                                                </button>
                                                             ))}
+                                                            {note.todos && note.todos.length > 3 && (
+                                                                <p className="text-[9px] font-bold text-on-surface-variant/30 ml-6 uppercase">+{note.todos.length - 3} more tasks</p>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
-                                                <span className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant/30 mt-2 block">{note.is_todo ? 'Checklist' : 'Note'}</span>
+                                                <span className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant/30 mt-3 block">{note.is_todo ? 'Checklist' : 'Note'}</span>
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="py-8 text-center border border-dashed border-outline rounded col-span-2">
-                                            <p className="text-xs font-semibold text-on-surface-variant/30 italic">No notes created yet.</p>
+                                        <div className="py-8 text-center border border-dashed border-outline rounded-xl col-span-2">
+                                            <p className="text-xs font-semibold text-on-surface-variant/30 italic">No items match the filter.</p>
                                         </div>
                                     )}
                                 </div>
@@ -614,7 +689,10 @@ const Dashboard: React.FC = () => {
                                         return (
                                             <button
                                                 key={cat}
-                                                onClick={() => setCategoryFilter(cat)}
+                                                onClick={() => {
+                                                    setCategoryFilter(cat);
+                                                    localStorage.setItem('zenith_dashboard_subject_filter', cat);
+                                                }}
                                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                                                     categoryFilter === cat
                                                         ? 'bg-on-surface text-surface'

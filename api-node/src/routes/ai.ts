@@ -15,19 +15,20 @@ const ChatSchema = z.object({
     history: z.array(z.object({
         role: z.enum(['user', 'assistant']),
         content: z.string()
-    })).optional()
+    })).optional(),
+    selectedSemester: z.number().optional()
 })
 
 /**
  * Builds a comprehensive data profile for the AI context.
  */
-async function buildFullContext(req: AuthRequest): Promise<string> {
+async function buildFullContext(req: AuthRequest, selectedSemester?: number): Promise<string> {
     const userId = req.userId!
     const today = new Date().toISOString().split('T')[0]
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
     const todayStr = days[new Date().getDay()]
 
-    const [user, subjects, recentLogs, allTimetables, courses, prefs, skills, resultRows, systemLogs, notes] = await Promise.all([
+    const [user, subjects, recentLogs, allTimetables, courses, prefs, skills, resultRows, systemLogs, notes, backups] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId } }),
         prisma.subject.findMany({ where: { user_id: userId } }),
         prisma.attendanceLog.findMany({ where: { user_id: userId }, orderBy: { date: 'desc' }, take: 20 }),
@@ -37,7 +38,8 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         prisma.skill.findMany({ where: { user_id: userId } }),
         prisma.semesterResult.findMany({ where: { user_id: userId }, orderBy: { semester: 'asc' } }),
         prisma.systemLog.findMany({ where: { user_id: userId }, orderBy: { timestamp: 'desc' }, take: 10 }),
-        prisma.note.findMany({ where: { user_id: userId } })
+        prisma.note.findMany({ where: { user_id: userId } }),
+        prisma.userBackup.findMany({ where: { user_id: userId }, orderBy: { created_at: 'desc' } })
     ])
 
     let resolvedTimetable = null
@@ -57,8 +59,21 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
     if (user) {
         lines.push('## User Profile')
         lines.push(`Name: ${user.name || 'Student'}`)
-        lines.push(`Institution: ${user.college || 'Unknown'}`)
-        lines.push(`Threshold Target: ${user.attendance_threshold || 75}%`)
+        lines.push(`Email: ${user.email}`)
+        lines.push(`Gender: ${user.gender || 'N/A'}`)
+        lines.push(`Phone Number: ${user.phone_number || 'N/A'}`)
+        lines.push(`Institution/College: ${user.college || 'Unknown'}`)
+        lines.push(`Course: ${user.course || 'N/A'}`)
+        lines.push(`Branch: ${user.branch || 'N/A'}`)
+        lines.push(`Batch: ${user.batch || 'N/A'}`)
+        lines.push(`Enrollment Number: ${user.enrollment_number || 'N/A'}`)
+        lines.push(`Admission Year: ${user.admission_year || 'N/A'}`)
+        lines.push(`Current Semester: ${user.current_semester || 1}`)
+        lines.push(`Default Target Attendance: ${user.target_attendance || 75}%`)
+        lines.push(`Attendance Threshold: ${user.attendance_threshold || 75}%`)
+        lines.push(`Warning Threshold: ${user.warning_threshold || 76}%`)
+        lines.push(`Active Selected Semester (UI State): ${selectedSemester || user.current_semester || 1}`)
+        lines.push('')
     }
 
     // Google Drive backup preferences and status
@@ -72,15 +87,24 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
     lines.push(`Last Backup Timestamp: ${lastBackup}`)
     lines.push('')
 
+
     if (subjects.length) {
         lines.push('## Subjects, Attendance & Trackers')
         let totalMarks = 0
         let totalMaxMarks = 0
+        let totalPracticals = 0
+        let completedPracticals = 0
+        let totalAssignments = 0
+        let completedAssignments = 0
 
         for (const sub of subjects) {
             const attended = sub.attended ?? 0
             const total = sub.total ?? 0
             const pct = AttendanceCalculator.calculatePercentage(attended, total)
+            const target = sub.target ?? user?.attendance_threshold ?? 75
+            
+            // Calculate bunk guard details programmatically to prevent LLM mathematical hallucinations
+            const bg = AttendanceCalculator.calculateBunkGuard(attended, total, target)
             const categories = sub.categories || []
             const isPractical = categories.includes('Practical')
             const isAssignment = categories.includes('Assignment')
@@ -89,13 +113,18 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
             if (isPractical) {
                 const p = (sub.practicals as any) || { total: 10, completed: 0, hardcopy: false }
                 trackerInfo += ` | Practicals: ${p.completed}/${p.total} (${p.hardcopy ? 'Submitted' : 'Not fully submitted'})`
+                totalPracticals += Number(p.total ?? 0)
+                completedPracticals += Number(p.completed ?? 0)
             }
             if (isAssignment) {
                 const a = (sub.assignments as any) || { total: 4, completed: 0, hardcopy: false }
                 trackerInfo += ` | Assignments: ${a.completed}/${a.total} (${a.hardcopy ? 'Submitted' : 'Not fully submitted'})`
+                totalAssignments += Number(a.total ?? 0)
+                completedAssignments += Number(a.completed ?? 0)
             }
 
-            lines.push(`  - ${sub.name}: ${pct}% (${attended}/${total}) | Target: ${sub.target ?? 75}%${trackerInfo}`)
+            const isSameSem = !selectedSemester || sub.semester === selectedSemester
+            lines.push(`  - ${sub.name} (Code: ${sub.code || 'N/A'}, Semester: ${sub.semester}${isSameSem ? ' - Selected' : ''}): Current: ${pct}% (${attended}/${total}) | Target: ${target}% | Bunk Status: ${bg.status_message}${trackerInfo}`)
         }
         
         const semesterData = resultRows.map(row => {
@@ -118,6 +147,7 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         lines.push('')
         lines.push('## Result Analytics')
         lines.push(`Academic Strength: ${academicStrength}% (Aggregate Percentage across all declared results)`)
+        lines.push(`Calculated Overall CGPA: ${cgpa}`)
         if (resultRows.length) {
             const latest = resultRows[resultRows.length - 1]
             lines.push(`Latest Result: Semester ${latest.semester} | SGPA: ${latest.sgpa} | CGPA: ${cgpa}`)
@@ -126,12 +156,26 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         lines.push('')
         lines.push('## Analytics KPIs')
         lines.push(`Overall Attendance: ${summary.total_attended}/${summary.total_classes} = ${summary.overall_percentage}%`)
+        lines.push(`Overall Attendance Status: ${summary.risk_level}`)
+        lines.push(`Safe Bunks Remaining (Overall): ${summary.safe_bunks_remaining}`)
+        lines.push(`Total Practical Items Tracked: ${completedPracticals}/${totalPracticals} Completed`)
+        lines.push(`Total Assignment Items Tracked: ${completedAssignments}/${totalAssignments} Completed`)
+        lines.push('')
+    }
+
+    if (recentLogs.length) {
+        lines.push('## Recent Attendance Logs (Last 20 entries)')
+        for (const log of recentLogs) {
+            lines.push(`  - ${log.date} | ${log.subject_name}: ${log.status} (${log.type})${log.notes ? ` - Note: ${log.notes}` : ''}`)
+        }
+        lines.push('')
     }
 
     if (resultRows.length) {
         lines.push('## Detailed Semester Results')
         for (const row of resultRows) {
-            lines.push(`  ### Semester ${row.semester} (SGPA: ${row.sgpa}, Credits: ${row.total_credits}, Marks: ${row.total_marks || 'N/A'}/${row.max_marks || 'N/A'})`)
+            const isSameSem = row.semester === selectedSemester
+            lines.push(`  ### Semester ${row.semester} (SGPA: ${row.sgpa}, Credits: ${row.total_credits}, Marks: ${row.total_marks || 'N/A'}/${row.max_marks || 'N/A'}, Declaration/Import Date: ${new Date(row.updated_at).toLocaleString('en-GB')}${isSameSem ? ' - Selected' : ''})`)
             const rowSubjects = Array.isArray(row.subjects) ? row.subjects as any[] : []
             for (const sub of rowSubjects) {
                 const isPending = sub.is_pending || sub.grade === '-'
@@ -149,6 +193,15 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         lines.push('## User Notes & Checklists (Todos)')
         const textNotes = notes.filter(n => !n.is_todo)
         const todoNotes = notes.filter(n => n.is_todo)
+
+        let totalTodosCount = 0
+        let completedTodosCount = 0
+        for (const todoNote of todoNotes) {
+            const items = Array.isArray(todoNote.todos) ? todoNote.todos as any[] : []
+            totalTodosCount += items.length
+            completedTodosCount += items.filter(t => t.completed).length
+        }
+        lines.push(`Total Checklist/Todo Tasks: ${completedTodosCount}/${totalTodosCount} Completed`)
 
         if (textNotes.length > 0) {
             lines.push('  ### Notes')
@@ -178,6 +231,20 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
         }
         lines.push('')
     }
+
+    lines.push('## Cloud Backup History')
+    lines.push(`Total Backups Done: ${backups.length}`)
+    if (backups.length > 0) {
+        const latest = backups[0]
+        lines.push(`Latest Backup Date & Time: ${new Date(latest.created_at).toLocaleString('en-GB')}`)
+        for (let i = 0; i < backups.length; i++) {
+            const b = backups[i]
+            lines.push(`  - Backup #${i + 1}: Timestamp: ${new Date(b.created_at).toLocaleString('en-GB')} | Type: ${b.backup_type} | Expires: ${new Date(b.expires_at).toLocaleDateString('en-GB')}`)
+        }
+    } else {
+        lines.push('No cloud backups completed yet.')
+    }
+    lines.push('')
 
     if (resolvedTimetable) {
         const schedule = (resolvedTimetable.schedule as any) || {}
@@ -219,24 +286,28 @@ async function buildFullContext(req: AuthRequest): Promise<string> {
 
     if (courses.length) {
         lines.push('## Active Online Courses')
+        const completed = courses.filter(c => c.status === 'Completed' || c.progress === 100).length
+        lines.push(`Total Courses Tracked: ${courses.length} | Completed: ${completed} | Active: ${courses.length - completed}`)
         for (const course of courses) {
-            lines.push(`  - ${course.name || 'Untitled'} | Progress: ${course.progress ?? 0}% | Status: ${course.status || 'Active'}`)
+            lines.push(`  - ${course.name || 'Untitled'} | Platform: ${course.platform || 'N/A'} | Progress: ${course.progress ?? 0}% | Status: ${course.status || 'Active'}${course.url ? ` | URL: ${course.url}` : ''}`)
         }
         lines.push('')
     }
 
     if (skills.length) {
         lines.push('## Skill Inventory')
+        const avgMastery = skills.length ? Math.round(skills.reduce((sum, s) => sum + (s.progress || 0), 0) / skills.length) : 0
+        lines.push(`Total Tracked Skills: ${skills.length} | Average Mastery: ${avgMastery}%`)
         for (const skill of skills) {
-             lines.push(`  - ${skill.name}: ${skill.progress || 0}% Mastery (${skill.level || 'Beginner'})`)
+             lines.push(`  - ${skill.name} (Category: ${skill.category || 'General'}): ${skill.progress || 0}% Mastery (${skill.level || 'Beginner'}) | Notes: ${skill.notes || 'None'}`)
         }
         lines.push('')
     }
 
     if (systemLogs.length) {
         lines.push('## Recent Activity Logs')
-        for (const log of systemLogs.slice(0, 5)) {
-            lines.push(`  - ${log.timestamp.toISOString().slice(0, 16).replace('T', ' ')}: ${log.action}`)
+        for (const log of systemLogs) {
+            lines.push(`  - ${log.timestamp.toISOString().slice(0, 16).replace('T', ' ')} | ${log.action}: ${log.description}`)
         }
         lines.push('')
     }
@@ -259,6 +330,15 @@ You have direct, real-time access to the student's unified database. Your missio
    - Suggest a concrete 3-step study or attendance strategy to optimize their semester.
 5. METRIC UNIFICATION: Use CGPA (Weighted), Overall Attendance, and Academic Strength as the definitive performance metrics. Always quote exact percentages and numbers.
 6. TODAY'S PENDING ACTION: Remind the student of any pending attendance logs that need to be marked today.
+7. SEMESTER CURATION: The context specifies the active selected semester (UI State). Unless the user explicitly specifies a particular semester in their prompt, you MUST default your answers and stats analysis to the currently active selected semester.
+8. PROFILE & SESSION AWARENESS: You have direct access to the student's complete profile (gender, phone number, default target attendance) and detailed system activity logs. Utilize these metrics when asked about user status, profile settings, or activity history.
+
+## Strict Anti-Hallucination & Verification Guidelines (Targeting 99.9% Accuracy)
+- NEVER make up, invent, or extrapolate facts, grades, dates, backup statuses, or logs.
+- If the user asks about a subject or a value that is NOT in the CURRENT ACADEMIC CONTEXT, state clearly: "This information is not present in your profile database." Do NOT assume or guess.
+- Use the calculations provided in the context (like Bunk Status, CGPA, SGPA, and Academic Strength) as the single source of truth. DO NOT perform custom mental math that contradicts the provided status messages.
+- Always quote the exact numbers and text from the context.
+- Ground every answer with a reference to the context category (e.g., "According to your detailed results", "According to your weekly timetable").
 
 ## Design, Tone and Length
 - Persona: High-impact Academic Strategist. Tactical, professional, and extremely direct.
@@ -269,11 +349,11 @@ You have direct, real-time access to the student's unified database. Your missio
 async function chatHandler(req: AuthRequest, res: any) {
     try {
         const body = ChatSchema.parse(req.body)
-        const { message, history = [] } = body
+        const { message, history = [], selectedSemester } = body
 
         let context = ''
         try {
-            context = await buildFullContext(req)
+            context = await buildFullContext(req, selectedSemester)
         } catch (contextErr) {
             console.error('[ai/chat] context build failed:', contextErr)
             context = 'Profile sync temporarily unavailable.'

@@ -111,8 +111,6 @@ const pdfUploadLimiter = rateLimit({
 app.use('/api', apiLimiter)
 
 // Aggressively protect scraper + auth (applied before route mounts)
-app.use('/api/v1/ipu', strictLimiter)
-app.use('/api/ipu', strictLimiter)
 app.use('/api/v1/auth', strictLimiter)
 app.use('/api/auth', strictLimiter)
 app.use('/api/v1/ai', aiLimiter)

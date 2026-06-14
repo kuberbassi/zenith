@@ -8,6 +8,7 @@ import Modal from '@/components/ui/Modal';
 import Select from '@/components/ui/Select';
 import { useToast } from '@/components/ui/Toast';
 import { attendanceService } from '@/services/attendance.service';
+import { useConfirm } from '@/contexts/ConfirmContext';
 
 interface Course {
     _id?: string;
@@ -109,6 +110,7 @@ const PLATFORMS = [
 ];
 
 const Courses: React.FC = () => {
+    const confirm = useConfirm();
     const { showToast } = useToast();
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
@@ -166,7 +168,11 @@ const Courses: React.FC = () => {
     };
 
     const handleDeleteCourse = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this course?')) return;
+        const isConfirmed = await confirm({
+            title: 'Delete Course',
+            message: 'Are you sure you want to delete this course?',
+        });
+        if (!isConfirmed) return;
         const previous = courses;
         setCourses(courses.filter(c => getCourseId(c) !== id));
         try {

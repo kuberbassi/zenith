@@ -7,6 +7,7 @@ import { useSemester } from '@/contexts/SemesterContext';
 import { attendanceService } from '@/services/attendance.service';
 import api from '@/services/api';
 import { Check, X, MoreHorizontal, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
+import { useConfirm } from '@/contexts/ConfirmContext';
 
 
 interface AttendanceModalProps {
@@ -19,6 +20,7 @@ interface AttendanceModalProps {
 }
 
 const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defaultDate, onSuccess, onLogsUpdate }) => {
+    const confirm = useConfirm();
     const { showToast } = useToast();
     const { currentSemester } = useSemester();
     const [selectedDate, setSelectedDate] = useState<Date>(defaultDate || new Date());
@@ -485,9 +487,13 @@ const AttendanceModal: React.FC<AttendanceModalProps> = ({ isOpen, onClose, defa
                                                     </div>
                                                 </div>
                                                 <button
-                                                    onClick={() => {
+                                                    onClick={async () => {
                                                         const subName = log.subject_name || log.subject_info?.name || logSubject?.name || 'this subject';
-                                                        if (confirm(`Delete this ${log.status} entry for ${subName}?`)) {
+                                                        const isConfirmed = await confirm({
+                                                            title: 'Delete Attendance Entry',
+                                                            message: `Delete this ${log.status} entry for ${subName}?`,
+                                                        });
+                                                        if (isConfirmed) {
                                                             deleteLog(logId, logSubjectId);
                                                         }
                                                     }}

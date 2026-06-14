@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useTheme } from '@/contexts/ThemeContext';
 import { attendanceService } from '@/services/attendance.service';
 import ResultsDashboard from '@/components/results/ResultsDashboard';
+import { useConfirm } from '@/contexts/ConfirmContext';
 
 /*  Grade utilities  */
 const GRADE_POINTS: Record<string, number> = {
@@ -157,6 +158,7 @@ type Step = 'loading' | 'form' | 'results';
 
 /*  Component  */
 const Results: React.FC = () => {
+    const confirm = useConfirm();
     const { user } = useAuth();
     const { showToast } = useToast();
 
@@ -296,8 +298,14 @@ const Results: React.FC = () => {
         setEditorSubjects(prev => [...prev, newSub]);
     }
 
-    function handleDeleteSubject(id: string) {
-        setEditorSubjects(prev => prev.filter(s => s.id !== id));
+    async function handleDeleteSubject(id: string) {
+        const isConfirmed = await confirm({
+            title: 'Delete Subject',
+            message: 'Are you sure you want to delete this subject?',
+        });
+        if (isConfirmed) {
+            setEditorSubjects(prev => prev.filter(s => s.id !== id));
+        }
     }
 
     function calculateDynamicGrade(total: number) {

@@ -4,7 +4,6 @@ import multer from 'multer'
 import { requireAuth, type AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../config/prisma.js'
 import { GradeCalculator } from '../lib/calculations.js'
-import { fetchIpuResults } from '../services/ipuClient.js'
 import { ok, created, fail } from '../utils/response.js'
 import { mergePreferredRecord } from '../utils/recordMerge.js'
 import { buildResultsPayload } from '../utils/resultsPayload.js'
@@ -316,84 +315,6 @@ router.get('/results/analytics', async (req: AuthRequest, res) => {
 })
 
 // ─── Results Sync ────────────────────────────────────────────────────────────
-
-const SyncSchema = z.object({
-    cookies: z.string().min(1),
-    semester: z.number().int().min(1).max(12),
-})
-
-router.post('/results/sync', async (req: AuthRequest, res) => {
-    try {
-        const userId = req.userId!
-        const { cookies, semester } = SyncSchema.parse(req.body)
-
-        const scrapedData = await fetchIpuResults(cookies, semester)
-        if (!scrapedData || scrapedData.length === 0) {
-            fail(res, 'No results found for this session', 'NOT_FOUND', 404)
-            return
-        }
-
-        const meta = scrapedData[0]
-        const studentInfo = {
-            name: meta.stname, father: meta.father, institution: meta.iname,
-            programme: meta.prgname, batch: meta.byoa, roll_no: meta.nrollno, enrollment_no: meta.nrollno,
-        }
-
-        const processedSubjects = scrapedData.map(row => {
-            const internal = parseFloat(row.minorprint === '-' ? '0' : row.minorprint) || 0
-            const external = parseFloat(row.majorprint === '-' ? '0' : row.majorprint) || 0
-            const totalMarks = parseFloat(row.moderatedprint) || (internal + external)
-            const isLabSub = /LAB|PRACTICAL|WORKSHOP|SEMINAR|VIVA/i.test(row.papername || '')
-            const sub = {
-                name: row.papername,
-                code: row.papercode,
-                credits: isLabSub ? 1 : 3,
-                internal_theory: isLabSub ? 0 : internal,
-                external_theory: isLabSub ? 0 : external,
-                internal_practical: isLabSub ? internal : 0,
-                external_practical: isLabSub ? external : 0,
-                total_marks: totalMarks,
-                max_marks: 100,
-                grade: ''
-            }
-            return { ...sub, ...GradeCalculator.calculateSubjectResult(sub) }
-        })
-
-        const sgpaCalc = GradeCalculator.calculateSGPA(processedSubjects)
-        const finalSgpa = meta.eugpa || sgpaCalc.sgpa
-        const totalMarksSum = processedSubjects.reduce((a, s: any) => a + (parseFloat(s.total_marks) || 0), 0)
-        const maxMarksSum = processedSubjects.reduce((a, s: any) => a + (parseFloat(s.max_marks) || 100), 0)
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
-
-        // Wipe all existing results for this semester to ensure clean sync and prevent duplicate entries
-        await prisma.semesterResult.deleteMany({
-            where: { user_id: userId, semester },
-        })
-
-        await prisma.semesterResult.create({
-            data: {
-                user_id: userId,
-                semester,
-                subjects: processedSubjects,
-                sgpa: finalSgpa,
-                total_credits: sgpaCalc.total_credits,
-                student_info: studentInfo,
-                source: 'ipu_scraper',
-                total_marks: String(totalMarksSum),
-                max_marks: String(maxMarksSum),
-                enrollment_number: meta.nrollno || null
-            },
-        })
-
-        sysLog(req, userId, 'Results Synced', `Fetched results for Semester ${semester} via direct API`).catch(() => { })
-        await clearUserViewCache(userId).catch(() => { })
-        ok(res, { message: 'Results synced successfully', sgpa: finalSgpa, subjects: processedSubjects.length, student_info: studentInfo })
-    } catch (err) {
-        if (err instanceof z.ZodError) { fail(res, err.errors[0]?.message || 'Validation failed', 'INVALID_PARAMS'); return }
-        console.error('[academic/results/sync POST]', err)
-        fail(res, 'Sync failed', 'SYNC_FAILED', 500)
-    }
-})
 
 const SaveResultSchema = z.object({
     semester: z.number().int().min(1).max(12),
