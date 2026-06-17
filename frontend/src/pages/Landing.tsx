@@ -100,16 +100,16 @@ const Landing: React.FC = () => {
 
     return (
         <div 
-            className="min-h-screen text-on-background select-none relative overflow-x-hidden"
+            className="min-h-screen text-on-background select-none relative overflow-x-hidden pt-16"
         >
             {/* Solid background layer */}
             <div className="fixed inset-0 bg-background -z-30 pointer-events-none" />
 
             {/* ── Navbar ────────────────────────────────────────────── */}
             <nav className={[
-                'sticky top-0 z-50 w-full transition-all duration-300 ease-in-out',
+                'fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ease-in-out',
                 scrolled
-                    ? 'border-b border-outline bg-surface/80 backdrop-blur-md shadow-sm'
+                    ? 'border-b border-outline bg-surface/85 backdrop-blur-md shadow-sm'
                     : 'border-b border-transparent bg-transparent backdrop-blur-none',
             ].join(' ')}>
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
