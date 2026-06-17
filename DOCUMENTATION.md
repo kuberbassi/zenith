@@ -33,7 +33,7 @@
 
 - **Attendance Tracking** — Mark, edit, delete attendance with substitution support, calendar view, bunk-guard calculations
 - **IPU Results Scraping** — Automated login to IPU exam portal with CAPTCHA handling, result fetching, SGPA/CGPA calculations
-- **AI Academic Assistant** — Groq LLM-powered chatbot with full academic context (attendance, results, schedule, skills)
+- **AI Academic Assistant** — Chatbot with full academic context powered by Groq LLM (`llama-3.3-70b-versatile`) with automatic failover backup to Google Gemini API (`gemini-2.5-flash`)
 - **Timetable Management** — Weekly schedule with slot CRUD, subject linking, legacy ID repair
 - **Dashboard & Analytics** — KPIs, streak tracking, day-of-week analysis, heatmaps, momentum scores
 - **Course & Skill Tracking** — Manual online courses, skill inventory
@@ -54,12 +54,17 @@
 │   TailwindCSS   │     │   Vercel Serverless   │     │                 │
 │   PWA           │     │                       │     │                 │
 └─────────────────┘     └──────────────────────┘     └─────────────────┘
-                              │         │
-                              ▼         ▼
-                        ┌─────────┐ ┌─────────┐
-                        │ Groq AI │ │ IPU     │
-                        │ LLM API │ │ Portal  │
-                        └─────────┘ └─────────┘
+                              │    │    │
+                              ▼    ▼    ▼
+                        ┌─────────┐│┌─────────┐
+                        │ Groq AI │││ IPU     │
+                        │ (Pri)   │││ Portal  │
+                        └─────────┘│└─────────┘
+                                   ▼
+                             ┌───────────┐
+                             │ Gemini AI │
+                             │ (Backup)  │
+                             └───────────┘
 ```
 
 ### Tech Stack Detail
@@ -79,7 +84,7 @@
 | **ORM** | Prisma (Neon HTTP adapter) | 7.4 |
 | **Database** | PostgreSQL (Neon Serverless) | — |
 | **Auth** | Google OAuth 2.0 + JWT | — |
-| **AI** | Groq API (llama-3.3-70b) | — |
+| **AI** | Groq API (Primary: llama-3.3-70b) + Gemini API (Backup: gemini-2.5-flash) | — |
 | **Scraping** | Cheerio + Axios | 1.2 / 1.13 |
 | **Image Processing** | Sharp | 0.34 |
 | **Validation** | Zod | 3.24 |
@@ -376,7 +381,7 @@ zenith/                          # Monorepo root
 - ✅ **Good**: Detailed system prompt with operational directives
 - ⚠️ **Issue**: Context includes ALL user data in every request — could exceed token limits for heavy users
 - ⚠️ **Issue**: No rate limiting specific to AI chat (expensive API calls)
-- 🔴 **Security**: Full user data (attendance, results, personal info) sent to third-party API (Groq)
+- 🔴 **Security**: Full user data (attendance, results, personal info) sent to third-party APIs (Groq / Gemini)
 
 ### `src/routes/attendance.ts` (647 lines) — Attendance Management
 - ✅ **Good**: Compound unique key prevents duplicate attendance logs
@@ -599,7 +604,7 @@ zenith/                          # Monorepo root
 | 1 | **JWT stored in localStorage** | `frontend/src/services/api.ts` | 🔴 HIGH | Migrate to `httpOnly` secure cookies |
 | 2 | **No CSRF protection** | All POST endpoints | 🔴 HIGH | Add CSRF tokens or use `SameSite=Strict` cookies |
 | 3 | **30-day JWT with no refresh** | `api-node/src/routes/auth.ts:88` | 🔴 HIGH | Implement refresh token rotation (15min access + 7d refresh) |
-| 4 | **Full user data sent to Groq** | `api-node/src/routes/ai.ts` | 🔴 HIGH | Anonymize or minimize data sent to 3rd party; add privacy disclosure |
+| 4 | **Full user data sent to external LLMs** | `api-node/src/routes/ai.ts` | 🔴 HIGH | Anonymize or minimize data sent to 3rd party; add privacy disclosure |
 | 5 | **Google Client ID hardcoded** | `frontend/src/App.tsx:224` | 🟡 MEDIUM | Remove fallback, require env var |
 | 6 | **SSL verification disabled** | `api-node/src/routes/ipu.ts:148` | 🟡 MEDIUM | Use proper CA bundle for IPU portal |
 | 7 | **IPU password handling** | `api-node/src/routes/ipu.ts` | 🟡 MEDIUM | Ensure passwords are never logged; add log sanitization |
