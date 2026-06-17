@@ -1,6 +1,7 @@
-# Zenith
+# Zenith — Your Academic Operating System
 
-Zenith is a full-stack student productivity app with a React web client and a Node + Express + Prisma backend on Neon PostgreSQL.
+Zenith is a full-stack Academic Operating System featuring a React web client (PWA) and a Node + Express + Prisma backend on Neon PostgreSQL.
+
 
 ## Current Stack
 - Frontend: React, TypeScript, Vite, Tailwind

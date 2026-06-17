@@ -29,7 +29,7 @@
 
 ## 1. Project Overview
 
-**Zenith** is a full-stack academic management platform built for IPU (Indraprastha University) students. It provides:
+**Zenith** is a full-stack Academic Operating System built for IPU (Indraprastha University) students. It provides:
 
 - **Attendance Tracking** — Mark, edit, delete attendance with substitution support, calendar view, bunk-guard calculations
 - **IPU Results Scraping** — Automated login to IPU exam portal with CAPTCHA handling, result fetching, SGPA/CGPA calculations
