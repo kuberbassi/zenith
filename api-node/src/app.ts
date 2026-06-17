@@ -128,8 +128,14 @@ app.use('/api/ai', aiLimiter)
 app.use('/api/v1/academic/results/parse-pdf', pdfUploadLimiter)
 app.use('/api/academic/results/parse-pdf', pdfUploadLimiter)
 // Protect data export/import endpoints from bulk harvesting
-app.use('/api/v1/data', bulkDataLimiter)
-app.use('/api/data', bulkDataLimiter)
+app.use('/api/v1/data/export_data', bulkDataLimiter)
+app.use('/api/data/export_data', bulkDataLimiter)
+app.use('/api/v1/data/import_data', bulkDataLimiter)
+app.use('/api/data/import_data', bulkDataLimiter)
+app.use('/api/v1/data/migration/initiate', bulkDataLimiter)
+app.use('/api/data/migration/initiate', bulkDataLimiter)
+app.use('/api/v1/data/migration/complete', bulkDataLimiter)
+app.use('/api/data/migration/complete', bulkDataLimiter)
 
 /* ── Compression ─────────────────────────────────────────── */
 app.use(compression({ threshold: 1024 })) // skip tiny responses

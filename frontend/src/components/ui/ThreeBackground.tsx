@@ -70,7 +70,17 @@ const ThreeBackground: React.FC<ThreeBackgroundProps> = ({ contained = false }) 
         // ── Scene / Camera ────────────────────────────────────────────────────
         const scene  = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(55, getW() / getH(), 0.1, 100);
-        camera.position.z = 7.5;
+        
+        // Dynamic camera Z positioning to prevent horizontal sphere clipping on portrait/mobile viewports
+        const updateCameraZ = (w: number, h: number) => {
+            const aspect = w / h;
+            if (aspect < 1) {
+                camera.position.z = 7.5 + (1 - aspect) * 8.0;
+            } else {
+                camera.position.z = 7.5;
+            }
+        };
+        updateCameraZ(getW(), getH());
 
         // ── Icosahedron geometry (detail=2 → 320 triangles, smooth sphere) ───
         const geo = new THREE.IcosahedronGeometry(3.0, 2);
@@ -152,6 +162,7 @@ const ThreeBackground: React.FC<ThreeBackgroundProps> = ({ contained = false }) 
                 if (!alive) return;
                 const w = getW(), h = getH();
                 camera.aspect = w / h;
+                updateCameraZ(w, h);
                 camera.updateProjectionMatrix();
                 renderer.setSize(w, h, false);
             }, 150);

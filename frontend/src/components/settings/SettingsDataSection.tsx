@@ -232,7 +232,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
 
     return (
         <div className="space-y-4">
-            <div className="rounded-xl border border-outline glass-panel p-8">
+            <div className="rounded-xl border border-outline glass-panel p-4 sm:p-8">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface">
@@ -245,7 +245,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-6 rounded-xl bg-surface-container border border-outline-variant">
+                    <div className="p-4 sm:p-6 rounded-xl bg-surface-container border border-outline-variant">
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface"><Download size={18} /></div>
                             <div>
@@ -256,7 +256,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                         <p className="text-xs text-on-surface-variant/70 mb-6 leading-relaxed">Save your entire profile, attendance logs, and settings to a secure offline file.</p>
                         <Button variant="secondary" size="lg" className="w-full justify-center rounded-lg" onClick={handleExport}>Export Backup</Button>
                     </div>
-                    <div className="p-6 rounded-xl bg-surface-container border border-outline-variant">
+                    <div className="p-4 sm:p-6 rounded-xl bg-surface-container border border-outline-variant">
                         <div className="flex items-center gap-4 mb-6">
                             <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface"><Upload size={18} /></div>
                             <div>
@@ -302,7 +302,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
  
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Google Drive Sync & Backup */}
-                        <div className="p-6 rounded-xl bg-surface-container border border-outline-variant space-y-4">
+                        <div className="p-4 sm:p-6 rounded-xl bg-surface-container border border-outline-variant space-y-4">
                             <div className="flex items-center justify-between">
                                 <h4 className="text-sm font-bold text-on-surface tracking-tight">Google Drive Backup</h4>
                                 {driveStatus?.google_drive_linked && (
@@ -328,7 +328,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <p className="text-[10px] font-bold uppercase text-on-surface-variant/40 mb-1.5">Frequency</p>
                                             <Select
@@ -378,18 +378,18 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                                             <p className="text-[9px] font-bold uppercase text-on-surface-variant/40 tracking-wider">Available Cloud Backups</p>
                                             <div className="max-h-[100px] overflow-y-auto space-y-1.5 pr-1 text-xs select-none">
                                                 {driveBackups.map((b) => (
-                                                    <div key={b.id} className="flex items-center justify-between p-2 rounded-lg bg-surface-container-high border border-outline-variant">
+                                                    <div key={b.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-2 gap-2 sm:gap-4 rounded-lg bg-surface-container-high border border-outline-variant">
                                                         <div className="min-w-0">
                                                             <p className="font-bold text-[10px] text-on-surface truncate">
                                                                 {new Date(b.created_at).toLocaleDateString()} at {new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                             </p>
                                                             <p className="text-[9px] text-on-surface-variant/50">{(b.size / 1024).toFixed(1)} KB</p>
                                                         </div>
-                                                        <div className="flex gap-1.5">
+                                                        <div className="flex gap-1.5 w-full sm:w-auto">
                                                             <button
                                                                 disabled={driveLoading}
                                                                 onClick={() => handleDriveDownload(b.id, b.created_at)}
-                                                                className="px-2 py-1 text-[9px] font-extrabold uppercase border border-outline hover:bg-surface-container rounded transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 text-on-surface"
+                                                                className="flex-1 sm:flex-initial px-2 py-1 text-[9px] font-extrabold uppercase border border-outline hover:bg-surface-container rounded transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1 text-on-surface"
                                                                 title="Download Backup JSON"
                                                             >
                                                                 <Download size={10} />
@@ -398,7 +398,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                                                             <button
                                                                 disabled={driveLoading}
                                                                 onClick={() => handleDriveRestore(b.id)}
-                                                                className="px-2 py-1 text-[9px] font-extrabold uppercase bg-on-surface text-surface hover:opacity-90 rounded transition-all cursor-pointer disabled:opacity-50"
+                                                                className="flex-1 sm:flex-initial px-2 py-1 text-[9px] font-extrabold uppercase bg-on-surface text-surface hover:opacity-90 rounded transition-all cursor-pointer disabled:opacity-50 text-center"
                                                             >
                                                                 Restore
                                                             </button>
@@ -413,7 +413,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                         </div>
 
                         {/* Migration tools */}
-                        <div className="p-6 rounded-xl bg-surface-container border border-outline-variant space-y-4">
+                        <div className="p-4 sm:p-6 rounded-xl bg-surface-container border border-outline-variant space-y-4">
                             <h4 className="text-sm font-bold text-on-surface tracking-tight">Migrate Account Data</h4>
                             <p className="text-xs text-on-surface-variant/70 leading-relaxed">
                                 Move all your academic history to a new Google login account seamlessly.
@@ -472,7 +472,7 @@ const SettingsDataSection: React.FC<SettingsDataSectionProps> = ({ onLogout, onD
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-outline-variant">
-                    <div className="p-6 rounded-xl bg-red-500/[0.02] border border-red-500/20 flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="p-4 sm:p-6 rounded-xl bg-red-500/[0.02] border border-red-500/20 flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex items-center gap-4 text-center md:text-left">
                             <div className="w-12 h-12 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500 shrink-0"><ShieldAlert size={24} /></div>
                             <div>

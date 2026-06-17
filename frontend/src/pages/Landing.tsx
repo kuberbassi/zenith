@@ -203,10 +203,10 @@ const Landing: React.FC = () => {
 
             <div className="w-full flex flex-col overflow-x-hidden relative">
                 {/* ── Hero Section ──────────────────────────────────────── */}
-            <header className="relative py-20 sm:py-28 md:py-36 max-w-5xl mx-auto px-6 text-center flex flex-col items-center overflow-visible">
+            <header className="relative py-20 sm:py-28 md:py-36 w-full text-center flex flex-col items-center overflow-hidden">
 
                 {/* 3D Background — contained to hero section only */}
-                <div className="absolute inset-x-[-50vw] top-[-80px] h-[calc(100%+80px)] pointer-events-none overflow-hidden -z-10">
+                <div className="absolute inset-0 pointer-events-none -z-10">
                     <ThreeBackground contained />
                     {/* Gradient fade-out at bottom so 3D dissolves into page */}
                     <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent pointer-events-none" />
@@ -221,7 +221,7 @@ const Landing: React.FC = () => {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex flex-col items-center"
+                    className="max-w-5xl mx-auto px-6 z-10 w-full flex flex-col items-center"
                 >
                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-outline bg-surface-container/50 text-[10px] font-bold uppercase tracking-wider mb-8 text-primary shadow-sm">
                         <Sparkles size={11} className="text-primary animate-pulse" />
