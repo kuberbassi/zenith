@@ -100,17 +100,17 @@ const Landing: React.FC = () => {
 
     return (
         <div 
-            className="min-h-screen text-on-background select-none relative overflow-x-hidden pt-16"
+            className="min-h-screen text-on-background select-none relative"
         >
             {/* Solid background layer */}
             <div className="fixed inset-0 bg-background -z-30 pointer-events-none" />
 
             {/* ── Navbar ────────────────────────────────────────────── */}
             <nav className={[
-                'fixed top-0 left-0 right-0 z-50 w-full transition-all duration-300 ease-in-out',
+                'sticky top-0 z-50 w-full transition-all duration-300 ease-in-out',
                 scrolled
-                    ? 'border-b border-outline bg-surface/85 backdrop-blur-md shadow-sm'
-                    : 'border-b border-transparent bg-transparent backdrop-blur-none',
+                    ? 'border-b border-outline bg-surface/90 backdrop-blur-md shadow-sm'
+                    : 'border-b border-transparent bg-transparent',
             ].join(' ')}>
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-8">
@@ -201,7 +201,8 @@ const Landing: React.FC = () => {
                 </AnimatePresence>
             </nav>
 
-            {/* ── Hero Section ──────────────────────────────────────── */}
+            <div className="w-full flex flex-col overflow-x-hidden relative">
+                {/* ── Hero Section ──────────────────────────────────────── */}
             <header className="relative py-20 sm:py-28 md:py-36 max-w-5xl mx-auto px-6 text-center flex flex-col items-center overflow-visible">
 
                 {/* 3D Background — contained to hero section only */}
@@ -645,6 +646,7 @@ const Landing: React.FC = () => {
                 </div>
             </footer>
 
+            </div>
         </div>
     );
 };
