@@ -26,11 +26,11 @@ export const useHaptics = () => {
       haptics.light();
     };
 
-    // Use pointerdown for faster response on mobile
-    window.addEventListener('pointerdown', handleInteraction, { capture: true });
+    // Use click for standard user activation compatibility across all browsers (including Firefox mobile)
+    window.addEventListener('click', handleInteraction, { capture: true });
 
     return () => {
-      window.removeEventListener('pointerdown', handleInteraction, { capture: true });
+      window.removeEventListener('click', handleInteraction, { capture: true });
     };
   }, []);
 };

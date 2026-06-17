@@ -125,7 +125,7 @@ const Notifications: React.FC = () => {
                                         <p className="text-xs text-on-surface-variant/70 mt-1 leading-relaxed">{alert.message}</p>
                                     </div>
                                     <Link
-                                        to="/"
+                                        to="/dashboard"
                                         className="p-2 rounded-xl hover:bg-surface-container transition-colors text-on-surface-variant/40 hover:text-on-surface"
                                         title="View Dashboard"
                                     >

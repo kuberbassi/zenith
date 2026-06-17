@@ -119,7 +119,7 @@ const Modal: React.FC<ModalProps> = ({
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0.95, opacity: 0, y: 10 }}
                         transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-                        className={`relative w-full ${hasCustomMaxWidth ? '' : sizeClasses[size]} ${className} rounded-2xl bg-surface border border-outline shadow-2xl overflow-hidden will-change-transform max-h-[90vh] flex flex-col`}
+                        className={`relative w-full ${hasCustomMaxWidth ? '' : sizeClasses[size]} ${className} rounded-xl bg-surface border border-outline shadow-2xl overflow-hidden will-change-transform max-h-[90vh] flex flex-col`}
                     >
                         {/* Header */}
                         {title && (
@@ -127,7 +127,7 @@ const Modal: React.FC<ModalProps> = ({
                                 <h2 className="text-base font-bold text-on-surface">{title}</h2>
                                 <button
                                     onClick={onClose}
-                                    className="p-1.5 rounded-xl hover:bg-surface-container transition-colors text-on-surface-variant/40 hover:text-on-surface"
+                                    className="p-1.5 rounded-lg hover:bg-surface-container transition-colors text-on-surface-variant/40 hover:text-on-surface"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>

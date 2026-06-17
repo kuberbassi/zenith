@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './queryClient';
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SemesterProvider } from './contexts/SemesterContext';
@@ -19,227 +19,265 @@ import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useHaptics } from './hooks/useHaptics';
 
-// Pages
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Settings from './pages/Settings';
-
 // Layout
 import AppLayout from './components/layout/AppLayout';
 
-// Lazy Load Heavy Pages
-const Analytics = lazy(() => import('./pages/Analytics.tsx'));
-const Calendar = lazy(() => import('./pages/Calendar.tsx'));
-const TimeTable = lazy(() => import('./pages/TimeTable.tsx'));
-const Courses = lazy(() => import('./pages/Courses.tsx'));
-const Practicals = lazy(() => import('./pages/Practicals.tsx'));
-const Notes = lazy(() => import('./pages/Notes.tsx'));
-const Results = lazy(() => import('./pages/Results.tsx'));
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy.tsx'));
+// Lazy Load All Pages for optimal code splitting
+const Landing     = lazy(() => import('./pages/Landing'));
+const Login       = lazy(() => import('./pages/Login'));
+const Dashboard   = lazy(() => import('./pages/Dashboard'));
+const Settings    = lazy(() => import('./pages/Settings'));
+const Analytics   = lazy(() => import('./pages/Analytics.tsx'));
+const Calendar    = lazy(() => import('./pages/Calendar.tsx'));
+const TimeTable   = lazy(() => import('./pages/TimeTable.tsx'));
+const Courses     = lazy(() => import('./pages/Courses.tsx'));
+const Practicals  = lazy(() => import('./pages/Practicals.tsx'));
+const Notes       = lazy(() => import('./pages/Notes.tsx'));
+const Results     = lazy(() => import('./pages/Results.tsx'));
+const PrivacyPolicy  = lazy(() => import('./pages/PrivacyPolicy.tsx'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService.tsx'));
-const NotFound = lazy(() => import('./pages/NotFound.tsx'));
+const NotFound       = lazy(() => import('./pages/NotFound.tsx'));
+const SkillTracker   = lazy(() => import('./pages/SkillTracker.tsx'));
+const Notifications  = lazy(() => import('./pages/Notifications.tsx'));
 
-const SkillTracker = lazy(() => import('./pages/SkillTracker.tsx'));
-const Notifications = lazy(() => import('./pages/Notifications.tsx'));
+// ── Route Guards ─────────────────────────────────────────────────────────────
 
-
-// Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingSpinner fullScreen />;
-  }
-
+  if (loading) return <LoadingSpinner fullScreen />;
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
-// Public Route Component (redirect if already authenticated)
 const PublicRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingSpinner fullScreen />;
-  }
-
-  return !isAuthenticated ? children : <Navigate to="/" replace />;
+  if (loading) return <LoadingSpinner fullScreen />;
+  return !isAuthenticated ? children : <Navigate to="/dashboard" replace />;
 };
 
-// Main App Routes
+// ── Page Transition ───────────────────────────────────────────────────────────
+// AnimatePresence lives here (outside Routes) so it can detect key changes
+// and correctly animate the outgoing page before mounting the new one.
+
+import { motion, AnimatePresence } from 'framer-motion';
+
+const pageVariants = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit:    { opacity: 0, y: -6 },
+};
+const pageTransition = { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const };
+
+// Suspense fallback used for every lazily-loaded page
+const PageFallback = <LoadingSpinner fullScreen />;
+
+// ── Main App Routes ───────────────────────────────────────────────────────────
+
 const AppRoutes: React.FC = () => {
+  const location = useLocation();
+
   return (
-    <Routes>
-      {/* Public Routes */}
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <Login />
-          </PublicRoute>
-        }
-      />
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={location.pathname}
+        variants={pageVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={pageTransition}
+        style={{ willChange: 'opacity, transform' }}
+      >
+        <Routes location={location}>
 
-      {/* Public Legal Pages */}
-      <Route
-        path="/privacy"
-        element={
-          <Suspense fallback={<LoadingSpinner fullScreen />}>
-            <PrivacyPolicy />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/terms"
-        element={
-          <Suspense fallback={<LoadingSpinner fullScreen />}>
-            <TermsOfService />
-          </Suspense>
-        }
-      />
+          {/* ── Public Routes ──────────────────────────────────── */}
+          <Route
+            path="/"
+            element={
+              <Suspense fallback={PageFallback}>
+                <Landing />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <Suspense fallback={PageFallback}>
+                  <Login />
+                </Suspense>
+              </PublicRoute>
+            }
+          />
 
-      {/* Protected Routes (Wrapped in App Layout) */}
-      <Route element={<AppLayout />}>
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-      <Route
-        path="/404"
-        element={
-          <Suspense fallback={<LoadingSpinner fullScreen />}>
-            <NotFound />
-          </Suspense>
-        }
-      />
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <Analytics />
+          {/* ── Legal Pages ────────────────────────────────────── */}
+          <Route
+            path="/privacy"
+            element={
+              <Suspense fallback={PageFallback}>
+                <PrivacyPolicy />
               </Suspense>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/timetable"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <TimeTable />
+            }
+          />
+          <Route
+            path="/terms"
+            element={
+              <Suspense fallback={PageFallback}>
+                <TermsOfService />
               </Suspense>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/calendar"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <Calendar />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
+            }
+          />
 
-        <Route
-          path="/courses"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <Courses />
+          {/* ── 404 (outside AppLayout) ────────────────────────── */}
+          <Route
+            path="/404"
+            element={
+              <Suspense fallback={PageFallback}>
+                <NotFound />
               </Suspense>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/practicals"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <Practicals />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
+            }
+          />
 
-        <Route
-          path="/notes"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <Notes />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/results"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <Results />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
+          {/* ── Protected Routes inside App Shell ──────────────── */}
+          <Route element={<AppLayout />}>
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Dashboard />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Analytics />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/timetable"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <TimeTable />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Calendar />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/courses"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Courses />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/practicals"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Practicals />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Settings />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notes"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Notes />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/results"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Results />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/skills"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <SkillTracker />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={PageFallback}>
+                    <Notifications />
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+          </Route>
 
-        <Route
-          path="/skills"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <SkillTracker />
+          {/* ── Catch-all → 404 ────────────────────────────────── */}
+          <Route
+            path="*"
+            element={
+              <Suspense fallback={PageFallback}>
+                <NotFound />
               </Suspense>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/notifications"
-          element={
-            <ProtectedRoute>
-              <Suspense fallback={<LoadingSpinner fullScreen />}>
-                <Notifications />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
-      </Route>
+            }
+          />
 
-      {/* Default redirect */}
-      <Route
-        path="*"
-        element={
-          <Suspense fallback={<LoadingSpinner fullScreen />}>
-            <NotFound />
-          </Suspense>
-        }
-      />
-    </Routes>
+        </Routes>
+      </motion.div>
+    </AnimatePresence>
   );
 };
 
-// Keyboard shortcuts wrapper - must be inside BrowserRouter
+// ── Keyboard Shortcuts (needs BrowserRouter context) ─────────────────────────
+
 const KeyboardShortcutsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useKeyboardShortcuts();
   return <>{children}</>;
 };
 
+// ── App Content ───────────────────────────────────────────────────────────────
+
 const AppContent: React.FC = () => {
-  useAutoUpdate(); // Automatically check for updates and reload if needed
-  useHaptics(); // Add haptic feedback to every click and interaction
+  useAutoUpdate();
+  useHaptics();
 
   return (
     <div className="min-h-screen bg-background text-on-background font-sans transition-colors duration-300 selection:bg-primary-container selection:text-primary">
@@ -249,11 +287,13 @@ const AppContent: React.FC = () => {
   );
 };
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'missing-client-id'
+// ── Root App ──────────────────────────────────────────────────────────────────
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'missing-client-id';
 
 const App: React.FC = () => {
   if (GOOGLE_CLIENT_ID === 'missing-client-id') {
-    console.warn('Missing VITE_GOOGLE_CLIENT_ID. Google Login will not work. Please configure the frontend environment before starting the app.')
+    console.warn('Missing VITE_GOOGLE_CLIENT_ID. Google Login will not work. Please configure the frontend environment before starting the app.');
   }
 
   return (

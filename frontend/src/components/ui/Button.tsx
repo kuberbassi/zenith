@@ -39,9 +39,9 @@ const Button: React.FC<ButtonProps> = ({
     };
 
     const sizeClasses = {
-        sm: "px-4 h-8 text-xs rounded-full gap-1.5",
-        md: "px-6 h-10 text-sm rounded-full gap-2",
-        lg: "px-8 h-12 text-base rounded-full gap-2.5",
+        sm: "px-3 h-8 text-xs rounded-md gap-1.5",
+        md: "px-4 h-10 text-xs rounded-md gap-2",
+        lg: "px-6 h-12 text-sm rounded-lg gap-2.5",
     };
 
     return (

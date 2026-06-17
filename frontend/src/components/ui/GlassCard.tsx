@@ -66,13 +66,13 @@ const GlassCard: React.FC<GlassCardProps> = ({
             }}
             className={`
                 relative overflow-hidden
-                bg-surface/80 dark:bg-surface-container/80 
-                border border-outline-variant/60 
-                rounded-2xl
-                shadow-sm
-                transition-shadow duration-300
+                bg-surface/70 dark:bg-surface/75 
+                border border-outline-variant/50 
+                rounded-xl
+                shadow-xs
+                transition-all duration-300
                 backdrop-blur-xl
-                ${hover ? 'hover:shadow-2xl hover:shadow-primary/20 hover:border-outline-variant cursor-pointer' : ''}
+                ${hover ? 'hover:shadow-lg hover:shadow-primary/5 hover:border-outline cursor-pointer' : ''}
                 ${className}
             `}
             whileTap={hover ? { scale: 0.98 } : undefined}

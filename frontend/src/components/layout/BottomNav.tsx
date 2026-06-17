@@ -14,7 +14,7 @@ import { haptics } from '@/utils/haptics';
 interface BottomNavProps {}
 
 const radialItems = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Notes & Todos', href: '/notes', icon: StickyNote },
     { name: 'Analytics', href: '/analytics', icon: PieChart },
     { name: 'Schedule', href: '/timetable', icon: CalendarClock },
@@ -208,7 +208,11 @@ const BottomNav: React.FC<BottomNavProps> = () => {
                                 transition={{ duration: 0.12 }}
                                 src={centerIconInfo.element as string}
                                 alt="Zenith"
-                                className="w-6.5 h-6.5 object-contain"
+                                className={`w-6.5 h-6.5 object-contain ${
+                                    isHolding 
+                                        ? (theme === 'dark' ? 'invert' : 'invert-0') 
+                                        : (theme === 'dark' ? 'invert-0' : 'invert')
+                                }`}
                             />
                         ) : (
                             (() => {
@@ -305,18 +309,18 @@ const BottomNav: React.FC<BottomNavProps> = () => {
                             animate={{ y: 0 }}
                             exit={{ y: '100%' }}
                             transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-                            className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-outline rounded-t-2xl z-[9999] max-h-[60vh] overflow-y-auto text-on-surface p-6 shadow-2xl"
+                            className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-outline/60 rounded-t-xl z-[9999] max-h-[60vh] overflow-y-auto text-on-surface p-6 shadow-2xl"
                         >
                             <div className="w-12 h-1 bg-outline-variant/30 rounded-full mx-auto mb-6" />
 
                             {/* User Profile Info Card */}
-                            <div className="bg-surface-container/50 border border-outline/10 rounded-2xl p-4 flex items-center gap-4 mb-5">
-                                <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-lg font-bold shrink-0">
+                            <div className="bg-surface-container/50 border border-outline/10 rounded-xl p-4 flex items-center gap-4 mb-5">
+                                <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary text-sm font-bold shrink-0">
                                     {user?.name?.[0]?.toUpperCase() || 'U'}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <h3 className="text-sm font-bold text-on-surface truncate">{user?.name || 'User'}</h3>
-                                    <p className="text-xs text-on-surface-variant/60 truncate">{user?.email}</p>
+                                    <h3 className="text-xs font-bold text-on-surface truncate">{user?.name || 'User'}</h3>
+                                    <p className="text-[10px] text-on-surface-variant/50 truncate mt-0.5">{user?.email}</p>
                                 </div>
                             </div>
 
@@ -325,10 +329,10 @@ const BottomNav: React.FC<BottomNavProps> = () => {
                                 {/* Theme Action */}
                                 <button
                                     onClick={() => { toggleTheme(); }}
-                                    className="flex flex-col items-start justify-between p-4 h-24 rounded-2xl border border-outline/10 bg-surface-container-low hover:bg-surface-container transition-all text-left cursor-pointer"
+                                    className="flex flex-col items-start justify-between p-4 h-24 rounded-xl border border-outline/10 bg-surface-container-low hover:bg-surface-container transition-all text-left cursor-pointer"
                                 >
                                     <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                                        {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}
+                                        {theme === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-on-surface">Theme</p>
@@ -340,10 +344,10 @@ const BottomNav: React.FC<BottomNavProps> = () => {
                                 <Link
                                     to="/settings"
                                     onClick={() => setProfileOpen(false)}
-                                    className="flex flex-col items-start justify-between p-4 h-24 rounded-2xl border border-outline/10 bg-surface-container-low hover:bg-surface-container transition-all text-left"
+                                    className="flex flex-col items-start justify-between p-4 h-24 rounded-xl border border-outline/10 bg-surface-container-low hover:bg-surface-container transition-all text-left"
                                 >
                                     <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                                        <Settings size={16} />
+                                        <Settings size={15} />
                                     </div>
                                     <div>
                                         <p className="text-xs font-bold text-on-surface">Settings</p>
@@ -354,11 +358,11 @@ const BottomNav: React.FC<BottomNavProps> = () => {
                                 {/* Logout Action */}
                                 <button
                                     onClick={() => { setProfileOpen(false); logout(); }}
-                                    className="col-span-2 flex items-center justify-between p-4 rounded-2xl border border-red-500/10 bg-red-500/5 hover:bg-red-500/10 transition-all text-left cursor-pointer animate-fade-in"
+                                    className="col-span-2 flex items-center justify-between p-4 rounded-xl border border-red-500/15 bg-red-500/5 hover:bg-red-500/10 transition-all text-left cursor-pointer animate-fade-in"
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 rounded-lg bg-red-500/10 text-red-500">
-                                            <LogOut size={16} />
+                                            <LogOut size={15} />
                                         </div>
                                         <div>
                                             <p className="text-xs font-bold text-red-500">Sign Out</p>

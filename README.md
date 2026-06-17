@@ -12,6 +12,11 @@ Zenith is a full-stack student productivity app with a React web client and a No
 - Native app support has ended.
 - The supported client is the web app (PWA), which you can install on mobile and desktop from your browser.
 
+## Application Routes
+- **`/`**: Public SaaS Landing Page for guests, detailing Zenith features, problem matrices, and FAQ accordions. Automatically redirects authenticated sessions to `/dashboard`.
+- **`/login`**: Secure Google OAuth authentication portal.
+- **`/dashboard`**: Protected student workspace container (subject compliance logs, timetable grids, notes workspace, results, calendar, and skill tracker).
+
 ## Monorepo Layout
 - frontend: web app
 - api-node: Node API (Primary Backend) - Express + Prisma + Neon DB

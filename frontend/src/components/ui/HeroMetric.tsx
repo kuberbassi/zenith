@@ -34,7 +34,7 @@ const HeroMetric: React.FC<HeroMetricProps> = ({
                 relative overflow-hidden
                 bg-gradient-to-br ${gradient}
                 text-white
-                rounded-2xl
+                rounded-xl
                 p-12
                 shadow-2xl
             `}
@@ -74,7 +74,7 @@ const HeroMetric: React.FC<HeroMetricProps> = ({
             <div className="relative z-10">
                 {icon && (
                     <motion.div
-                        className="mb-6 w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm"
+                        className="mb-6 w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm"
                         whileHover={{ scale: 1.05, rotate: 5 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                     >
@@ -94,7 +94,7 @@ const HeroMetric: React.FC<HeroMetricProps> = ({
 
                     {trend && trendValue && (
                         <motion.span
-                            className="text-2xl font-semibold bg-white/20 px-4 py-2 rounded-full backdrop-blur-sm"
+                            className="text-2xl font-semibold bg-white/20 px-4 py-2 rounded-md backdrop-blur-sm"
                             initial={{ x: -10, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             transition={{ delay: 0.3 }}

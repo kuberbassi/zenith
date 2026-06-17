@@ -325,7 +325,7 @@ const TimeTable: React.FC = () => {
                                     return (
                                         <motion.div key={idx} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.02 }} onClick={() => handleEditSlot(slot)} className="p-3.5 rounded-xl border border-outline bg-surface flex items-center justify-between group hover:border-on-surface/20 transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
                                             <div className="flex items-center gap-4">
-                                                <div className="w-14 h-11 rounded-lg bg-surface-variant/60 border border-outline flex flex-col items-center justify-center shrink-0">
+                                                <div className="w-14 h-12 rounded-lg bg-surface-variant/60 border border-outline flex flex-col items-center justify-center shrink-0">
                                                     <span className="text-[9px] font-bold text-on-surface-variant/60 leading-none">{getSlotStartTime(slot)}</span>
                                                     <div className="w-3 h-px bg-outline-variant my-1" />
                                                     <span className="text-[9px] font-bold text-on-surface-variant/60 leading-none">{getSlotEndTime(slot)}</span>

@@ -21,10 +21,10 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, trend, color = 
     return (
         <motion.div
             whileHover={{ y: -2 }}
-            className="bg-surface p-4 rounded-2xl border border-outline-variant/20 shadow-sm"
+            className="bg-surface p-4 rounded-xl border border-outline-variant/20 shadow-sm"
         >
             <div className="flex justify-between items-start mb-2">
-                <div className={`p-2 rounded-xl ${colorClasses[color]}`}>
+                <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
                     {icon}
                 </div>
                 {trend && (

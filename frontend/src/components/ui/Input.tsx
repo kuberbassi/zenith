@@ -26,7 +26,7 @@ const Input: React.FC<InputProps> = ({
             <div className="relative group">
                 <input
                     className={`
-                        w-full px-4 py-3 rounded-xl
+                        w-full px-4 py-2.5 rounded-lg
                         bg-surface
                         border transition-all duration-200
                         text-on-surface text-sm placeholder-on-surface-variant/50

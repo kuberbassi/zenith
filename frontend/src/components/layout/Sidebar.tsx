@@ -15,7 +15,7 @@ interface SidebarProps {
 }
 
 const quickNavItems = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Notes', href: '/notes', icon: StickyNote },
     { name: 'Analytics', href: '/analytics', icon: PieChart },
     { name: 'Schedule', href: '/timetable', icon: CalendarClock },
@@ -82,18 +82,18 @@ const Sidebar: React.FC<SidebarProps> = ({ notificationCount: _notificationCount
                 <div className="flex flex-col flex-1 min-h-0">
                     
                     {/* Brand / Semester Picker */}
-                    <div ref={semRef} className="relative border-b border-outline px-4 py-3.5 flex items-center justify-between hover:bg-surface-container/30 transition-colors cursor-pointer" onClick={() => setSemDropOpen(!semDropOpen)}>
+                    <div ref={semRef} className="relative border-b border-outline/50 px-4 py-3.5 flex items-center justify-between hover:bg-surface-container/20 transition-colors cursor-pointer" onClick={() => setSemDropOpen(!semDropOpen)}>
                         <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-[30px] h-[30px] rounded border border-outline flex items-center justify-center shrink-0 overflow-hidden bg-surface-variant">
-                                <img src="/zenith-logo.png" alt="Zenith" className="w-[22px] h-[22px] object-contain" />
+                            <div className="w-[28px] h-[28px] rounded-md border border-outline flex items-center justify-center shrink-0 overflow-hidden bg-surface-variant">
+                                <img src="/zenith-logo.png" alt="Zenith" className="w-[18px] h-[18px] object-contain invert dark:invert-0" />
                             </div>
                             <div className="min-w-0">
                                 <p className="text-xs font-bold text-on-surface truncate leading-none">Zenith</p>
-                                <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-wider mt-1 block">Semester {currentSemester}</span>
+                                <span className="text-[9px] font-semibold text-on-surface-variant/40 uppercase tracking-wider mt-1 block">Semester {currentSemester}</span>
                             </div>
                         </div>
-                        <div className="text-on-surface-variant/40 shrink-0 flex items-center justify-center">
-                            <span className="material-symbols-outlined text-[15px] leading-none">unfold_more</span>
+                        <div className="text-on-surface-variant/30 shrink-0 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-[14px] leading-none">unfold_more</span>
                         </div>
                         
                         {/* Semester Selection Dropdown */}
@@ -104,16 +104,16 @@ const Sidebar: React.FC<SidebarProps> = ({ notificationCount: _notificationCount
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -4 }}
                                     transition={{ duration: 0.1 }}
-                                    className="absolute left-4 top-12 w-[calc(100%-32px)] bg-surface border border-outline rounded-lg p-1 shadow-lg z-50 text-on-surface"
+                                    className="absolute left-4 top-12 w-[calc(100%-32px)] bg-surface border border-outline/50 rounded-md p-1 shadow-lg z-50 text-on-surface"
                                     onClick={(e) => e.stopPropagation()}
                                 >
-                                    <p className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant/30 px-2 py-1.5 border-b border-outline-variant/35 mb-1">Select Semester</p>
+                                    <p className="text-[8px] font-bold uppercase tracking-wider text-on-surface-variant/30 px-2 py-1.5 border-b border-outline-variant/30 mb-1">Select Semester</p>
                                     {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                                         <button
                                             key={s}
                                             onClick={() => { setCurrentSemester(s); setSemDropOpen(false); }}
-                                            className={`w-full text-left px-2 py-1.5 rounded text-[11px] font-semibold transition-colors cursor-pointer flex justify-between items-center ${s === currentSemester
-                                                ? 'bg-on-surface text-surface font-bold'
+                                            className={`w-full text-left px-2 py-1.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer flex justify-between items-center ${s === currentSemester
+                                                ? 'bg-primary text-on-primary font-bold'
                                                 : 'text-on-surface-variant hover:bg-surface-container'
                                                 }`}
                                         >
@@ -130,13 +130,13 @@ const Sidebar: React.FC<SidebarProps> = ({ notificationCount: _notificationCount
                     <div className="px-4 py-3">
                         <button
                             onClick={() => setSearchOpen(true)}
-                            className="w-full flex items-center justify-between px-3 py-1.5 bg-surface border border-outline hover:border-on-surface/30 rounded text-left text-xs font-semibold text-on-surface-variant/50 transition-colors cursor-pointer"
+                            className="w-full flex items-center justify-between px-3 py-1.5 bg-surface border border-outline hover:border-on-surface/20 rounded-md text-left text-xs font-semibold text-on-surface-variant/50 transition-colors cursor-pointer"
                         >
                             <div className="flex items-center gap-2">
-                                <Search size={13} className="text-on-surface-variant/45" />
-                                <span>Search pages...</span>
+                                <Search size={13} className="text-on-surface-variant/40" />
+                                <span className="text-on-surface-variant/60 font-medium">Search pages...</span>
                             </div>
-                            <kbd className="h-5 px-1.5 flex items-center justify-center bg-surface-container border border-outline text-[9px] font-bold font-mono rounded opacity-60">Ctrl+K</kbd>
+                            <kbd className="h-4.5 px-1 flex items-center justify-center bg-surface-container border border-outline/65 text-[9px] font-semibold font-mono rounded opacity-50">Ctrl+K</kbd>
                         </button>
                     </div>
 
@@ -148,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({ notificationCount: _notificationCount
                             <p className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest px-3 mb-2">Overview</p>
                             <div className="space-y-0.5">
                                 {[
-                                    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+                                    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
                                     { name: 'Notes & Todos', href: '/notes', icon: StickyNote },
                                     { name: 'Analytics', href: '/analytics', icon: PieChart },
                                     { name: 'Schedule', href: '/timetable', icon: CalendarClock },
@@ -158,13 +158,13 @@ const Sidebar: React.FC<SidebarProps> = ({ notificationCount: _notificationCount
                                     return (
                                         <Link
                                             key={item.name} to={item.href}
-                                            className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded border border-transparent transition-colors ${
+                                            className={`flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-md border border-transparent transition-all ${
                                                 isActive
-                                                    ? 'bg-surface-container text-on-surface border-outline/10 font-bold'
-                                                    : 'text-on-surface-variant/70 hover:bg-surface-container/40 hover:text-on-surface'
+                                                    ? 'bg-primary/5 text-on-surface border-outline/20 font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.01)]'
+                                                    : 'text-on-surface-variant/70 hover:bg-surface-container/20 hover:text-on-surface'
                                             }`}
                                         >
-                                            <item.icon size={14} className={isActive ? 'text-on-surface' : 'text-on-surface-variant/50'} />
+                                            <item.icon size={13} className={isActive ? 'text-on-surface' : 'text-on-surface-variant/50'} />
                                             <span>{item.name}</span>
                                         </Link>
                                     );
@@ -186,13 +186,13 @@ const Sidebar: React.FC<SidebarProps> = ({ notificationCount: _notificationCount
                                     return (
                                         <Link
                                             key={item.name} to={item.href}
-                                            className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded border border-transparent transition-colors ${
+                                            className={`flex items-center gap-3 px-3 py-2 text-xs font-medium rounded-md border border-transparent transition-all ${
                                                 isActive
-                                                    ? 'bg-surface-container text-on-surface border-outline/10 font-bold'
-                                                    : 'text-on-surface-variant/70 hover:bg-surface-container/40 hover:text-on-surface'
+                                                    ? 'bg-primary/5 text-on-surface border-outline/20 font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.01)]'
+                                                    : 'text-on-surface-variant/70 hover:bg-surface-container/20 hover:text-on-surface'
                                             }`}
                                         >
-                                            <item.icon size={14} className={isActive ? 'text-on-surface' : 'text-on-surface-variant/50'} />
+                                            <item.icon size={13} className={isActive ? 'text-on-surface' : 'text-on-surface-variant/50'} />
                                             <span>{item.name}</span>
                                         </Link>
                                     );

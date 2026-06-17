@@ -252,41 +252,41 @@ const Courses: React.FC = () => {
                     ))}
                 </div>
             ) : courses.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-outline py-20 text-center">
+                <div className="rounded-xl border border-dashed border-outline/50 py-20 text-center">
                     <Book size={28} className="mx-auto mb-4 text-on-surface-variant/20" />
                     <p className="text-xs font-bold text-on-surface-variant/30 uppercase tracking-widest mb-1">No courses tracked</p>
-                    <p className="text-xs text-on-surface-variant/20 mb-6 font-semibold">Add your first course to start tracking progress.</p>
-                    <button onClick={handleAddCourse} className="h-8 px-4 text-xs font-bold rounded bg-on-surface text-surface hover:opacity-90 transition-all cursor-pointer">Add Course</button>
+                    <p className="text-xs text-on-surface-variant/25 mb-6 font-semibold">Add your first course to start tracking progress.</p>
+                    <button onClick={handleAddCourse} className="h-8.5 px-4 text-xs font-bold rounded-md bg-on-surface text-surface hover:opacity-90 transition-all cursor-pointer">Add Course</button>
                 </div>
             ) : (
                 <div className="space-y-8">
                     {activeCourses.length > 0 && (
                         <section>
                             <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/30 mb-4 px-1">In Progress</p>
-                            <div className="border border-outline rounded-lg overflow-hidden bg-surface">
+                            <div className="border border-outline/50 rounded-xl overflow-hidden bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
                                 {activeCourses.map((course, idx) => {
                                     const plat = PLATFORMS.find(p => p.value === course.platform) || PLATFORMS[PLATFORMS.length - 1];
                                     const tag = getNotionTagStyles(plat.label);
                                     return (
-                                        <div key={getCourseId(course)} className={`group flex flex-col md:flex-row md:items-center gap-3 p-4 sm:p-5 hover:bg-surface-container transition-all ${idx < activeCourses.length - 1 ? 'border-b border-outline' : ''}`}>
-                                            <span style={tag.style} className={`shrink-0 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded min-w-[72px] text-center ${tag.className}`}>
+                                        <div key={getCourseId(course)} className={`group flex flex-col md:flex-row md:items-center gap-3 p-4 sm:p-5 hover:bg-surface-container/20 transition-all ${idx < activeCourses.length - 1 ? 'border-b border-outline/35' : ''}`}>
+                                            <span style={tag.style} className={`shrink-0 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide rounded-md min-w-[72px] text-center ${tag.className}`}>
                                                 {plat.label}
                                             </span>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm md:text-xs font-bold text-on-surface break-words md:truncate">{course.title}</p>
+                                                <p className="text-xs font-bold text-on-surface break-words md:truncate">{course.title}</p>
                                                 {course.instructor && <p className="text-[10px] text-on-surface-variant/40 mt-0.5 truncate font-semibold">{course.instructor}</p>}
                                             </div>
                                             <div className="flex items-center gap-3 w-full md:w-36 shrink-0">
-                                                <div className="flex-1 h-1 bg-on-surface/10 rounded-full overflow-hidden">
+                                                <div className="flex-1 h-1 bg-on-surface/5 border border-outline/35 rounded-full overflow-hidden">
                                                     <div className="h-full bg-on-surface" style={{ width: `${course.progress}%` }} />
                                                 </div>
                                                 <span className="text-[10px] font-bold text-on-surface-variant/50 w-8 text-right shrink-0">{course.progress}%</span>
                                             </div>
                                             <div className="flex items-center gap-1.5 shrink-0 self-end md:self-auto">
-                                                <button aria-label={`Increase ${course.title} progress`} onClick={() => { const previous = courses; const nextProgress = clampProgress(course.progress + 10); setCourses(courses.map(c => getCourseId(c) === getCourseId(course) ? { ...c, progress: nextProgress } : c)); void attendanceService.updateManualCourse(getCourseId(course), { progress: nextProgress }).catch(() => { setCourses(previous); showToast('error', 'Save Failed'); }); }} className="no-fluid h-8 md:h-7 px-2 text-[9px] font-bold rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">+10%</button>
-                                                <button aria-label={`Open ${course.title}`} onClick={() => openCourse(course)} className="no-fluid h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer"><ExternalLink size={11} /></button>
-                                                <button aria-label={`Edit ${course.title}`} onClick={() => handleEditCourse(course)} className="no-fluid h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded border border-outline bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer"><Edit2 size={11} /></button>
-                                                <button aria-label={`Delete ${course.title}`} onClick={() => void handleDeleteCourse(getCourseId(course))} className="no-fluid h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"><Trash size={11} /></button>
+                                                <button aria-label={`Increase ${course.title} progress`} onClick={() => { const previous = courses; const nextProgress = clampProgress(course.progress + 10); setCourses(courses.map(c => getCourseId(c) === getCourseId(course) ? { ...c, progress: nextProgress } : c)); void attendanceService.updateManualCourse(getCourseId(course), { progress: nextProgress }).catch(() => { setCourses(previous); showToast('error', 'Save Failed'); }); }} className="no-fluid h-8 md:h-7 px-2.5 text-[9px] font-bold rounded-md border border-outline/60 bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">+10%</button>
+                                                <button aria-label={`Open ${course.title}`} onClick={() => openCourse(course)} className="no-fluid h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded-md border border-outline/60 bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer"><ExternalLink size={11} /></button>
+                                                <button aria-label={`Edit ${course.title}`} onClick={() => handleEditCourse(course)} className="no-fluid h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded-md border border-outline/60 bg-surface text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer"><Edit2 size={11} /></button>
+                                                <button aria-label={`Delete ${course.title}`} onClick={() => void handleDeleteCourse(getCourseId(course))} className="no-fluid h-8 w-8 md:h-7 md:w-7 flex items-center justify-center rounded-md border border-outline bg-surface text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all cursor-pointer"><Trash size={11} /></button>
                                             </div>
                                         </div>
                                     );
@@ -300,16 +300,16 @@ const Courses: React.FC = () => {
                             <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/30 mb-4 px-1">Completed</p>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {completedCourses.map(course => (
-                                    <div key={getCourseId(course)} className="group p-5 rounded-lg border border-outline bg-surface hover:border-on-surface transition-all flex flex-col justify-between">
+                                    <div key={getCourseId(course)} className="group p-5 rounded-xl border border-outline/50 bg-surface hover:border-on-surface/20 transition-all flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
                                         <div className="flex justify-between items-start mb-4">
-                                            <div className="w-8 h-8 rounded border border-outline bg-surface-container-high flex items-center justify-center text-on-surface"><Award size={14} /></div>
+                                            <div className="w-8 h-8 rounded-md border border-outline/50 bg-surface-container-high flex items-center justify-center text-on-surface"><Award size={13} /></div>
                                             <div className="flex gap-1.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                                 <button aria-label={`Edit ${course.title}`} onClick={() => handleEditCourse(course)} className="no-fluid p-1 text-on-surface-variant/40 hover:text-on-surface cursor-pointer"><Edit2 size={11} /></button>
                                                 <button aria-label={`Delete ${course.title}`} onClick={() => void handleDeleteCourse(getCourseId(course))} className="no-fluid p-1 text-on-surface-variant/40 hover:text-red-500 cursor-pointer"><Trash size={11} /></button>
                                             </div>
                                         </div>
                                         <h4 className="text-xs font-bold text-on-surface-variant/70 line-clamp-2 mb-4 break-words">{course.title}</h4>
-                                        <button onClick={() => openCourse(course)} className="no-fluid w-full py-1.5 rounded border border-outline bg-surface text-[10px] font-bold hover:bg-surface-container flex items-center justify-center gap-1 cursor-pointer">Open Course <ExternalLink size={10} /></button>
+                                        <button onClick={() => openCourse(course)} className="no-fluid w-full py-1.5 rounded-md border border-outline/50 bg-surface text-[10px] font-bold hover:bg-surface-container flex items-center justify-center gap-1 cursor-pointer">Open Course <ExternalLink size={10} /></button>
                                     </div>
                                 ))}
                             </div>

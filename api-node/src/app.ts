@@ -11,6 +11,7 @@ import { flaskRewrite, compatHandlers } from './routes/compat.js'
 import docsRoutes from './routes/docs.js'
 import v1Router from './routes/v1.js'
 import { xssSanitize } from './middleware/xss.js'
+import { sanitizeResponse } from './middleware/sanitizeResponse.js'
 
 const app = express()
 
@@ -107,6 +108,15 @@ const pdfUploadLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+/** Bulk data limiter — 3 req / 5 min per IP (blocks automated data harvesting) */
+const bulkDataLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 3,
+  message: { success: false, error: 'Data export rate limit exceeded. Please wait before exporting again.', code: 'BULK_DATA_RATE_LIMIT_EXCEEDED' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 // Apply global protection to all /api/* routes
 app.use('/api', apiLimiter)
 
@@ -117,6 +127,9 @@ app.use('/api/v1/ai', aiLimiter)
 app.use('/api/ai', aiLimiter)
 app.use('/api/v1/academic/results/parse-pdf', pdfUploadLimiter)
 app.use('/api/academic/results/parse-pdf', pdfUploadLimiter)
+// Protect data export/import endpoints from bulk harvesting
+app.use('/api/v1/data', bulkDataLimiter)
+app.use('/api/data', bulkDataLimiter)
 
 /* ── Compression ─────────────────────────────────────────── */
 app.use(compression({ threshold: 1024 })) // skip tiny responses
@@ -136,6 +149,12 @@ if (ENV.NODE_ENV === 'development') {
 /* ── Platform Detection ──────────────────────────────────── */
 app.use(detectPlatform)
 app.use('/api', requireCsrf)
+
+/* ── Response Sanitization (defence-in-depth) ──────────────── */
+// Strips sensitive fields (tokens, biometrics, google_id, etc.) from
+// every outgoing API response — even if a route handler accidentally
+// returns a raw DB record, these fields will never reach the client.
+app.use('/api', sanitizeResponse)
 
 /* ══════════════════════════════════════════════════════════════
  *  API-FIRST ROUTE ARCHITECTURE

@@ -122,7 +122,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                             name="name"
                             value={formData.name}
                             onChange={handleChange}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30"
                             placeholder="e.g. Data Structures"
                             required
                         />
@@ -134,7 +134,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                     {/* Categories Multi-Select */}
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-on-surface-variant/70 uppercase ml-1">Categories</label>
-                        <div className="flex flex-wrap gap-2 p-2 bg-surface-container border border-outline rounded-xl min-h-[46px]">
+                        <div className="flex flex-wrap gap-2 p-2 bg-surface-container border border-outline rounded-lg min-h-[46px]">
                             {['Theory', 'Practical', 'Assignment'].map((cat) => (
                                 <button
                                     key={cat}
@@ -147,7 +147,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                             setFormData(prev => ({ ...prev, categories: [...current, cat] }));
                                         }
                                     }}
-                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all
+                                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold border transition-all
                                         ${((formData as any).categories || []).includes(cat)
                                             ? 'bg-primary/10 border-primary text-primary'
                                             : 'bg-surface border-transparent text-on-surface-variant/50 hover:bg-surface-container hover:text-on-surface'
@@ -170,7 +170,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                 name="code"
                                 value={formData.code}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30"
                                 placeholder="e.g. CS-101"
                             />
                         </div>
@@ -188,7 +188,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                 name="professor"
                                 value={formData.professor}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30"
                                 placeholder="Prof. Name"
                             />
                         </div>
@@ -204,7 +204,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                 name="classroom"
                                 value={formData.classroom}
                                 onChange={handleChange}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30"
                                 placeholder="Room 301"
                             />
                         </div>
@@ -221,14 +221,14 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                             value={formData.syllabus}
                             onChange={handleChange}
                             rows={3}
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30 resize-none"
+                            className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-primary focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/30 resize-none"
                             placeholder="Enter syllabus topics or important notes..."
                         />
                     </div>
                 </div>
 
                 {/* Attendance Count Override */}
-                <div className="p-4 rounded-xl bg-orange-500/10 dark:bg-orange-500/5 border border-orange-500/20">
+                <div className="p-4 rounded-lg bg-orange-500/10 dark:bg-orange-500/5 border border-orange-500/20">
                     <label className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase mb-2 block">⚠️ Manual Attendance Override</label>
                     <p className="text-xs text-on-surface-variant/60 mb-3">Use this to fix incorrect counts. Be careful!</p>
                     <div className="grid grid-cols-2 gap-4">
@@ -240,7 +240,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                 value={formData.attended}
                                 onChange={handleChange}
                                 min="0"
-                                className="w-full px-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-orange-500/50 focus:outline-none transition-all text-on-surface text-center font-bold text-lg"
+                                className="w-full px-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-orange-500/50 focus:outline-none transition-all text-on-surface text-center font-bold text-lg"
                             />
                         </div>
                         <div className="space-y-2">
@@ -251,12 +251,12 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                 value={formData.total}
                                 onChange={handleChange}
                                 min="0"
-                                className="w-full px-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-orange-500/50 focus:outline-none transition-all text-on-surface text-center font-bold text-lg"
+                                className="w-full px-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-orange-500/50 focus:outline-none transition-all text-on-surface text-center font-bold text-lg"
                             />
                         </div>
 
                         {/* Assignment & Practical Totals Override */}
-                        <div className="col-span-2 p-4 rounded-xl bg-surface-container/30 border border-outline">
+                        <div className="col-span-2 p-4 rounded-lg bg-surface-container/30 border border-outline">
                             <label className="text-xs font-bold text-on-surface-variant/80 uppercase mb-2 block">🎯 Target Totals</label>
                             <div className="grid grid-cols-2 gap-4">
                                 {((formData as any).categories?.includes('Practical')) && (
@@ -268,7 +268,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                             value={(formData as any).practical_total || 10}
                                             onChange={handleChange}
                                             min="1"
-                                            className="w-full px-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-primary/50 focus:outline-none transition-all text-on-surface text-center font-bold text-lg"
+                                            className="w-full px-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-primary/50 focus:outline-none transition-all text-on-surface text-center font-bold text-lg"
                                         />
                                     </div>
                                 )}
@@ -281,7 +281,7 @@ const EditSubjectModal: React.FC<EditSubjectModalProps> = ({ isOpen, onClose, su
                                             value={(formData as any).assignment_total || 4}
                                             onChange={handleChange}
                                             min="1"
-                                            className="w-full px-4 py-2.5 rounded-xl bg-surface border border-outline focus:border-primary/50 focus:outline-none transition-all text-on-surface text-center font-bold text-lg"
+                                            className="w-full px-4 py-2.5 rounded-lg bg-surface border border-outline focus:border-primary/50 focus:outline-none transition-all text-on-surface text-center font-bold text-lg"
                                         />
                                     </div>
                                 )}

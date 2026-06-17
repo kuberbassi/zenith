@@ -25,9 +25,6 @@ const AppLayout: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-background font-sans text-on-background flex relative overflow-x-hidden">
-            {/* Subtle Geist Dot Grid Background */}
-            <div className="fixed inset-0 z-0 subtle-dot-grid" />
-
             {/* Sidebar (Left-side docked navigation on desktop) */}
             <Sidebar />
 

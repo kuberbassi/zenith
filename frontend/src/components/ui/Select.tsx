@@ -107,7 +107,7 @@ const Select: React.FC<SelectProps> = ({
                     }
                 }}
                 className={`
-                    w-full px-5 py-3.5 rounded-2xl text-left
+                    w-full px-4 py-2.5 rounded-lg text-left
                     bg-surface
                     border transition-all duration-200
                     text-on-surface text-sm font-medium
@@ -142,7 +142,7 @@ const Select: React.FC<SelectProps> = ({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -8, scale: 0.96 }}
                             transition={{ duration: 0.15, ease: 'easeOut' }}
-                            className="fixed rounded-2xl border border-outline bg-surface shadow-2xl overflow-hidden"
+                            className="fixed rounded-lg border border-outline bg-surface shadow-2xl overflow-hidden"
                             style={{
                                 top: `${coords.top}px`,
                                 left: `${coords.left}px`,
@@ -161,7 +161,7 @@ const Select: React.FC<SelectProps> = ({
                                         type="button"
                                         onClick={() => handleSelect(opt.value)}
                                         className={`
-                                            w-full px-5 py-3 text-left text-sm font-medium flex items-center justify-between
+                                            w-full px-4 py-2.5 text-left text-sm font-medium flex items-center justify-between
                                             transition-all duration-100
                                             ${isSelected
                                                 ? 'bg-primary/10 text-primary'

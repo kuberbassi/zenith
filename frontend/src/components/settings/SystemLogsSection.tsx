@@ -49,7 +49,7 @@ const SystemLogsSection: React.FC = () => {
     return (
         <div className="space-y-6">
             {dates.length === 0 ? (
-                <div className="rounded-3xl border border-outline glass-panel p-12 flex flex-col items-center justify-center text-center">
+                <div className="rounded-xl border border-outline glass-panel p-12 flex flex-col items-center justify-center text-center">
                     <Clock size={32} className="text-on-surface-variant/20 mb-4" />
                     <h3 className="text-sm font-bold text-on-surface tracking-wide uppercase mb-1">System Logs</h3>
                     <p className="text-xs text-on-surface-variant/50 max-w-xs">No activity has been logged in your profile yet.</p>
@@ -62,10 +62,10 @@ const SystemLogsSection: React.FC = () => {
                             <h3 className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40">{date}</h3>
                             <div className="h-px flex-1 bg-outline-variant" />
                         </div>
-                        <div className="rounded-3xl border border-outline glass-panel overflow-hidden divide-y divide-outline-variant">
+                        <div className="rounded-xl border border-outline glass-panel overflow-hidden divide-y divide-outline-variant">
                             {groupedLogs[date].map((log, index) => (
                                 <div key={index} className="flex gap-4 p-5 hover:bg-surface-container transition-colors group">
-                                    <div className="w-10 h-10 rounded-2xl bg-surface-container border border-outline-variant flex items-center justify-center shrink-0 group-hover:border-outline transition-all">
+                                    <div className="w-10 h-10 rounded-lg bg-surface-container border border-outline-variant flex items-center justify-center shrink-0 group-hover:border-outline transition-all">
                                         {getLogIcon(log.action)}
                                     </div>
                                     <div className="flex-1 min-w-0">

@@ -14,7 +14,7 @@ interface HeaderProps {
 }
 
 const routeTitles: Record<string, { title: string; icon: any }> = {
-    '/': { title: 'Dashboard', icon: LayoutDashboard },
+    '/dashboard': { title: 'Dashboard', icon: LayoutDashboard },
     '/analytics': { title: 'Analytics', icon: PieChart },
     '/timetable': { title: 'Schedule', icon: CalendarClock },
     '/calendar': { title: 'Calendar', icon: CalendarDays },
@@ -27,7 +27,7 @@ const routeTitles: Record<string, { title: string; icon: any }> = {
 };
 
 const quickNavItems = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Analytics', href: '/analytics', icon: PieChart },
     { name: 'Schedule', href: '/timetable', icon: CalendarClock },
     { name: 'Calendar', href: '/calendar', icon: CalendarDays },
@@ -80,7 +80,7 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0, onMenuClick }) =
                     {onMenuClick && (
                         <button
                             onClick={onMenuClick}
-                            className="lg:hidden p-2 rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+                            className="lg:hidden p-2 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
                             aria-label="Toggle navigation menu"
                         >
                             <Menu size={20} />
@@ -134,7 +134,7 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0, onMenuClick }) =
                     {/* Search */}
                     <button
                         onClick={() => setSearchOpen(true)}
-                        className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-container-high text-on-surface-variant/70 hover:text-on-surface transition-colors"
+                        className="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-container-high text-on-surface-variant/70 hover:text-on-surface transition-colors"
                         title="Search (Ctrl+K)"
                     >
                         <Search size={16} />
@@ -146,7 +146,7 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0, onMenuClick }) =
                     {/* Notifications */}
                     <Link
                         to="/notifications"
-                        className="relative flex items-center justify-center p-2 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface-variant/70 hover:text-on-surface"
+                        className="relative flex items-center justify-center p-2 rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant/70 hover:text-on-surface"
                         title="Notifications"
                     >
                         <Bell size={16} />
@@ -158,7 +158,7 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0, onMenuClick }) =
                     {/* Settings */}
                     <Link
                         to="/settings"
-                        className="flex items-center justify-center p-2 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface-variant/70 hover:text-on-surface"
+                        className="flex items-center justify-center p-2 rounded-lg hover:bg-surface-container-high transition-colors text-on-surface-variant/70 hover:text-on-surface"
                         title="Settings"
                     >
                         <Settings size={16} />
@@ -179,7 +179,7 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0, onMenuClick }) =
                             initial={{ opacity: 0, y: -8, scale: 0.98 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                            className="fixed top-24 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] md:w-full max-w-md bg-surface border border-outline rounded-2xl shadow-2xl z-50 overflow-hidden text-on-surface"
+                            className="fixed top-24 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] md:w-full max-w-md bg-surface border border-outline rounded-xl shadow-2xl z-50 overflow-hidden text-on-surface"
                         >
                             <div className="flex items-center gap-3 px-4 py-3.5 border-b border-outline bg-surface-container/30">
                                 <Search size={18} className="text-on-surface-variant/50" />
@@ -203,7 +203,7 @@ const Header: React.FC<HeaderProps> = ({ notificationCount = 0, onMenuClick }) =
                                         <Link
                                             key={item.href} to={item.href}
                                             onClick={() => setSearchOpen(false)}
-                                            className="flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors group"
+                                            className="flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors group"
                                         >
                                             <div className="p-2 rounded-lg bg-surface-container group-hover:bg-surface-container-highest transition-colors">
                                                 <item.icon size={18} className="text-on-surface-variant group-hover:text-on-surface transition-colors" />

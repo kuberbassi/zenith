@@ -718,7 +718,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ note, onUpdate, onDelete, onClo
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 350 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full max-w-lg lg:w-[460px] border border-outline bg-surface rounded-2xl lg:rounded-xl p-5 flex flex-col max-h-[85vh] lg:max-h-none lg:h-[calc(100vh-160px)] shadow-2xl lg:shadow-sm lg:sticky lg:top-20 lg:self-start lg:shrink-0"
+                className="w-full max-w-lg lg:w-[460px] border border-outline bg-surface rounded-xl p-5 flex flex-col max-h-[85vh] lg:max-h-none lg:h-[calc(100vh-160px)] shadow-2xl lg:shadow-sm lg:sticky lg:top-20 lg:self-start lg:shrink-0"
             >
                 {/* Header */}
                 <div className="flex items-center justify-between pb-3 border-b border-outline mb-3">

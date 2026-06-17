@@ -120,7 +120,7 @@ const StructureModal: React.FC<StructureModalProps> = ({ isOpen, onClose, onSucc
                         </div>
                     ))}
                     {periods.length === 0 && (
-                        <div className="py-16 text-center border border-dashed border-outline rounded-2xl">
+                        <div className="py-16 text-center border border-dashed border-outline rounded-xl">
                             <p className="text-xs font-semibold text-on-surface-variant/50 uppercase tracking-widest">No slots configured</p>
                         </div>
                     )}

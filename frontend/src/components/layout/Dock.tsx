@@ -9,7 +9,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Analytics', href: '/analytics', icon: PieChart },
     { name: 'Courses', href: '/courses', icon: GraduationCap },
     { name: 'Results', href: '/results', icon: Trophy },
@@ -51,7 +51,7 @@ function DockItem({ item, mouseX, isHoveredGlobal }: {
                 animate={{ width: isHoveredGlobal ? undefined : BASE_SIZE, height: isHoveredGlobal ? undefined : BASE_SIZE }}
                 onMouseEnter={() => setIsHovered(true)}
                 onMouseLeave={() => setIsHovered(false)}
-                className={`flex items-center justify-center rounded-2xl transition-colors duration-200 cursor-pointer ${
+                className={`flex items-center justify-center rounded-xl transition-colors duration-200 cursor-pointer ${
                     isActive ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.05]'
                 }`}
             >
@@ -60,7 +60,7 @@ function DockItem({ item, mouseX, isHoveredGlobal }: {
             <motion.div
                 initial={{ opacity: 0, y: 8, scale: 0.9 }}
                 animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? -56 : 8, scale: isHovered ? 1 : 0.9 }}
-                className="absolute top-0 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/[0.1] text-white/80 px-3 py-1.5 rounded-xl text-sm font-medium shadow-xl pointer-events-none"
+                className="absolute top-0 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#1a1a1a] border border-white/[0.1] text-white/80 px-3 py-1.5 rounded-lg text-sm font-medium shadow-xl pointer-events-none"
                 style={{ originY: 1 }}
             >
                 {item.name}
@@ -165,7 +165,7 @@ function DesktopDock() {
                     onMouseMove={(e) => mouseX.set(e.clientX)}
                     onMouseEnter={() => setIsHoveredGlobal(true)}
                     onMouseLeave={() => { mouseX.set(Infinity); setIsHoveredGlobal(false); }}
-                    className="flex items-center gap-3 px-5 py-3 rounded-3xl glass-panel/92 backdrop-blur-2xl border border-white/[0.1] shadow-2xl"
+                    className="flex items-center gap-3 px-5 py-3 rounded-xl glass-panel/92 backdrop-blur-2xl border border-white/[0.1] shadow-2xl"
                     style={{ boxShadow: '0 0 30px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.06)' }}
                 >
                     <div ref={pfpRef} className="relative mr-2">
@@ -210,7 +210,7 @@ function DesktopDock() {
                                 width: 224,
                                 boxShadow: '0 -16px 48px rgba(0,0,0,0.8), 0 0 20px rgba(255,255,255,0.03), inset 0 1px 0 rgba(255,255,255,0.05)',
                             }}
-                            className="rounded-2xl border border-white/[0.08] glass-panel backdrop-blur-2xl overflow-hidden"
+                            className="rounded-xl border border-white/[0.08] glass-panel backdrop-blur-2xl overflow-hidden"
                         >
                             <div className="p-4 flex items-center gap-3 bg-white/[0.02]">
                                 <div className="w-10 h-10 rounded-full overflow-hidden border border-white/[0.1] flex-shrink-0">
@@ -386,7 +386,7 @@ function MobileBubble() {
                             marginLeft: -110,
                             boxShadow: '0 -8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.07), inset 0 1px 0 rgba(255,255,255,0.05)',
                         }}
-                        className="rounded-3xl bg-[#0c0c0f]/98 backdrop-blur-2xl overflow-visible"
+                        className="rounded-xl bg-[#0c0c0f]/98 backdrop-blur-2xl overflow-visible"
                     >
                         <div className="p-4 flex items-center gap-3">
                             <img
@@ -404,14 +404,14 @@ function MobileBubble() {
                         <div className="py-1.5 px-1.5 flex flex-col gap-0.5">
                             <button
                                 onClick={() => { setPfpMenuOpen(false); navigate('/settings'); }}
-                                className="w-full px-3 py-2.5 text-left text-[13px] font-medium text-white/60 hover:bg-white/[0.06] rounded-2xl transition-colors flex items-center gap-3"
+                                className="w-full px-3 py-2.5 text-left text-[13px] font-medium text-white/60 hover:bg-white/[0.06] rounded-lg transition-colors flex items-center gap-3"
                             >
                                 <Settings size={15} className="text-white/30" />
                                 Profile & Settings
                             </button>
                             <button
                                 onClick={() => { setPfpMenuOpen(false); logout(); }}
-                                className="w-full px-3 py-2.5 text-left text-[13px] font-medium text-red-400/70 hover:bg-red-500/[0.08] rounded-2xl transition-colors flex items-center gap-3"
+                                className="w-full px-3 py-2.5 text-left text-[13px] font-medium text-red-400/70 hover:bg-red-500/[0.08] rounded-lg transition-colors flex items-center gap-3"
                             >
                                 <LogOut size={15} className="text-red-400/50" />
                                 Log Out
@@ -449,7 +449,7 @@ function MobileBubble() {
                                 style={{ WebkitTapHighlightColor: 'transparent' }}
                             >
                                 <div
-                                    className={`w-[52px] h-[52px] rounded-[18px] flex items-center justify-center border transition-all ${
+                                    className={`w-[52px] h-[52px] rounded-xl flex items-center justify-center border transition-all ${
                                         isActive
                                             ? 'bg-white/10 border-white/20 text-white'
                                             : 'glass-panel/95 border-white/[0.09] text-white/55'

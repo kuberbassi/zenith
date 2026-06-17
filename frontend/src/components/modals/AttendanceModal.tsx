@@ -625,7 +625,7 @@ const SubjectRow = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => onSimpleMark(subject, 'present')}
-                            className="h-7 w-7 p-0 rounded-full text-on-surface-variant hover:text-green-500 hover:bg-green-500/10 cursor-pointer"
+                            className="h-7 w-7 p-0 rounded-lg text-on-surface-variant hover:text-green-500 hover:bg-green-500/10 cursor-pointer"
                             title="Mark Present"
                         >
                             <Check size={14} />
@@ -634,7 +634,7 @@ const SubjectRow = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => onSimpleMark(subject, 'absent')}
-                            className="h-7 w-7 p-0 rounded-full text-red-400 hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                            className="h-7 w-7 p-0 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
                             title="Mark Absent"
                         >
                             <X size={14} />
@@ -653,7 +653,7 @@ const SubjectRow = ({
                             size="sm"
                             variant="ghost"
                             onClick={() => onDelete(subject)}
-                            className="h-7 w-7 p-0 rounded-full text-on-surface-variant hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                            className="h-7 w-7 p-0 rounded-lg text-on-surface-variant hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
                             title="Delete/Clear"
                         >
                             <Trash2 size={13} />
@@ -665,7 +665,7 @@ const SubjectRow = ({
                     size="sm"
                     variant="ghost"
                     onClick={() => onOpenDetails(subject._id || subject.id, status, subject.notes)}
-                    className="h-7 w-7 p-0 rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high cursor-pointer"
+                    className="h-7 w-7 p-0 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high cursor-pointer"
                 >
                     <MoreHorizontal size={14} />
                 </Button>
@@ -768,7 +768,7 @@ const SubstitutionDropdown = ({ subjects, value, selectedName, onChange }: {
             <button
                 type="button"
                 onClick={() => setOpen(!open)}
-                className="w-full bg-surface border border-outline text-on-surface rounded-xl px-3 py-2 text-xs text-left flex items-center justify-between hover:border-primary/50 transition-all"
+                className="w-full bg-surface border border-outline text-on-surface rounded-lg px-3 py-2 text-xs text-left flex items-center justify-between hover:border-primary/50 transition-all"
             >
                 <span className={value ? 'text-on-surface' : 'text-on-surface-variant/40'}>{selectedName || 'Select Subject...'}</span>
                 <svg className={`w-4 h-4 text-on-surface-variant/40 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>

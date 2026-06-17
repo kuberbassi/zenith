@@ -236,10 +236,10 @@ const SkillTracker: React.FC = () => {
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-sm font-bold text-on-surface break-words">{skill.name}</p>
                                                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full text-center leading-tight ${levelTag.className}`}>
+                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded text-center leading-tight ${levelTag.className}`}>
                                                         {skill.level}
                                                     </span>
-                                                    <span style={catTag.style} className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider leading-tight ${catTag.className}`}>
+                                                    <span style={catTag.style} className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider leading-tight ${catTag.className}`}>
                                                         {skill.category}
                                                     </span>
                                                 </div>
@@ -273,10 +273,10 @@ const SkillTracker: React.FC = () => {
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-xs font-bold text-on-surface truncate">{skill.name}</p>
                                                 <div className="flex items-center gap-1.5 mt-1.5">
-                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full text-center shrink-0 ${levelTag.className}`}>
+                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded text-center shrink-0 ${levelTag.className}`}>
                                                         {skill.level}
                                                     </span>
-                                                    <span style={catTag.style} className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${catTag.className}`}>
+                                                    <span style={catTag.style} className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${catTag.className}`}>
                                                         {skill.category}
                                                     </span>
                                                 </div>

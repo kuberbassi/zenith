@@ -112,52 +112,52 @@ const SubjectRow: React.FC<{
     return (
         <tr
             {...longPressHandlers}
-            className="hover:bg-surface-container/30 transition-colors group cursor-default"
+            className="hover:bg-surface-container/20 transition-colors group cursor-default border-b border-outline/10 last:border-b-0"
         >
-            <td className="px-6 py-4 font-mono font-bold text-on-surface-variant/50">{subject.code || 'COURSE'}</td>
-            <td className="px-6 py-4 font-bold text-on-surface">
+            <td className="px-6 py-3.5 font-mono text-xs font-semibold text-on-surface-variant/40">{subject.code || 'COURSE'}</td>
+            <td className="px-6 py-3.5 font-bold text-on-surface">
                 <div>
-                    <p className="truncate max-w-[200px] leading-tight">{subject.name}</p>
-                    <span className="text-[9px] font-bold text-on-surface-variant/30 uppercase mt-1 inline-block">{subject.type || 'Theory'}</span>
+                    <p className="truncate max-w-[200px] leading-tight text-xs">{subject.name}</p>
+                    <span className="text-[8px] font-semibold text-on-surface-variant/40 uppercase tracking-widest mt-1 inline-block">{subject.type || 'Theory'}</span>
                 </div>
             </td>
-            <td className="px-6 py-4 text-on-surface-variant/60 font-medium">
+            <td className="px-6 py-3.5 text-on-surface-variant/50 font-medium text-xs">
                 <p className="truncate max-w-[150px] leading-tight">{formatTeacherName(subject.professor)}</p>
             </td>
-            <td className="px-6 py-4 text-center font-bold text-on-surface">{subject.attended || 0} / {subject.total || 0}</td>
-            <td className="px-6 py-4 text-center">
-                <div className="flex flex-col items-center gap-1.5">
+            <td className="px-6 py-3.5 text-center font-semibold text-on-surface text-xs">{subject.attended || 0} / {subject.total || 0}</td>
+            <td className="px-6 py-3.5 text-center">
+                <div className="flex flex-col items-center gap-1">
                     <span className={`font-bold text-xs ${isCritical ? 'text-red-500' : 'text-on-surface'}`}>{Math.round(pct)}%</span>
-                    <div className="w-16 h-1 bg-on-surface/10 border border-outline/50 rounded-full overflow-hidden shrink-0">
+                    <div className="w-12 h-0.5 bg-on-surface/5 rounded-full overflow-hidden shrink-0">
                         <div className={`h-full ${isCritical ? 'bg-red-500' : 'bg-on-surface'}`} style={{ width: `${Math.min(100, pct)}%` }} />
                     </div>
                 </div>
             </td>
-            <td className="px-6 py-4 text-center whitespace-nowrap">
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border whitespace-nowrap ${
+            <td className="px-6 py-3.5 text-center whitespace-nowrap">
+                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border whitespace-nowrap tracking-wide ${
                     isCritical 
-                        ? 'bg-red-500/10 border-red-500/20 text-red-500' 
-                        : 'bg-primary/5 border-outline text-on-surface'
+                        ? 'bg-red-500/5 border-red-500/10 text-red-500' 
+                        : 'bg-primary/5 border-outline/30 text-on-surface-variant/80'
                 }`}>
                     {isCritical ? `Need ${needed} cls` : `${canSkip} Bunks`}
                 </span>
             </td>
 
-            <td className="px-6 py-4 text-right">
+            <td className="px-6 py-3.5 text-right">
                 <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                         onClick={() => setEditingSubject(subject)}
-                        className="p-1 rounded hover:bg-surface-container text-on-surface-variant/40 hover:text-on-surface transition-colors cursor-pointer"
+                        className="p-1 rounded-md hover:bg-surface-container text-on-surface-variant/40 hover:text-on-surface transition-colors cursor-pointer"
                         title="Edit"
                     >
-                        <Edit2 size={12} />
+                        <Edit2 size={11} />
                     </button>
                     <button
                         onClick={() => handleDeleteSubject(subject._id, subject.name)}
-                        className="p-1 rounded hover:bg-red-500/5 text-on-surface-variant/40 hover:text-red-500 transition-colors cursor-pointer"
+                        className="p-1 rounded-md hover:bg-red-500/5 text-on-surface-variant/40 hover:text-red-500 transition-colors cursor-pointer"
                         title="Delete"
                     >
-                        <Trash2 size={12} />
+                        <Trash2 size={11} />
                     </button>
                 </div>
             </td>
@@ -437,113 +437,113 @@ const Dashboard: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-6">
-                    
-                    {/* Bento Grid */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                               {/* Bento Grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         
                         {/* Bento Card 1: Academic Health */}
-                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all lg:col-span-2">
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Overall Academic Health</span>
+                        <div className="rounded-xl border border-outline/50 bg-surface p-6 sm:p-7 flex flex-col justify-between hover:border-on-surface/20 transition-all lg:col-span-2 shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                            <div className="flex items-center justify-between mb-6">
+                                <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Overall Academic Health</span>
                                 <Activity size={13} className="text-on-surface-variant/40" />
                             </div>
                             
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 my-2">
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 my-2">
                                 <div>
-                                    <p className="text-6xl md:text-7xl font-extrabold tracking-tighter text-on-surface leading-none">{att.toFixed(1)}%</p>
-                                    <p className="text-xs font-semibold text-on-surface-variant/40 mt-2">Overall Conducted Classes</p>
+                                    <p className="text-6xl md:text-8xl font-black tracking-tighter text-on-surface leading-none">{att.toFixed(1)}%</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40 mt-3">Overall Conducted Classes</p>
                                 </div>
                                 
                                 <div className="flex-1 w-full md:max-w-xs space-y-4">
                                     <div>
-                                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 mb-1">
+                                        <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/50 mb-2">
                                             <span>Conduct Progress</span>
                                             <span>{totalAttended} / {totalClasses} classes</span>
                                         </div>
-                                        <div className="w-full h-1.5 bg-on-surface/10 border border-outline rounded-full overflow-hidden">
+                                        <div className="w-full h-1 bg-on-surface/5 border border-outline/35 rounded-full overflow-hidden">
                                             <div className="h-full bg-on-surface" style={{ width: `${Math.min(100, totalClasses > 0 ? (totalAttended / totalClasses) * 100 : 0)}%` }} />
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 border-t border-outline pt-4 mt-6">
+                            <div className="grid grid-cols-3 gap-1.5 sm:gap-2 border-t border-outline/40 pt-4 mt-8">
                                 <div className="text-left">
-                                    <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Deficit Risk</span>
-                                    <span className={`text-xs sm:text-sm md:text-base font-bold ${riskCount > 0 ? 'text-red-500' : 'text-on-surface'}`}>{riskCount} {riskCount === 1 ? 'Subject' : 'Subjects'}</span>
+                                    <span className="block text-[8px] font-bold text-on-surface-variant/45 uppercase tracking-wider">Deficit Risk</span>
+                                    <span className={`text-sm md:text-base font-bold ${riskCount > 0 ? 'text-red-500' : 'text-on-surface'}`}>{riskCount} {riskCount === 1 ? 'Subject' : 'Subjects'}</span>
                                 </div>
                                 <div className="text-left">
-                                    <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Safe Bunks</span>
-                                    <span className="text-xs sm:text-sm md:text-base font-bold text-on-surface">{safeBunks} Left</span>
+                                    <span className="block text-[8px] font-bold text-on-surface-variant/45 uppercase tracking-wider">Safe Bunks</span>
+                                    <span className="text-sm md:text-base font-bold text-on-surface">{safeBunks} Left</span>
                                 </div>
                                 <div className="text-left">
-                                    <span className="block text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Total Tracked</span>
-                                    <span className="text-xs sm:text-sm md:text-base font-bold text-on-surface">{safeCount}/{subjectCount}</span>
+                                    <span className="block text-[8px] font-bold text-on-surface-variant/45 uppercase tracking-wider">Total Tracked</span>
+                                    <span className="text-sm md:text-base font-bold text-on-surface">{safeCount}/{subjectCount}</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Bento Card 2: Student Target */}
-                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all">
+                        <div className="rounded-xl border border-outline/50 bg-surface p-6 flex flex-col justify-between hover:border-on-surface/20 transition-all shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
                             <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Academic Target</span>
+                                <div className="flex items-center justify-between mb-6">
+                                    <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Academic Target</span>
                                     <Target size={13} className="text-on-surface-variant/40" />
                                 </div>
                                 
                                 <div className="space-y-4 my-2">
                                     <div>
-                                        <p className="text-xs font-semibold text-on-surface-variant/40">Student Name</p>
+                                        <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">Student Name</p>
                                         <p className="text-sm font-bold text-on-surface">{user?.name || 'Student'}</p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <p className="text-xs font-semibold text-on-surface-variant/40 font-mono">Enrollment</p>
-                                            <p className="text-xs font-bold text-on-surface truncate font-mono">{user?.enrollment_number || '—'}</p>
+                                            <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 font-mono">Enrollment</p>
+                                            <p className="text-xs font-semibold text-on-surface truncate font-mono">{user?.enrollment_number || '—'}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs font-semibold text-on-surface-variant/40">Batch</p>
-                                            <p className="text-xs font-bold text-on-surface truncate">{user?.batch || '—'}</p>
+                                            <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">Batch</p>
+                                            <p className="text-xs font-semibold text-on-surface truncate">{user?.batch || '—'}</p>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <p className="text-xs font-semibold text-on-surface-variant/40">Target Goal</p>
-                                            <p className="text-xs font-bold text-on-surface">{targetThreshold}% Minimum</p>
+                                            <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">Target Goal</p>
+                                            <p className="text-xs font-semibold text-on-surface">{targetThreshold}% Minimum</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs font-semibold text-on-surface-variant/40">Current Semester</p>
-                                            <p className="text-xs font-bold text-on-surface">Semester {currentSemester}</p>
+                                            <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">Current Semester</p>
+                                            <p className="text-xs font-semibold text-on-surface">Semester {currentSemester}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="border-t border-outline pt-4 mt-6">
+                            <div className="border-t border-outline/40 pt-4 mt-6">
                                 <Link
                                     to="/settings"
-                                    className="w-full h-8 flex items-center justify-center gap-2 border border-outline hover:border-on-surface hover:bg-surface-container rounded text-xs font-bold text-on-surface transition-all cursor-pointer"
+                                    className="w-full h-8.5 flex items-center justify-center gap-2 border border-outline hover:border-on-surface/20 hover:bg-surface-container rounded-md text-xs font-semibold text-on-surface transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.01)]"
                                 >
                                     <SettingsIcon size={12} />
                                     Configure Settings
                                 </Link>
                             </div>
                         </div>
-                                          {/* Bento Card 3: Today's Schedule */}
-                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[260px]">
+
+                        {/* Bento Card 3: Today's Schedule */}
+                        <div className="rounded-xl border border-outline/50 bg-surface p-6 flex flex-col justify-between hover:border-on-surface/20 transition-all min-h-[260px] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
                             <div>
-                                <div className="flex items-center justify-between mb-4">
-                                    <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Today's Schedule</span>
+                                <div className="flex items-center justify-between mb-6">
+                                    <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Today's Schedule</span>
                                     <Flame size={13} className="text-on-surface-variant/40" />
                                 </div>
                                 
-                                <div className="space-y-3.5 my-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                                <div className="space-y-3 my-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
                                     {todayClasses.length > 0 ? (
                                         todayClasses.map((cls, idx) => {
                                             const sub = findSubjectForSlot(subjects, cls);
                                             return (
-                                                <div key={idx} className="flex items-center gap-3 py-1 border-b border-outline last:border-b-0">
-                                                    <div className="text-center bg-surface-container border border-outline rounded px-2 py-1 shrink-0 min-w-[55px]">
+                                                <div key={idx} className="flex items-center gap-3 py-1.5 border-b border-outline/30 last:border-b-0">
+                                                    <div className="text-center bg-surface-container border border-outline/40 rounded-md px-2 py-0.5 shrink-0 min-w-[55px]">
                                                         <span className="block text-[8px] font-bold text-on-surface-variant/50 leading-none">{cls.start_time || cls.startTime || '—'}</span>
                                                     </div>
                                                     <div className="min-w-0 flex-1">
@@ -560,10 +560,10 @@ const Dashboard: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="border-t border-outline pt-4 mt-6 shrink-0">
+                            <div className="border-t border-outline/40 pt-4 mt-6 shrink-0">
                                 <Link
                                     to="/timetable"
-                                    className="w-full h-8 flex items-center justify-center gap-1 border border-outline hover:border-on-surface hover:bg-surface-container rounded text-xs font-bold text-on-surface transition-all cursor-pointer"
+                                    className="w-full h-8.5 flex items-center justify-center gap-1 border border-outline hover:border-on-surface/20 hover:bg-surface-container rounded-md text-xs font-semibold text-on-surface transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.01)]"
                                 >
                                     View Full Timetable
                                     <ChevronRight size={12} />
@@ -572,14 +572,14 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Bento Card 4: Recent Notes */}
-                        <div className="rounded-lg border border-outline bg-surface p-4 sm:p-6 flex flex-col justify-between hover:border-on-surface transition-all min-h-[280px] lg:col-span-2">
+                        <div className="rounded-xl border border-outline/50 bg-surface p-6 flex flex-col justify-between hover:border-on-surface/20 transition-all min-h-[280px] lg:col-span-2 shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
                             <div>
-                                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                                <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Recent Notes & Checklists</span>
+                                        <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Recent Notes & Checklists</span>
                                         <FileText size={13} className="text-on-surface-variant/40" />
                                     </div>
-                                    <div className="flex items-center gap-1 p-0.5 bg-surface-container border border-outline rounded-lg">
+                                    <div className="flex items-center gap-1 p-0.5 bg-surface-container border border-outline/50 rounded-md">
                                         {(['all', 'notes', 'todos'] as const).map(filter => (
                                             <button
                                                 key={filter}
@@ -587,7 +587,7 @@ const Dashboard: React.FC = () => {
                                                     setNotesFilter(filter);
                                                     localStorage.setItem('zenith_dashboard_notes_filter', filter);
                                                 }}
-                                                className={`px-2.5 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                                className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                                                     notesFilter === filter
                                                         ? 'bg-on-surface text-surface'
                                                         : 'text-on-surface-variant/50 hover:text-on-surface'
@@ -602,7 +602,7 @@ const Dashboard: React.FC = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-2">
                                     {filteredNotesPreview.length > 0 ? (
                                         filteredNotesPreview.slice(0, 2).map((note, idx) => (
-                                            <div key={note.id || idx} className="border border-outline bg-surface-container/20 rounded-xl p-4 flex flex-col justify-between min-h-[140px] hover:border-on-surface/30 hover:bg-surface-container/30 transition-all">
+                                            <div key={note.id || idx} className="border border-outline/40 bg-surface-container/20 rounded-lg p-4 flex flex-col justify-between min-h-[140px] hover:border-on-surface/20 hover:bg-surface-container/30 transition-all shadow-[0_1px_2px_rgba(0,0,0,0.01)]">
                                                 <div>
                                                     <Link to="/notes" className="hover:underline cursor-pointer block">
                                                         <h4 className="text-xs font-bold text-on-surface truncate">{note.title || 'Untitled'}</h4>
@@ -652,17 +652,17 @@ const Dashboard: React.FC = () => {
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="py-8 text-center border border-dashed border-outline rounded-xl col-span-2">
+                                        <div className="py-8 text-center border border-dashed border-outline/50 rounded-lg col-span-2">
                                             <p className="text-xs font-semibold text-on-surface-variant/30 italic">No items match the filter.</p>
                                         </div>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="border-t border-outline pt-4 mt-6">
+                            <div className="border-t border-outline/40 pt-4 mt-6">
                                 <Link
                                     to="/notes"
-                                    className="w-full h-8 flex items-center justify-center gap-1 border border-outline hover:border-on-surface hover:bg-surface-container rounded text-xs font-bold text-on-surface transition-all cursor-pointer"
+                                    className="w-full h-8.5 flex items-center justify-center gap-1 border border-outline hover:border-on-surface/20 hover:bg-surface-container rounded-md text-xs font-semibold text-on-surface transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.01)]"
                                 >
                                     Open Notes &amp; Todos
                                     <ChevronRight size={12} />
@@ -671,11 +671,11 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* Bento Card 5: Courses Breakdown */}
-                        <div className="rounded-lg border border-outline bg-surface overflow-hidden lg:col-span-3 hover:border-on-surface transition-all">
-                            <div className="px-6 py-4 border-b border-outline bg-surface-container/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <span className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Courses Breakdown</span>
+                        <div className="rounded-xl border border-outline/50 bg-surface overflow-hidden lg:col-span-3 hover:border-on-surface/20 transition-all shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                            <div className="px-6 py-5 border-b border-outline/30 bg-surface-container/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <span className="text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Courses Breakdown</span>
                                 {/* Category filter tabs */}
-                                <div className="flex items-center gap-1 p-0.5 bg-surface border border-outline rounded-lg self-start sm:self-auto">
+                                <div className="flex items-center gap-1 p-0.5 bg-surface border border-outline/50 rounded-md self-start sm:self-auto">
                                     {(['Theory', 'Practical', 'All'] as const).map(cat => {
                                         const count = cat === 'All'
                                             ? subjects.length
@@ -693,14 +693,14 @@ const Dashboard: React.FC = () => {
                                                     setCategoryFilter(cat);
                                                     localStorage.setItem('zenith_dashboard_subject_filter', cat);
                                                 }}
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                                className={`flex items-center gap-1.5 px-3 py-1 rounded text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                                                     categoryFilter === cat
                                                         ? 'bg-on-surface text-surface'
                                                         : 'text-on-surface-variant/50 hover:text-on-surface'
                                                 }`}
                                             >
                                                 {cat}
-                                                <span className={`text-[9px] ${categoryFilter === cat ? 'opacity-60' : 'opacity-40'}`}>{count}</span>
+                                                <span className={`text-[8px] ${categoryFilter === cat ? 'opacity-60' : 'opacity-40'}`}>{count}</span>
                                             </button>
                                         );
                                     })}
@@ -726,17 +726,17 @@ const Dashboard: React.FC = () => {
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse text-xs select-none min-w-[650px]">
                                         <thead>
-                                            <tr className="border-b border-outline bg-surface-container/50 text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-wider">
-                                                <th className="px-6 py-3">Code</th>
-                                                <th className="px-6 py-3">Subject Name</th>
-                                                <th className="px-6 py-3">Professor</th>
-                                                <th className="px-6 py-3 text-center">Attended</th>
-                                                <th className="px-6 py-3 text-center">Percentage</th>
-                                                <th className="px-6 py-3 text-center">Can Bunk / Needed</th>
-                                                <th className="px-6 py-3 text-right">Actions</th>
+                                            <tr className="border-b border-outline/30 bg-surface-container/20 text-[9px] font-bold text-on-surface-variant/40 uppercase tracking-widest">
+                                                <th className="px-6 py-3.5">Code</th>
+                                                <th className="px-6 py-3.5">Subject Name</th>
+                                                <th className="px-6 py-3.5">Professor</th>
+                                                <th className="px-6 py-3.5 text-center">Attended</th>
+                                                <th className="px-6 py-3.5 text-center">Percentage</th>
+                                                <th className="px-6 py-3.5 text-center">Can Bunk / Needed</th>
+                                                <th className="px-6 py-3.5 text-right">Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-outline">
+                                        <tbody className="divide-y divide-outline/20">
                                             {sortSubs(filteredSubjects).map((subject) => (
                                                 <SubjectRow
                                                     key={subject._id}

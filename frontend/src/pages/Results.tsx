@@ -739,7 +739,7 @@ const Results: React.FC = () => {
                                 <button
                                     key={opt.val}
                                     onClick={() => setPdfSem(opt.val)}
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-xs font-bold text-left transition-all ${
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-xs font-bold text-left transition-all ${
                                         pdfSem === opt.val
                                             ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                                             : 'border-outline bg-surface text-on-surface-variant hover:bg-surface-container'
@@ -754,12 +754,12 @@ const Results: React.FC = () => {
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setShowPdfModal(false)}
-                                className="flex-1 py-3 rounded-xl border border-outline bg-surface text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-all"
+                                className="flex-1 py-3 rounded-lg border border-outline bg-surface text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-all"
                             >Cancel</button>
                             <button
                                 onClick={handleDownloadPdf}
                                 disabled={pdfLoading}
-                                className="flex-1 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                                className="flex-1 py-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                             >
                                 {pdfLoading
                                     ? <><Loader size={20} /> Generating…</>
@@ -776,7 +776,7 @@ const Results: React.FC = () => {
                     <motion.div
                         initial={{ opacity: 0, scale: 0.98 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className="w-full max-w-4xl rounded-2xl border border-outline bg-surface overflow-hidden flex flex-col max-h-[90vh] shadow-2xl"
+                        className="w-full max-w-4xl rounded-xl border border-outline bg-surface overflow-hidden flex flex-col max-h-[90vh] shadow-2xl"
                     >
                         {/* Header */}
                         <div className="p-6 md:p-8 border-b border-outline flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0 bg-surface-container">
@@ -818,7 +818,7 @@ const Results: React.FC = () => {
                                         type="text"
                                         value={editorStudentInfo.name}
                                         onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, name: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
+                                        className="w-full px-4 py-2.5 rounded-lg border border-outline bg-surface text-xs text-on-surface"
                                     />
                                 </div>
                                 <div>
@@ -827,7 +827,7 @@ const Results: React.FC = () => {
                                         type="text"
                                         value={editorStudentInfo.enrollment_number}
                                         onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, enrollment_number: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
+                                        className="w-full px-4 py-2.5 rounded-lg border border-outline bg-surface text-xs text-on-surface"
                                     />
                                 </div>
                                 <div>
@@ -845,7 +845,7 @@ const Results: React.FC = () => {
                                             setEditorSem(parseInt(e.target.value) || 1);
                                             setIsSemAutoDetected(false);
                                         }}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
+                                        className="w-full px-4 py-2.5 rounded-lg border border-outline bg-surface text-xs text-on-surface"
                                     >
                                         {[1, 2, 3, 4, 5, 6, 7, 8].map(s => (
                                             <option key={s} value={s}>Semester {s}</option>
@@ -858,7 +858,7 @@ const Results: React.FC = () => {
                                         type="text"
                                         value={editorStudentInfo.institute}
                                         onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, institute: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
+                                        className="w-full px-4 py-2.5 rounded-lg border border-outline bg-surface text-xs text-on-surface"
                                     />
                                 </div>
                                 <div className="md:col-span-2">
@@ -867,7 +867,7 @@ const Results: React.FC = () => {
                                         type="text"
                                         value={editorStudentInfo.program}
                                         onChange={(e) => setEditorStudentInfo({ ...editorStudentInfo, program: e.target.value })}
-                                        className="w-full px-4 py-2.5 rounded-xl border border-outline bg-surface text-xs text-on-surface"
+                                        className="w-full px-4 py-2.5 rounded-lg border border-outline bg-surface text-xs text-on-surface"
                                     />
                                 </div>
                             </div>
@@ -878,7 +878,7 @@ const Results: React.FC = () => {
                                     <h4 className="text-xs font-semibold text-on-surface-variant/80 ml-1">Extracted Subjects & Grades</h4>
                                     <button
                                         onClick={handleAddSubject}
-                                        className="px-4 py-2 rounded-xl bg-surface border border-outline text-xs font-semibold text-on-surface hover:bg-surface-container transition-all flex items-center gap-1.5"
+                                        className="px-4 py-2 rounded-lg bg-surface border border-outline text-xs font-semibold text-on-surface hover:bg-surface-container transition-all flex items-center gap-1.5"
                                     >
                                         <Plus size={14} /> Add Subject
                                     </button>
@@ -959,7 +959,7 @@ const Results: React.FC = () => {
                                                             {total}
                                                         </td>
                                                         <td className="p-3 text-center font-bold">
-                                                            <span className={`px-2.5 py-1 rounded-full text-[10px] ${gradeBgClass(grade)}`}>
+                                                            <span className={`px-2.5 py-1 rounded text-[10px] ${gradeBgClass(grade)}`}>
                                                                 {grade}
                                                             </span>
                                                         </td>
@@ -985,14 +985,14 @@ const Results: React.FC = () => {
                             <button
                                 onClick={() => setIsEditorOpen(false)}
                                 disabled={isSaving}
-                                className="px-5 py-3 rounded-xl border border-outline bg-surface text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-all disabled:opacity-50"
+                                className="px-5 py-3 rounded-lg border border-outline bg-surface text-xs font-bold text-on-surface-variant hover:bg-surface-container transition-all disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleSaveEditor}
                                 disabled={isSaving}
-                                className="px-6 py-3 rounded-xl bg-primary hover:opacity-90 border border-primary text-xs font-bold text-on-primary transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-6 py-3 rounded-lg bg-primary hover:opacity-90 border border-primary text-xs font-bold text-on-primary transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isSaving ? (
                                     <><RefreshCw size={12} className="animate-spin" /> Saving...</>

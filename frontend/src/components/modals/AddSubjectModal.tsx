@@ -89,7 +89,7 @@ const AddSubjectModal: React.FC<AddSubjectModalProps> = ({ isOpen, onClose, onSu
                                             setCategories([...categories, cat]);
                                         }
                                     }}
-                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all
+                                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold border transition-all
                                         ${categories.includes(cat)
                                             ? 'bg-primary/10 border-primary text-primary'
                                             : 'bg-surface border-transparent text-on-surface-variant/50 hover:bg-surface-container hover:text-on-surface'

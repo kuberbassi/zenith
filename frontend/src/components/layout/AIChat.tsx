@@ -248,7 +248,7 @@ const AIChat: React.FC = () => {
                                     className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     {msg.role === 'user' ? (
-                                        <div className="max-w-[80%] px-4 py-2.5 rounded-2xl rounded-tr-sm bg-surface-container border border-outline text-on-surface text-xs font-semibold shadow-xs">
+                                        <div className="max-w-[80%] px-4 py-2.5 rounded-xl rounded-tr-sm bg-surface-container border border-outline text-on-surface text-xs font-semibold shadow-xs">
                                             {msg.content}
                                         </div>
                                     ) : (
@@ -270,7 +270,7 @@ const AIChat: React.FC = () => {
                                     <div className="w-6 h-6 rounded-full bg-on-surface text-surface flex items-center justify-center shrink-0 mt-0.5 border border-on-surface shadow-sm">
                                         <ZenithAIIcon className="w-3.5 h-3.5 animate-spin" />
                                     </div>
-                                    <div className="px-3.5 py-2 rounded-2xl bg-surface border border-outline flex items-center gap-2 shadow-sm font-mono text-[9px] uppercase text-on-surface-variant/40">
+                                    <div className="px-3.5 py-2 rounded-xl bg-surface border border-outline flex items-center gap-2 shadow-sm font-mono text-[9px] uppercase text-on-surface-variant/40">
                                         <span className="relative flex h-1.5 w-1.5 shrink-0">
                                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-on-surface/40 opacity-75"></span>
                                             <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-on-surface"></span>
@@ -299,7 +299,7 @@ const AIChat: React.FC = () => {
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
                                     placeholder="Message Zenith AI..."
-                                    className="flex-1 bg-surface border border-outline rounded-full py-2.5 pl-4 pr-12 text-xs text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:border-on-surface/50 transition-all font-medium"
+                                    className="flex-1 bg-surface border border-outline rounded-lg py-2.5 pl-4 pr-12 text-xs text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:border-on-surface/50 transition-all font-medium"
                                 />
                                 <button
                                     onClick={() => handleSend()}

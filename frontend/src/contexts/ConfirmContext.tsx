@@ -84,17 +84,17 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
                                 animate={{ scale: 1, opacity: 1, y: 0 }}
                                 exit={{ scale: 0.95, opacity: 0, y: 15 }}
                                 transition={{ type: 'spring', damping: 25, stiffness: 450 }}
-                                className="relative w-full max-w-[420px] rounded-2xl bg-surface border border-outline shadow-2xl p-6 md:p-8 flex flex-col gap-5 text-on-surface"
+                                className="relative w-full max-w-[420px] rounded-xl bg-surface border border-outline shadow-2xl p-6 md:p-8 flex flex-col gap-5 text-on-surface"
                             >
                                 <button 
                                     onClick={handleCancel}
-                                    className="absolute top-4 right-4 p-1.5 rounded-xl hover:bg-surface-container transition-colors text-on-surface-variant/40 hover:text-on-surface cursor-pointer"
+                                    className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface-container transition-colors text-on-surface-variant/40 hover:text-on-surface cursor-pointer"
                                 >
                                     <X size={18} />
                                 </button>
 
                                 <div className="flex gap-4 items-start mt-2">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${
                                         options.requireDeleteText 
                                             ? 'bg-red-500/10 border-red-500/20 text-red-500' 
                                             : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
@@ -112,7 +112,7 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
                                 </div>
 
                                 {options.requireDeleteText && (
-                                    <div className="flex flex-col gap-2 bg-surface-container/30 border border-outline rounded-xl p-4 mt-1">
+                                    <div className="flex flex-col gap-2 bg-surface-container/30 border border-outline rounded-lg p-4 mt-1">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40">
                                             Security Verification
                                         </label>
@@ -138,14 +138,14 @@ export const ConfirmProvider: React.FC<{ children: React.ReactNode }> = ({ child
                                 <div className="flex gap-3 mt-2">
                                     <button
                                         onClick={handleCancel}
-                                        className="flex-1 py-3 rounded-xl border border-outline bg-surface text-xs font-bold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer"
+                                        className="flex-1 py-3 rounded-lg border border-outline bg-surface text-xs font-bold text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-all cursor-pointer"
                                     >
                                         {options.cancelText || 'Cancel'}
                                     </button>
                                     <button
                                         onClick={handleConfirm}
                                         disabled={isConfirmDisabled}
-                                        className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex justify-center items-center ${
+                                        className={`flex-1 py-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex justify-center items-center ${
                                             isConfirmDisabled 
                                                 ? 'bg-on-surface/5 border border-outline text-on-surface-variant/30 cursor-not-allowed'
                                                 : options.requireDeleteText

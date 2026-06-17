@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { usePageMeta } from '@/hooks/usePageMeta';
-import { Sun, Moon } from 'lucide-react';
+import { getCopyrightYears } from '@/utils/copyright';
+import { Sun, Moon, ArrowLeft } from 'lucide-react';
 
 const Login: React.FC = () => {
     const { loginWithGoogle } = useAuth();
@@ -19,11 +21,17 @@ const Login: React.FC = () => {
 
     return (
         <div className="min-h-screen w-full flex flex-col justify-between items-center relative overflow-hidden bg-background text-on-background font-sans py-8">
-            {/* Subtle Geist Dot Grid Background */}
-            <div className="fixed inset-0 z-0 subtle-dot-grid" />
 
-            {/* Floating Top Header / Theme Toggle */}
-            <header className="w-full max-w-7xl px-6 flex justify-end z-10">
+
+            {/* Floating Top Header / Theme Toggle & Navigation */}
+            <header className="w-full max-w-7xl px-6 flex justify-between items-center z-10">
+                <Link 
+                    to="/" 
+                    className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors duration-200"
+                >
+                    <ArrowLeft size={14} />
+                    <span>Back to Home</span>
+                </Link>
                 <button
                     onClick={toggleTheme}
                     className="w-9 h-9 flex items-center justify-center rounded-lg border border-outline bg-surface hover:bg-surface-container text-on-surface-variant hover:text-on-surface transition-all duration-200 cursor-pointer shadow-sm"
@@ -39,7 +47,7 @@ const Login: React.FC = () => {
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                    className="w-full text-center p-8 md:p-10 rounded-2xl bg-surface border border-outline shadow-[0_8px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] select-none"
+                    className="w-full text-center p-8 md:p-10 rounded-xl bg-surface border border-outline shadow-[0_8px_30px_rgba(0,0,0,0.03)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.4)] select-none"
                 >
                     {/* Logo Icon */}
                     <motion.div
@@ -48,8 +56,8 @@ const Login: React.FC = () => {
                         transition={{ delay: 0.1, duration: 0.4 }}
                         className="mb-8 flex justify-center"
                     >
-                        <div className="w-24 h-24 rounded-2xl overflow-hidden bg-surface-variant border border-outline shadow-sm flex items-center justify-center">
-                            <img src="/zenith-logo.png" alt="Zenith Logo" className="w-[72px] h-[72px] object-contain" />
+                        <div className="w-24 h-24 rounded-xl overflow-hidden bg-surface-variant border border-outline shadow-sm flex items-center justify-center">
+                            <img src="/zenith-logo.png" alt="Zenith Logo" className="w-[72px] h-[72px] object-contain invert dark:invert-0" />
                         </div>
                     </motion.div>
 
@@ -128,11 +136,25 @@ const Login: React.FC = () => {
                 </motion.div>
             </main>
 
-            {/* Stark minimal Footer */}
-            <footer className="w-full max-w-7xl px-6 text-center z-10">
-                <p className="text-[10px] text-on-surface-variant/30 font-medium tracking-wide">
-                    &copy; {new Date().getFullYear()} Zenith. All rights reserved.
-                </p>
+            {/* Footer — synced with Landing page */}
+            <footer className="w-full max-w-7xl px-6 z-10">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-outline">
+                    <p className="text-[10px] text-on-surface-variant/40 font-medium">
+                        &copy; {getCopyrightYears(2025)} Zenith &mdash; made something cool by{' '}
+                        <a
+                            href="https://kuberbassi.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="glow-link font-semibold transition-all duration-300 hover:text-primary"
+                        >
+                            Kuber Bassi
+                        </a>
+                    </p>
+                    <div className="flex gap-4">
+                        <a href="/terms" className="text-[10px] text-on-surface-variant/40 hover:text-on-surface hover:underline transition-colors font-medium">Terms</a>
+                        <a href="/privacy" className="text-[10px] text-on-surface-variant/40 hover:text-on-surface hover:underline transition-colors font-medium">Privacy</a>
+                    </div>
+                </div>
             </footer>
         </div>
     );

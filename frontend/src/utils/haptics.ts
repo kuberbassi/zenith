@@ -36,14 +36,27 @@ const playAudioClick = (duration: number = 0.03, frequency: number = 800) => {
     }
 };
 
-/**
- * Helper to trigger physical vibration, falling back to a synthesized click if unsupported.
- */
+const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox');
+
 const triggerHaptic = (pattern: number | number[], frequency: number = 800) => {
     let success = false;
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
         try {
-            success = navigator.vibrate(pattern);
+            let adjustedPattern = pattern;
+            if (isFirefox) {
+                if (Array.isArray(pattern)) {
+                    adjustedPattern = pattern.map((val, idx) => (idx % 2 === 0 ? Math.max(val, 35) : val));
+                } else {
+                    adjustedPattern = Math.max(pattern, 35);
+                }
+            } else {
+                if (Array.isArray(pattern)) {
+                    adjustedPattern = pattern.map((val, idx) => (idx % 2 === 0 ? Math.max(val, 25) : val));
+                } else {
+                    adjustedPattern = Math.max(pattern, 25);
+                }
+            }
+            success = navigator.vibrate(adjustedPattern);
         } catch {
             success = false;
         }

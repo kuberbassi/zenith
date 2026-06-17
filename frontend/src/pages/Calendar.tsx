@@ -103,36 +103,36 @@ const Calendar: React.FC = () => {
                         {currentDate.toLocaleString('default', { month: 'long' })} {currentDate.getFullYear()}
                     </h1>
                     <div className="flex items-center gap-1.5">
-                        <button onClick={handlePrevMonth} className="w-8 h-8 rounded border border-outline bg-surface flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer">
+                        <button onClick={handlePrevMonth} className="w-8 h-8 rounded-md border border-outline/60 bg-surface flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.01)]">
                             <ChevronLeft size={14} />
                         </button>
-                        <button onClick={handleNextMonth} className="w-8 h-8 rounded border border-outline bg-surface flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer">
+                        <button onClick={handleNextMonth} className="w-8 h-8 rounded-md border border-outline/60 bg-surface flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer shadow-[0_1px_2px_rgba(0,0,0,0.01)]">
                             <ChevronRight size={14} />
                         </button>
                     </div>
                 </div>
-                <div className="mt-4 h-px bg-outline" />
+                <div className="mt-4 h-px bg-outline/30" />
             </div>
 
             {loading ? (
                 /* Non-blocking Skeleton Grid */
-                <div className="border border-outline bg-surface rounded-lg p-5">
+                <div className="border border-outline/50 bg-surface rounded-xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
                     <div className="grid grid-cols-7 gap-2">
                         {weekDays.map(d => (
                             <div key={d} className="h-6 bg-surface-container-high rounded animate-pulse" />
                         ))}
                         {Array.from({ length: 35 }).map((_, i) => (
-                            <div key={i} className="aspect-square bg-surface-container-high border border-outline rounded animate-pulse" />
+                            <div key={i} className="aspect-square bg-surface-container-high border border-outline/40 rounded animate-pulse" />
                         ))}
                     </div>
                 </div>
             ) : (
                 /* Calendar Grid */
-                <div className="rounded-lg border border-outline bg-surface p-5 relative overflow-hidden">
+                <div className="rounded-xl border border-outline/50 bg-surface p-6 relative overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
                     {/* Weekday Headers */}
                     <div className="grid grid-cols-7 mb-4">
                         {weekDays.map(day => (
-                            <div key={day} className="text-center text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-wider py-1.5">
+                            <div key={day} className="text-center text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest py-1.5">
                                 {day}
                             </div>
                         ))}
@@ -158,11 +158,11 @@ const Calendar: React.FC = () => {
                                 <button
                                     key={day}
                                     onClick={() => handleDayClick(day)}
-                                    className={`aspect-square rounded border p-1 md:p-2 relative flex flex-col items-center justify-center transition-all ${isToday
-                                        ? 'bg-on-surface/5 border-on-surface font-bold'
+                                    className={`aspect-square rounded-md border p-1 md:p-2 relative flex flex-col items-center justify-center transition-all ${isToday
+                                        ? 'bg-on-surface/5 border-on-surface font-bold shadow-[0_1px_3px_rgba(0,0,0,0.02)]'
                                         : total > 0
-                                            ? 'bg-surface-container/60 border-outline hover:bg-surface-container-high hover:border-on-surface'
-                                            : 'bg-transparent border-outline/30 hover:bg-surface-container/40 hover:border-on-surface'
+                                            ? 'bg-surface-container/60 border-outline/50 hover:bg-surface-container-high hover:border-on-surface'
+                                            : 'bg-transparent border-outline/25 hover:bg-surface-container/40 hover:border-on-surface'
                                         }`}
                                 >
                                     <span className={`text-xs sm:text-sm md:text-base font-bold ${isToday ? 'text-on-surface' : 'text-on-surface-variant/80'} leading-none ${total > 0 ? 'mb-1.5' : ''}`}>
@@ -185,7 +185,7 @@ const Calendar: React.FC = () => {
                     </div>
 
                     {/* Legend */}
-                    <div className="mt-8 pt-5 border-t border-outline flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/40">
+                    <div className="mt-8 pt-5 border-t border-outline/30 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40">
                         <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-on-surface" />
                             <span>Present</span>
@@ -195,7 +195,7 @@ const Calendar: React.FC = () => {
                             <span>Absent</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="px-2 py-0.5 rounded border border-on-surface text-[8px] font-black">Today</div>
+                            <div className="px-2 py-0.5 rounded border border-on-surface/50 text-[8px] font-black">Today</div>
                         </div>
                     </div>
                 </div>

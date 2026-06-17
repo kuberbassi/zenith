@@ -178,7 +178,7 @@ const Analytics: React.FC = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
                 {[
                     { label: 'Attendance', val: `${kpis.overall_percentage ?? overallAttendance}%`, sub: `Goal: ${kpis.target_threshold ?? targetThreshold}%`, icon: <Activity size={12} /> },
                     { label: 'Consistency', val: `${kpis.consistency_score ?? overallAttendance}`, sub: currentLevel.label, icon: <TrendingUp size={12} /> },
@@ -186,9 +186,9 @@ const Analytics: React.FC = () => {
                     { label: 'Safe Bunks', val: `${kpis.safe_bunks_remaining ?? 0}`, sub: 'before threshold', icon: <CalendarDays size={12} /> },
                     { label: 'CGPA', val: Number(kpis.academic_standing || kpis.cgpa || 0).toFixed(2), sub: 'Standing score', icon: <Award size={12} /> },
                 ].map((k, i) => (
-                    <div key={i} className="rounded-lg border border-outline bg-surface p-4 flex flex-col justify-between">
+                    <div key={i} className="rounded-xl border border-outline/50 bg-surface p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(0,0,0,0.01)] hover:border-on-surface/10 transition-all">
                         <div className="flex items-center justify-between mb-4">
-                            <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">{k.label}</span>
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40">{k.label}</span>
                             <span className={`${k.danger ? 'text-red-500' : 'text-on-surface-variant/30'}`}>{k.icon}</span>
                         </div>
                         <div>
@@ -200,38 +200,38 @@ const Analytics: React.FC = () => {
             </div>
 
             {/* Insight cards row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-                <div className="rounded-lg border border-outline bg-surface p-5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-2">Momentum</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div className="rounded-xl border border-outline/50 bg-surface p-5 shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">Momentum</p>
                     <p className="text-2xl font-bold tracking-tight text-on-surface">{momentumText}</p>
                     <p className="mt-1 text-[10px] text-on-surface-variant/40 font-semibold">Shift in attendance logs performance.</p>
                 </div>
-                <div className="rounded-lg border border-outline bg-surface p-5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-2">Strongest Course</p>
+                <div className="rounded-xl border border-outline/50 bg-surface p-5 shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">Strongest Course</p>
                     <p className="text-sm font-bold text-on-surface tracking-tight truncate">{kpis.best_subject_name || 'N/A'}</p>
                     <p className="mt-1 text-[10px] text-on-surface-variant/40 font-semibold">{kpis.best_subject_percent || '0%'} attendance record.</p>
                 </div>
-                <div className="rounded-lg border border-outline bg-surface p-5">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-2">Recommendation</p>
+                <div className="rounded-xl border border-outline/50 bg-surface p-5 shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">Recommendation</p>
                     <p className="text-xs font-bold text-on-surface leading-snug">{kpis.focus_label || 'Maintain target across all subjects.'}</p>
                 </div>
             </div>
 
             {/* Visualization Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-                <div className="lg:col-span-2 rounded-lg bg-surface border border-outline p-5 flex flex-col justify-between min-h-[260px]">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-4">Ratio Analysis</p>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                <div className="lg:col-span-2 rounded-xl bg-surface border border-outline/50 p-6 flex flex-col justify-between min-h-[260px] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-4">Ratio Analysis</p>
                     <div className="relative w-40 h-40 mx-auto">
                         <Doughnut data={doughnutData} options={doughnutOptions} />
                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                             <span className="text-3xl font-bold text-on-surface tracking-tight">{overallAttendance}%</span>
-                            <span className="text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-wider">Total</span>
+                            <span className="text-[8px] font-bold text-on-surface-variant/40 uppercase tracking-widest">Total</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="lg:col-span-3 rounded-lg bg-surface border border-outline p-5 flex flex-col min-h-[260px]">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-4">Weekly Trend</p>
+                <div className="lg:col-span-3 rounded-xl bg-surface border border-outline/50 p-6 flex flex-col min-h-[260px] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-4">Weekly Trend</p>
                     <div className="flex-1 w-full relative min-h-[180px]">
                         {days.length > 0 ? (
                             <Line data={lineData} options={lineOptions} />
@@ -241,8 +241,8 @@ const Analytics: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="lg:col-span-2 rounded-lg bg-surface border border-outline p-5 flex flex-col min-h-[280px]">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-4">Immediate Attention</p>
+                <div className="lg:col-span-2 rounded-xl bg-surface border border-outline/50 p-6 flex flex-col min-h-[280px] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-4">Immediate Attention</p>
                     <div className="flex-1 relative min-h-[200px]">
                         {focusSubjects.length > 0 ? (
                             <Bar data={focusBarData} options={focusBarOptions} />
@@ -252,8 +252,8 @@ const Analytics: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="lg:col-span-3 rounded-lg bg-surface border border-outline p-5 min-h-[280px]">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40 mb-4">Subject breakdown</p>
+                <div className="lg:col-span-3 rounded-xl bg-surface border border-outline/50 p-6 min-h-[280px] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-4">Subject breakdown</p>
                     <div className="space-y-4 max-h-[200px] overflow-y-auto pr-1">
                         {subjects.map((subject: any, idx: number) => (
                             <div key={idx} className="space-y-1">
@@ -261,7 +261,7 @@ const Analytics: React.FC = () => {
                                     <span className="font-bold text-on-surface truncate pr-4">{subject.name}</span>
                                     <span className={`font-bold shrink-0 ${subject.percentage < targetThreshold ? 'text-red-500' : 'text-on-surface'}`}>{subject.percentage || 0}%</span>
                                 </div>
-                                <div className="h-1.5 w-full bg-on-surface/10 rounded overflow-hidden">
+                                <div className="h-1 w-full bg-on-surface/5 border border-outline/25 rounded overflow-hidden">
                                     <div className={`h-full transition-all duration-500 ${subject.percentage < targetThreshold ? 'bg-red-500' : 'bg-on-surface'}`} style={{ width: `${subject.percentage || 0}%` }} />
                                 </div>
                             </div>

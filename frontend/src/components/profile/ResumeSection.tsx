@@ -46,17 +46,17 @@ export const TacticalOps: React.FC = () => {
     }
 
     return (
-        <div className="rounded-[2.5rem] border border-outline glass-panel p-8 group transition-all duration-500 flex flex-col h-full">
+        <div className="rounded-xl border border-outline glass-panel p-8 group transition-all duration-500 flex flex-col h-full">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-surface-container flex items-center justify-center text-on-surface group-hover:scale-105 transition-transform"><Briefcase size={20} /></div>
+                    <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface group-hover:scale-105 transition-transform"><Briefcase size={20} /></div>
                     <div><h3 className="text-sm font-bold text-on-surface">Work Experience</h3></div>
                 </div>
                 <button onClick={handleAdd} className="text-[10px] font-bold text-on-surface-variant/40 hover:text-on-surface uppercase tracking-wider transition-colors flex items-center gap-1"><Plus size={12} /> Add Experience</button>
             </div>
             <div className="space-y-4 flex-1">
                 {loading ? <div className="text-on-surface-variant/30 text-xs">Loading...</div> : experiences.length === 0 ? <div className="text-on-surface-variant/40 text-xs text-center py-4">No work experience logged.</div> : experiences.map(exp => (
-                    <div key={exp._id} className={`p-4 rounded-2xl bg-surface-container border border-outline-variant relative group/item ${!exp.current ? 'opacity-60 hover:opacity-100 transition-opacity' : ''}`}>
+                    <div key={exp._id} className={`p-4 rounded-xl bg-surface-container border border-outline-variant relative group/item ${!exp.current ? 'opacity-60 hover:opacity-100 transition-opacity' : ''}`}>
                         <div className="flex items-center justify-between mb-1 pr-6">
                             <h4 className="text-xs font-bold text-on-surface truncate">{exp.role}</h4>
                             <span className={`text-[8px] font-bold uppercase tracking-widest ${exp.current ? 'text-on-surface' : 'text-on-surface-variant/40'}`}>{exp.current ? 'Active' : 'Completed'}</span>
@@ -107,10 +107,10 @@ export const SkillArsenal: React.FC = () => {
     }
 
     return (
-        <div className="rounded-[2.5rem] border border-outline glass-panel p-8 group transition-all duration-500 flex flex-col h-full">
+        <div className="rounded-xl border border-outline glass-panel p-8 group transition-all duration-500 flex flex-col h-full">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-surface-container flex items-center justify-center text-on-surface group-hover:scale-105 transition-transform"><Code size={20} /></div>
+                    <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface group-hover:scale-105 transition-transform"><Code size={20} /></div>
                     <div><h3 className="text-sm font-bold text-on-surface">Additional Skills</h3></div>
                 </div>
                 <button onClick={handleAdd} className="text-[10px] font-bold text-on-surface-variant/40 hover:text-on-surface uppercase tracking-wider transition-colors flex items-center gap-1"><Plus size={12} /> Add Skill</button>
@@ -118,7 +118,7 @@ export const SkillArsenal: React.FC = () => {
             <div className="flex flex-wrap gap-2 flex-1 content-start">
                 {loading ? <div className="text-on-surface-variant/30 text-xs">Loading...</div> : skills.length === 0 ? <div className="text-on-surface-variant/40 text-xs text-center w-full py-4">No skills registered.</div> : skills.map(skill => (
                     <div key={skill._id} className="relative group/tag">
-                        <span className="px-3 py-1.5 rounded-xl bg-surface-container border border-outline-variant text-[9px] font-semibold text-on-surface-variant uppercase tracking-wider hover:text-on-surface hover:border-outline transition-all cursor-default flex items-center gap-2">
+                        <span className="px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant text-[9px] font-semibold text-on-surface-variant uppercase tracking-wider hover:text-on-surface hover:border-outline transition-all cursor-default flex items-center gap-2">
                             {skill.name}
                             <button onClick={() => handleDelete(skill._id!)} className="text-on-surface-variant/20 hover:text-red-500 opacity-0 group-hover/tag:opacity-100 transition-opacity"><Trash2 size={10} /></button>
                         </span>
@@ -169,17 +169,17 @@ export const MissionLogs: React.FC = () => {
     }
 
     return (
-        <div className="rounded-[2.5rem] border border-outline glass-panel p-8 group flex flex-col h-full transition-all duration-500">
+        <div className="rounded-xl border border-outline glass-panel p-8 group flex flex-col h-full transition-all duration-500">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-surface-container flex items-center justify-center text-on-surface"><Zap size={20} /></div>
+                    <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface"><Zap size={20} /></div>
                     <div><h3 className="text-sm font-bold text-on-surface">Projects</h3></div>
                 </div>
                 <button onClick={handleAdd} className="text-[10px] font-bold text-on-surface-variant/40 hover:text-on-surface uppercase tracking-wider transition-colors flex items-center gap-1"><Plus size={12} /> Add Project</button>
             </div>
             <div className="space-y-4 flex-1">
                 {loading ? <div className="text-on-surface-variant/30 text-xs">Loading...</div> : projects.length === 0 ? <div className="text-on-surface-variant/40 text-xs text-center py-4">No projects recorded.</div> : projects.map(proj => (
-                    <div key={proj._id} className="relative group/item flex items-center justify-between p-4 rounded-2xl border border-outline-variant bg-surface-container hover:bg-surface-container-high transition-all cursor-pointer overflow-hidden">
+                    <div key={proj._id} className="relative group/item flex items-center justify-between p-4 rounded-xl border border-outline-variant bg-surface-container hover:bg-surface-container-high transition-all cursor-pointer overflow-hidden">
                         <div className="min-w-0 pr-8">
                             <h4 className="text-xs font-bold text-on-surface mb-1 truncate">{proj.name}</h4>
                             <p className="text-[9px] font-medium text-on-surface-variant/60 uppercase tracking-wider truncate">{proj.description}</p>
@@ -232,10 +232,10 @@ export const StrategicHonors: React.FC = () => {
     }
 
     return (
-        <div className="rounded-[2.5rem] border border-outline glass-panel p-8 group flex flex-col h-full transition-all duration-500">
+        <div className="rounded-xl border border-outline glass-panel p-8 group flex flex-col h-full transition-all duration-500">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-surface-container flex items-center justify-center text-on-surface"><Award size={20} /></div>
+                    <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-on-surface"><Award size={20} /></div>
                     <div><h3 className="text-sm font-bold text-on-surface">Certifications</h3></div>
                 </div>
                 <button onClick={handleAdd} className="text-[10px] font-bold text-on-surface-variant/40 hover:text-on-surface uppercase tracking-wider transition-colors flex items-center gap-1"><Plus size={12} /> Add Certification</button>

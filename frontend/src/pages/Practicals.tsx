@@ -146,15 +146,15 @@ const Practicals: React.FC = () => {
                     <h1 className="text-2xl font-bold text-on-surface tracking-tight">Practicals &amp; Assignments</h1>
                 </div>
                 {/* Category tabs */}
-                <div className="flex gap-0 border-b border-outline mt-4 overflow-x-auto no-scrollbar">
+                <div className="flex gap-0 border-b border-outline/30 mt-4 overflow-x-auto no-scrollbar">
                     {categories.map(cat => (
                         <button
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
                             className={`px-4 py-2 text-xs font-semibold border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                                 selectedCategory === cat
-                                    ? 'border-on-surface text-on-surface'
-                                    : 'border-transparent text-on-surface-variant/40 hover:text-on-surface-variant hover:border-outline'
+                                    ? 'border-on-surface text-on-surface font-bold'
+                                    : 'border-transparent text-on-surface-variant/40 hover:text-on-surface-variant hover:border-outline/40'
                             }`}
                         >
                             {cat}
@@ -167,12 +167,12 @@ const Practicals: React.FC = () => {
                 /* Non-blocking skeletons */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="animate-pulse h-48 bg-surface-container border border-outline rounded-lg" />
+                        <div key={i} className="animate-pulse h-48 bg-surface-container border border-outline/40 rounded-xl" />
                     ))}
                 </div>
             ) : (
                 /* Subject Grid */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <AnimatePresence mode="popLayout">
                         {filteredSubjects.map((subject, index) => {
                             const cats = subject.categories || (subject.category ? [subject.category] : ['Theory']);
@@ -188,7 +188,7 @@ const Practicals: React.FC = () => {
 
                             return (
                                 <motion.div key={subject._id as any} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ delay: index * 0.04 }}>
-                                    <div className="h-full rounded-lg border border-outline bg-surface p-5 relative overflow-hidden hover:border-on-surface transition-all flex flex-col justify-between min-h-[180px]">
+                                    <div className="h-full rounded-xl border border-outline/50 bg-surface p-5 relative overflow-hidden hover:border-on-surface/20 transition-all flex flex-col justify-between min-h-[180px] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
                                         <div>
                                             <div className="flex justify-between items-start mb-3 pt-1">
                                                 <div className="min-w-0 flex-1">
@@ -197,13 +197,13 @@ const Practicals: React.FC = () => {
                                                         {cats.filter(c => c !== 'Theory' && c !== 'Project').map(c => {
                                                             const tag = getNotionTagStyles(c);
                                                             return (
-                                                                <span key={c} className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${tag.className}`} style={tag.style}>{c}</span>
+                                                                <span key={c} className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider ${tag.className}`} style={tag.style}>{c}</span>
                                                             );
                                                         })}
                                                     </div>
                                                 </div>
-                                                <button onClick={() => setEditingSubject(subject)} className="w-7 h-7 rounded border border-outline bg-surface flex items-center justify-center text-on-surface-variant/30 hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer flex-shrink-0 ml-2">
-                                                    <Edit2 size={12} />
+                                                <button onClick={() => setEditingSubject(subject)} className="w-7 h-7 rounded-md border border-outline/50 bg-surface flex items-center justify-center text-on-surface-variant/30 hover:text-on-surface hover:bg-surface-container transition-all cursor-pointer flex-shrink-0 ml-2 shadow-[0_1px_2px_rgba(0,0,0,0.01)]">
+                                                    <Edit2 size={11} />
                                                 </button>
                                             </div>
 
@@ -211,40 +211,40 @@ const Practicals: React.FC = () => {
                                                 {hasPracticals && (
                                                     <div className="space-y-2">
                                                         <div className="flex justify-between items-center">
-                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">Practicals Progress</span>
+                                                            <span className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/40">Practicals Progress</span>
                                                             <span className="text-xs font-bold text-on-surface font-mono">{p.completed}/{p.total}</span>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <button disabled={p.completed <= 0} onClick={() => handleUpdate(subject._id, { completed: p.completed - 1 })} className="flex-1 h-7 rounded border border-outline text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
+                                                            <button disabled={p.completed <= 0} onClick={() => handleUpdate(subject._id, { completed: p.completed - 1 })} className="flex-1 h-7 rounded-md border border-outline/50 text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
                                                                 <Minus size={11} />
                                                             </button>
-                                                            <button disabled={p.completed >= p.total} onClick={() => handleUpdate(subject._id, { completed: p.completed + 1 })} className="flex-1 h-7 rounded border border-outline text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
+                                                            <button disabled={p.completed >= p.total} onClick={() => handleUpdate(subject._id, { completed: p.completed + 1 })} className="flex-1 h-7 rounded-md border border-outline/50 text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
                                                                 <Plus size={11} />
                                                             </button>
                                                         </div>
-                                                        <button onClick={() => handleUpdate(subject._id, { hardcopy: !p.hardcopy })} className={`w-full py-1.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${p.hardcopy ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 font-bold' : 'border border-dashed border-outline text-on-surface-variant/40 hover:border-outline hover:text-on-surface-variant'}`}>
+                                                        <button onClick={() => handleUpdate(subject._id, { hardcopy: !p.hardcopy })} className={`w-full py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${p.hardcopy ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 font-bold' : 'border border-dashed border-outline/40 text-on-surface-variant/40 hover:border-outline/80 hover:text-on-surface-variant'}`}>
                                                             {p.hardcopy ? <><CheckCircle size={11} /> Submitted</> : <><Target size={11} /> Mark Submitted</>}
                                                         </button>
                                                     </div>
                                                 )}
 
-                                                {hasPracticals && hasAssignments && <div className="h-px bg-outline" />}
+                                                {hasPracticals && hasAssignments && <div className="h-px bg-outline/30" />}
 
                                                 {hasAssignments && (
                                                     <div className="space-y-2">
                                                         <div className="flex justify-between items-center">
-                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-on-surface-variant/40">Assignments Progress</span>
+                                                            <span className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/40">Assignments Progress</span>
                                                             <span className="text-xs font-bold text-on-surface font-mono">{a.completed}/{a.total}</span>
                                                         </div>
                                                         <div className="flex gap-2">
-                                                            <button disabled={a.completed <= 0} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed - 1 })} className="flex-1 h-7 rounded border border-outline text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
+                                                            <button disabled={a.completed <= 0} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed - 1 })} className="flex-1 h-7 rounded-md border border-outline/50 text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
                                                                 <Minus size={11} />
                                                             </button>
-                                                            <button disabled={a.completed >= a.total} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed + 1 })} className="flex-1 h-7 rounded border border-outline text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
+                                                            <button disabled={a.completed >= a.total} onClick={() => handleAssignmentUpdate(subject._id, { completed: a.completed + 1 })} className="flex-1 h-7 rounded-md border border-outline/50 text-on-surface-variant hover:bg-surface-container disabled:opacity-30 transition-all flex items-center justify-center cursor-pointer">
                                                                 <Plus size={11} />
                                                             </button>
                                                         </div>
-                                                        <button onClick={() => handleAssignmentUpdate(subject._id, { hardcopy: !a.hardcopy })} className={`w-full py-1.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${a.hardcopy ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 font-bold' : 'border border-dashed border-outline text-on-surface-variant/40 hover:border-outline hover:text-on-surface-variant'}`}>
+                                                        <button onClick={() => handleAssignmentUpdate(subject._id, { hardcopy: !a.hardcopy })} className={`w-full py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 cursor-pointer ${a.hardcopy ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/30 font-bold' : 'border border-dashed border-outline/40 text-on-surface-variant/40 hover:border-outline/80 hover:text-on-surface-variant'}`}>
                                                             {a.hardcopy ? <><CheckCircle size={11} /> Submitted</> : <><Target size={11} /> Mark Submitted</>}
                                                         </button>
                                                     </div>
@@ -253,7 +253,7 @@ const Practicals: React.FC = () => {
                                         </div>
 
                                         {/* bottom progress line */}
-                                        <div className="h-1 w-full bg-on-surface/10 rounded-full overflow-hidden mt-3">
+                                        <div className="h-0.5 w-full bg-on-surface/5 rounded-full overflow-hidden mt-3">
                                             <div className="h-full bg-on-surface" style={{ width: `${progress}%` }} />
                                         </div>
                                     </div>

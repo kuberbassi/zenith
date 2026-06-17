@@ -22,10 +22,10 @@ const SubjectCard: React.FC<SubjectCardProps> = ({ subject, onClick }) => {
             onClick={onClick}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="bg-surface p-4 rounded-2xl border border-outline-variant/20 shadow-sm cursor-pointer group hover:border-primary/50 transition-colors"
+            className="bg-surface p-4 rounded-xl border border-outline-variant/20 shadow-sm cursor-pointer group hover:border-primary/50 transition-colors"
         >
             <div className="flex justify-between items-start mb-3">
-                <div className="p-2 bg-secondary/10 text-secondary rounded-xl">
+                <div className="p-2 bg-secondary/10 text-secondary rounded-lg">
                     <BookOpen className="w-5 h-5" />
                 </div>
                 <div className={`px-2 py-1 rounded-lg text-sm font-bold ${isLow ? 'bg-error/10 text-error' : 'bg-green-500/10 text-white'

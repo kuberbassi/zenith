@@ -134,9 +134,9 @@ const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
   return (
     <div className="space-y-6">
       {/* Sessions Overview Header Card */}
-      <div className="rounded-[2.5rem] border border-outline glass-panel p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="rounded-xl border border-outline glass-panel p-8 flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-surface-container flex items-center justify-center text-on-surface shrink-0">
+          <div className="w-12 h-12 rounded-lg bg-surface-container flex items-center justify-center text-on-surface shrink-0">
             <Shield size={24} />
           </div>
           <div>
@@ -151,7 +151,7 @@ const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
           <button
             onClick={handleRevokeOthers}
             disabled={revokingAll}
-            className="px-5 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/25 border border-red-500/20 text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {revokingAll ? (
               <RefreshCw size={12} className="animate-spin" />
@@ -164,7 +164,7 @@ const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
       </div>
 
       {/* Sessions List */}
-      <div className="rounded-3xl border border-outline glass-panel overflow-hidden divide-y divide-outline-variant">
+      <div className="rounded-xl border border-outline glass-panel overflow-hidden divide-y divide-outline-variant">
         {sessions.map(session => {
           const { os, browser } = getDeviceDetails(session.user_agent);
           const deviceName = `${os} • ${browser}`;
@@ -175,7 +175,7 @@ const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
               className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 hover:bg-surface-container transition-colors group"
             >
               <div className="flex gap-4 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-surface-container border border-outline-variant flex items-center justify-center shrink-0 group-hover:border-outline transition-all">
+                <div className="w-10 h-10 rounded-lg bg-surface-container border border-outline-variant flex items-center justify-center shrink-0 group-hover:border-outline transition-all">
                   {getDeviceIcon(session.user_agent)}
                 </div>
                 <div className="min-w-0">
@@ -184,7 +184,7 @@ const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
                       {deviceName}
                     </h4>
                     {session.is_current && (
-                      <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded bg-primary/10 border border-primary/20 text-[9px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
                         <CheckCircle size={8} /> Current Session
                       </span>
                     )}
@@ -201,7 +201,7 @@ const SessionsSection: React.FC<SessionsSectionProps> = ({ showToast }) => {
                 <button
                   onClick={() => handleRevoke(session.id, deviceName)}
                   disabled={revokingId === session.id}
-                  className="self-end md:self-auto px-4 py-2 rounded-xl bg-surface hover:bg-surface-container border border-outline text-[9px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-wider transition-all disabled:opacity-50"
+                  className="self-end md:self-auto px-4 py-2 rounded-lg bg-surface hover:bg-surface-container border border-outline text-[9px] font-bold text-on-surface-variant hover:text-on-surface uppercase tracking-wider transition-all disabled:opacity-50"
                 >
                   {revokingId === session.id ? (
                     <RefreshCw size={10} className="animate-spin" />
