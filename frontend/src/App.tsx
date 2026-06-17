@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './queryClient';
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { SemesterProvider } from './contexts/SemesterContext';
@@ -21,6 +21,7 @@ import { useHaptics } from './hooks/useHaptics';
 
 // Layout
 import AppLayout from './components/layout/AppLayout';
+import PageTransition from './components/ui/PageTransition';
 
 // Lazy Load All Pages for optimal code splitting
 const Landing     = lazy(() => import('./pages/Landing'));
@@ -54,215 +55,200 @@ const PublicRoute: React.FC<{ children: React.ReactElement }> = ({ children }) =
   return !isAuthenticated ? children : <Navigate to="/dashboard" replace />;
 };
 
-// ── Page Transition ───────────────────────────────────────────────────────────
-// AnimatePresence lives here (outside Routes) so it can detect key changes
-// and correctly animate the outgoing page before mounting the new one.
-
-import { motion, AnimatePresence } from 'framer-motion';
-
-const pageVariants = {
-  initial: { opacity: 0, y: 8 },
-  animate: { opacity: 1, y: 0 },
-  exit:    { opacity: 0, y: -6 },
-};
-const pageTransition = { duration: 0.28, ease: [0.16, 1, 0.3, 1] as const };
-
 // Suspense fallback used for every lazily-loaded page
 const PageFallback = <LoadingSpinner fullScreen />;
 
 // ── Main App Routes ───────────────────────────────────────────────────────────
 
 const AppRoutes: React.FC = () => {
-  const location = useLocation();
-
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={location.pathname}
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        transition={pageTransition}
-        style={{ willChange: 'opacity, transform' }}
-      >
-        <Routes location={location}>
+    <Routes>
 
-          {/* ── Public Routes ──────────────────────────────────── */}
-          <Route
-            path="/"
-            element={
+      {/* ── Public Routes ──────────────────────────────────── */}
+      <Route
+        path="/"
+        element={
+          <Suspense fallback={PageFallback}>
+            <PageTransition>
+              <Landing />
+            </PageTransition>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <Suspense fallback={PageFallback}>
+              <PageTransition>
+                <Login />
+              </PageTransition>
+            </Suspense>
+          </PublicRoute>
+        }
+      />
+
+      {/* ── Legal Pages ────────────────────────────────────── */}
+      <Route
+        path="/privacy"
+        element={
+          <Suspense fallback={PageFallback}>
+            <PageTransition>
+              <PrivacyPolicy />
+            </PageTransition>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/terms"
+        element={
+          <Suspense fallback={PageFallback}>
+            <PageTransition>
+              <TermsOfService />
+            </PageTransition>
+          </Suspense>
+        }
+      />
+
+      {/* ── 404 (outside AppLayout) ────────────────────────── */}
+      <Route
+        path="/404"
+        element={
+          <Suspense fallback={PageFallback}>
+            <PageTransition>
+              <NotFound />
+            </PageTransition>
+          </Suspense>
+        }
+      />
+
+      {/* ── Protected Routes inside App Shell ──────────────── */}
+      <Route element={<AppLayout />}>
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
               <Suspense fallback={PageFallback}>
-                <Landing />
+                <Dashboard />
               </Suspense>
-            }
-          />
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <Suspense fallback={PageFallback}>
-                  <Login />
-                </Suspense>
-              </PublicRoute>
-            }
-          />
-
-          {/* ── Legal Pages ────────────────────────────────────── */}
-          <Route
-            path="/privacy"
-            element={
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <ProtectedRoute>
               <Suspense fallback={PageFallback}>
-                <PrivacyPolicy />
+                <Analytics />
               </Suspense>
-            }
-          />
-          <Route
-            path="/terms"
-            element={
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/timetable"
+          element={
+            <ProtectedRoute>
               <Suspense fallback={PageFallback}>
-                <TermsOfService />
+                <TimeTable />
               </Suspense>
-            }
-          />
-
-          {/* ── 404 (outside AppLayout) ────────────────────────── */}
-          <Route
-            path="/404"
-            element={
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
               <Suspense fallback={PageFallback}>
-                <NotFound />
+                <Calendar />
               </Suspense>
-            }
-          />
-
-          {/* ── Protected Routes inside App Shell ──────────────── */}
-          <Route element={<AppLayout />}>
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Dashboard />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/analytics"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Analytics />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/timetable"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <TimeTable />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/calendar"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Calendar />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/courses"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Courses />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/practicals"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Practicals />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Settings />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notes"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Notes />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/results"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Results />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/skills"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <SkillTracker />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notifications"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={PageFallback}>
-                    <Notifications />
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-          </Route>
-
-          {/* ── Catch-all → 404 ────────────────────────────────── */}
-          <Route
-            path="*"
-            element={
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/courses"
+          element={
+            <ProtectedRoute>
               <Suspense fallback={PageFallback}>
-                <NotFound />
+                <Courses />
               </Suspense>
-            }
-          />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/practicals"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={PageFallback}>
+                <Practicals />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={PageFallback}>
+                <Settings />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notes"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={PageFallback}>
+                <Notes />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/results"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={PageFallback}>
+                <Results />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/skills"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={PageFallback}>
+                <SkillTracker />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <Suspense fallback={PageFallback}>
+                <Notifications />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+      </Route>
 
-        </Routes>
-      </motion.div>
-    </AnimatePresence>
+      {/* ── Catch-all → 404 ────────────────────────────────── */}
+      <Route
+        path="*"
+        element={
+          <Suspense fallback={PageFallback}>
+            <PageTransition>
+              <NotFound />
+            </PageTransition>
+          </Suspense>
+        }
+      />
+
+    </Routes>
   );
 };
 
