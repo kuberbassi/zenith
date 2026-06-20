@@ -66,11 +66,31 @@ model User {
   user_preference  UserPreference?
   skills           Skill[]
   notes            Note[]
-
-
+  sessions         UserSession[]
 
   @@map("users")
 }
+
+model UserSession {
+  id                 String   @id @default(cuid())
+  user_id            String
+  device_id          String?
+  refresh_token_hash String   @unique
+  refresh_expires_at DateTime
+  refresh_issued_at  DateTime @default(now())
+  ip                 String?
+  user_agent         String?
+  last_active_at     DateTime @default(now())
+  rotated_at         DateTime? // Grace period marker for concurrent requests
+  created_at         DateTime @default(now())
+
+  user               User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([refresh_token_hash])
+  @@map("user_sessions")
+}
+
 
 model Subject {
   id          String   @id @default(cuid())

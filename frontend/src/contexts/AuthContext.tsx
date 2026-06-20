@@ -39,10 +39,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         setUser(verifiedUser);
                         authService.storeUser(verifiedUser);
                     }
-                } catch (error) {
-                    // 401 will be caught here or by interceptor
-                    setUser(null);
-                    authService.logout();
+                } catch (error: any) {
+                    const status = error.response?.status;
+                    const code = error.response?.data?.code;
+                    const isSessionInvalid = status === 401 || status === 403 || code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID' || code === 'REFRESH_INVALID' || code === 'REFRESH_EXPIRED';
+                    
+                    if (isSessionInvalid) {
+                        console.warn('Session invalid/expired, logging out');
+                        setUser(null);
+                        authService.logout();
+                    } else {
+                        console.warn('Failed to verify session on startup (network/server error). Keeping cached session.', error);
+                    }
                 }
             } else {
                 setLoading(false);

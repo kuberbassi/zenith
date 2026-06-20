@@ -88,9 +88,15 @@ api.interceptors.response.use(
                     await refreshPromise;
                     (config as any)._authRefreshed = true;
                     return api.request(config);
-                } catch {
-                    localStorage.removeItem('user');
-                    window.location.href = '/login';
+                } catch (refreshError: any) {
+                    const status = refreshError.response?.status;
+                    const code = refreshError.response?.data?.code;
+                    const isSessionInvalid = status === 401 || status === 403 || code === 'REFRESH_INVALID' || code === 'REFRESH_EXPIRED';
+                    
+                    if (isSessionInvalid) {
+                        localStorage.removeItem('user');
+                        window.location.href = '/login';
+                    }
                     return Promise.reject(error);
                 } finally {
                     refreshPromise = null;
@@ -98,8 +104,14 @@ api.interceptors.response.use(
             }
 
             if (shouldRefreshAuth) {
-                localStorage.removeItem('user');
-                window.location.href = '/login';
+                const status = error.response?.status;
+                const code = (error.response?.data as any)?.code;
+                const isSessionInvalid = status === 401 || status === 403 || code === 'TOKEN_EXPIRED' || code === 'TOKEN_INVALID' || code === 'REFRESH_INVALID' || code === 'REFRESH_EXPIRED';
+                
+                if (isSessionInvalid) {
+                    localStorage.removeItem('user');
+                    window.location.href = '/login';
+                }
             }
         }
 
